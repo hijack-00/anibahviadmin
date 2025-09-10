@@ -6,6 +6,7 @@ import 'package:anibhaviadmin/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'dashboard_widgets.dart';
 import 'users_page.dart';
+import 'universal_navbar.dart';
 
 class UniversalScaffold extends StatefulWidget {
   final int selectedIndex;
@@ -18,21 +19,23 @@ class UniversalScaffold extends StatefulWidget {
 
 class _UniversalScaffoldState extends State<UniversalScaffold> {
   void _onItemTapped(int index) {
+    String? route;
     switch (index) {
       case 0:
-        Navigator.pushReplacementNamed(context, '/dashboard');
+        route = '/dashboard';
         break;
       case 1:
-        Navigator.pushReplacementNamed(context, '/orders');
+        route = '/orders';
         break;
       case 2:
-        Navigator.pushReplacementNamed(context, '/users');
+        route = '/users';
         break;
       case 3:
-        Navigator.pushReplacementNamed(context, '/challan');
+        route = '/challan';
         break;
-      
-      
+    }
+    if (route != null && ModalRoute.of(context)?.settings.name != route) {
+      Navigator.pushNamedAndRemoveUntil(context, route, (r) => r.settings.name == '/dashboard');
     }
   }
 
@@ -47,11 +50,9 @@ class _UniversalScaffoldState extends State<UniversalScaffold> {
         title: Padding(
           padding: const EdgeInsets.all(8.0),
           child: Row(
-            
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-                          Text('Dashboard', style: Theme.of(context).textTheme.headlineSmall),
-              
+              Text('Dashboard', style: Theme.of(context).textTheme.headlineSmall),
               if (widget.selectedIndex == 0)
                 IconButton(
                   icon: Icon(Icons.logout, color: Colors.red),
@@ -71,32 +72,9 @@ class _UniversalScaffoldState extends State<UniversalScaffold> {
         ),
       ),
       body: widget.body,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 8,
-              offset: Offset(0, -2),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          backgroundColor: Colors.white,
-          currentIndex: widget.selectedIndex,
-          onTap: _onItemTapped,
-          selectedItemColor: Colors.indigo,
-          unselectedItemColor: Colors.grey,
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-            BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Users'),
-            BottomNavigationBarItem(icon: Icon(Icons.local_shipping), label: 'Challan'),
-          ],
-        ),
+      bottomNavigationBar: UniversalNavBar(
+        selectedIndex: widget.selectedIndex,
+        onTap: _onItemTapped,
       ),
     );
   }

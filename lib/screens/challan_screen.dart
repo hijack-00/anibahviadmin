@@ -1,3 +1,4 @@
+import 'universal_navbar.dart';
 import 'package:flutter/material.dart';
 
 class ChallanScreen extends StatefulWidget {
@@ -193,6 +194,23 @@ class _ChallanScreenState extends State<ChallanScreen> {
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: UniversalNavBar(
+        selectedIndex: 3,
+        onTap: (index) {
+          if (index == 3) return; // Already on Challan
+          switch (index) {
+            case 0:
+              Navigator.pushReplacementNamed(context, '/dashboard');
+              break;
+            case 1:
+              Navigator.pushReplacementNamed(context, '/orders');
+              break;
+            case 2:
+              Navigator.pushReplacementNamed(context, '/users');
+              break;
+          }
+        },
       ),
     );
   }

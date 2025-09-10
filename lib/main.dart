@@ -31,6 +31,13 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
+        final navigator = Navigator.of(context);
+        // If not on dashboard, go to dashboard
+        if (ModalRoute.of(context)?.settings.name != '/dashboard') {
+          navigator.pushNamedAndRemoveUntil('/dashboard', (route) => false);
+          return false;
+        }
+        // If on dashboard, show exit dialog
         final result = await showDialog<bool>(
           context: context,
           barrierDismissible: false,

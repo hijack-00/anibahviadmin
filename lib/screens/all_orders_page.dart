@@ -1,3 +1,4 @@
+import 'universal_navbar.dart';
 import 'package:flutter/material.dart';
 import '../services/app_data_repo.dart';
 import 'order_details_page.dart';
@@ -201,6 +202,23 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                       );
                     },
                   ),
+      ),
+      bottomNavigationBar: UniversalNavBar(
+        selectedIndex: 1,
+        onTap: (index) {
+          if (index == 1) return; // Already on Orders
+          switch (index) {
+            case 0:
+              Navigator.pushReplacementNamed(context, '/dashboard');
+              break;
+            case 2:
+              Navigator.pushReplacementNamed(context, '/users');
+              break;
+            case 3:
+              Navigator.pushReplacementNamed(context, '/challan');
+              break;
+          }
+        },
       ),
     );
   }

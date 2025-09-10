@@ -1,3 +1,4 @@
+import 'universal_navbar.dart';
 import 'dart:convert';
 
 import 'package:anibhaviadmin/screens/userDetailsPage.dart';
@@ -303,6 +304,23 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
           final created = await showUserCreationDialog(context);
           if (created == true) {
             _fetchUsers();
+          }
+        },
+      ),
+      bottomNavigationBar: UniversalNavBar(
+        selectedIndex: 2,
+        onTap: (index) {
+          if (index == 2) return; // Already on Users, do nothing
+          switch (index) {
+            case 0:
+              Navigator.pushReplacementNamed(context, '/dashboard');
+              break;
+            case 1:
+              Navigator.pushReplacementNamed(context, '/orders');
+              break;
+            case 3:
+              Navigator.pushReplacementNamed(context, '/challan');
+              break;
           }
         },
       ),

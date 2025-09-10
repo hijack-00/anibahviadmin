@@ -29,7 +29,7 @@ class _UniversalScaffoldState extends State<UniversalScaffold> {
         Navigator.pushReplacementNamed(context, '/users');
         break;
       case 3:
-        Navigator.pushReplacementNamed(context, '/invoices');
+        Navigator.pushReplacementNamed(context, '/challan');
         break;
       
       
@@ -184,10 +184,8 @@ class _DashboardScreenState extends State<DashboardScreen> with RouteAware {
       {'label': 'Add Customer', 'icon': Icons.person_add, 'action': 'add_customer'},
       {'label': 'View Orders', 'icon': Icons.shopping_cart, 'route': '/orders'},
       {'label': 'View Catalogue', 'icon': Icons.collections, 'route': '/catalogue'},
-      {'label': 'View Invoices', 'icon': Icons.receipt_long, 'route': '/invoices'},
+      {'label': 'View Challan', 'icon': Icons.local_shipping, 'route': '/challan'},
       {'label': 'Sales Report', 'icon': Icons.currency_rupee, 'route': '/reports'},
-
-    
     ];
 
     // Order status colors

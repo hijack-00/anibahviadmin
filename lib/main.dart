@@ -10,7 +10,6 @@ import 'screens/inventory_screen.dart';
 import 'screens/job_slip_screen.dart';
 import 'screens/dispatch_screen.dart';
 import 'screens/invoice_screen.dart';
-// ...existing code...
 import 'screens/sales_reports_page.dart';
 import 'screens/dispatch_detail_screen.dart';
 import 'screens/order_detail_screen.dart';
@@ -19,6 +18,7 @@ import 'screens/catalogue_detail_screen.dart';
 import 'screens/inventory_detail_screen.dart';
 import 'screens/invoice_detail_screen.dart';
 import 'screens/report_detail_screen.dart';
+import 'screens/challan_screen.dart';
 
 void main() {
   runApp(ProviderScope(child: MyApp()));
@@ -70,6 +70,7 @@ class MyApp extends StatelessWidget {
           '/inventory': (context) => InventoryScreen(),
           '/jobslips': (context) => JobSlipScreen(),
           '/dispatch': (context) => DispatchScreen(),
+          '/challan': (context) => ChallanScreen(),
           '/invoices': (context) => InvoiceScreen(),
           '/reports': (context) => SalesReportsPage(),
           '/users': (context) =>  UsersPage(showActive: true),

@@ -1,9 +1,14 @@
 
+
 import 'dart:convert';
+import 'package:anibhaviadmin/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
 class AppDataRepo {
+  Future<Map<String, dynamic>> deleteOrderById(String orderId) async {
+    return await _api.deleteOrderById(orderId);
+  }
   Future<Map<String, dynamic>> deleteUserById(String userId) async {
     return await _api.deleteUserById(userId);
   }
@@ -15,6 +20,10 @@ class AppDataRepo {
   }
   Future<Map<String, dynamic>> fetchAllOrders() async {
     return await _api.getAllOrders();
+  }
+
+    Future<Map<String, dynamic>> changeOrderStatus(String orderId, {String? orderStatus, String? paymentStatus}) async {
+    return await _api.changeOrderStatus(orderId, orderStatus: orderStatus, paymentStatus: paymentStatus);
   }
 
   Future<Map<String, dynamic>> fetchOrderById(String orderId) async {

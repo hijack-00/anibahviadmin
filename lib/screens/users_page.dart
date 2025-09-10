@@ -28,6 +28,7 @@ Future<bool?> showUserCreationDialog(BuildContext context) async {
 
 
 class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMixin {
+  bool _disposed = false;
   List<Map<String, dynamic>> _activeUsers = [];
   List<Map<String, dynamic>> _inactiveUsers = [];
   List<Map<String, dynamic>> _filteredActive = [];
@@ -44,12 +45,21 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
     _fetchUsers();
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    _tabController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchUsers() async {
-    setState(() { _loading = true; });
+  if (_disposed) return;
+  setState(() { _loading = true; });
     try {
       final repo = AppDataRepo();
       await repo.loadAllUsers();
       final users = AppDataRepo.users;
+      if (_disposed) return;
       setState(() {
         _activeUsers = users.where((u) => u['isActive'] == true).toList();
         _inactiveUsers = users.where((u) => u['isActive'] == false).toList();
@@ -57,13 +67,19 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
         _filteredInactive = _inactiveUsers;
         _loading = false;
       });
+      // Preload orders for all users after fetching
+  await _preloadUserOrders(users);
+  if (_disposed) return;
+  setState(() {}); // trigger rebuild after cache
     } catch (e) {
-      setState(() { _loading = false; });
+  if (_disposed) return;
+  setState(() { _loading = false; });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load users: $e')));
     }
   }
 
-  void _searchUsers(bool active, String value) {
+  void _searchUsers(bool active, String value) async {
+    if (_disposed) return;
     setState(() {
       if (active) {
         _searchActive = value;
@@ -73,7 +89,43 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
         _filteredInactive = _inactiveUsers.where((u) => (u['name'] ?? '').toLowerCase().contains(_searchInactive.toLowerCase())).toList();
       }
     });
+    // Preload orders for filtered users after search
+    await _preloadUserOrders(active ? _filteredActive : _filteredInactive);
+    if (_disposed) return;
+    setState(() {});
   }
+
+  // Cache for user orders and spent
+  Map<String, Map<String, dynamic>> _userOrderCache = {};
+
+  Future<void> _preloadUserOrders(List<Map<String, dynamic>> users) async {
+    for (final user in users) {
+      final userId = user['_id'];
+      if (!_userOrderCache.containsKey(userId)) {
+        try {
+          final resp = await AppDataRepo().fetchOrdersByUserId(userId);
+          int orderCount = 0;
+          double totalSpent = 0;
+          if (resp['success'] == true) {
+            final orders = List<Map<String, dynamic>>.from(resp['orders'] ?? []);
+            orderCount = orders.length;
+            totalSpent = orders.fold(0, (sum, o) => sum + (double.tryParse(o['totalAmount']?.toString() ?? '0') ?? 0));
+          }
+          _userOrderCache[userId] = {
+            'orderCount': orderCount,
+            'totalSpent': totalSpent,
+          };
+        } catch (_) {
+          _userOrderCache[userId] = {
+            'orderCount': 0,
+            'totalSpent': 0.0,
+          };
+        }
+      }
+    }
+  }
+
+  // Remove didChangeDependencies override (no longer needed)
 
   Widget _buildUserList(List<Map<String, dynamic>> users) {
     if (users.isEmpty) {
@@ -83,20 +135,19 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
       itemCount: users.length,
       itemBuilder: (context, idx) {
         final user = users[idx];
+        final cache = _userOrderCache[user['_id']];
+        final shopName = user['shopname'] ?? '';
+        final addressObj = user['address'] ?? {};
+        final address = [
+          addressObj['street'],
+          addressObj['city'],
+          addressObj['state'],
+          addressObj['zipCode'],
+          addressObj['country'],
+        ].where((e) => e != null && e.toString().isNotEmpty).join(', ');
         return Card(
-          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundImage: user['photo'] != null && user['photo'].toString().isNotEmpty
-                  ? NetworkImage(user['photo'])
-                  : null,
-              child: user['photo'] == null || user['photo'].toString().isEmpty
-                  ? Icon(Icons.person)
-                  : null,
-            ),
-            title: Text(user['name'] ?? ''),
-            subtitle: Text(user['email'] ?? ''),
-            trailing: Icon(user['isActive'] ? Icons.check_circle : Icons.cancel, color: user['isActive'] ? Colors.green : Colors.red),
+          margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: InkWell(
             onTap: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute(
@@ -105,6 +156,89 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
               );
               _fetchUsers();
             },
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundImage: user['photo'] != null && user['photo'].toString().isNotEmpty
+                        ? NetworkImage(user['photo'])
+                        : null,
+                    child: user['photo'] == null || user['photo'].toString().isEmpty
+                        ? Icon(Icons.person, size: 24)
+                        : null,
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(user['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                            ),
+                            Icon(user['isActive'] ? Icons.check_circle : Icons.cancel, color: user['isActive'] ? Colors.green : Colors.red, size: 18),
+                          ],
+                        ),
+                        SizedBox(height: 2),
+                        Text(user['email'] ?? '', style: TextStyle(fontSize: 13, color: Colors.grey[700]), overflow: TextOverflow.ellipsis),
+                        if (shopName.toString().isNotEmpty)
+                          Text('Shop: $shopName', style: TextStyle(fontSize: 13, color: Colors.indigo), overflow: TextOverflow.ellipsis),
+                        if (address.isNotEmpty)
+                          Text('Address: $address', style: TextStyle(fontSize: 12, color: Colors.grey[600]), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        SizedBox(height: 4),
+                        cache == null
+                          ? Row(
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Container(
+                                  width: 70,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.indigo.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text('Orders: ${cache['orderCount']}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.indigo)),
+                                ),
+                                SizedBox(width: 8),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text('Spent: ₹${(cache['totalSpent'] as double).toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green[800])),
+                                ),
+                              ],
+                            ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },

@@ -5,6 +5,15 @@ import 'package:http/http.dart' as http;
 import '../models/product.dart';
 
 class ApiService {
+  Future<Map<String, dynamic>> deleteOrderById(String orderId) async {
+    final response = await post('/order/order-delete/$orderId');
+    print('Delete order by id response: ' + response.body);
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to delete order: ${response.statusCode}');
+    }
+  }
   Future<Map<String, dynamic>> deleteUserById(String userId) async {
     final response = await get('/user/delete-user/$userId');
     print('Delete user by id response: ' + response.body);
@@ -41,6 +50,28 @@ class ApiService {
       throw Exception('Failed to fetch orders: ${response.statusCode}');
     }
   }
+
+
+  Future<Map<String, dynamic>> changeOrderStatus(String orderId, {String? orderStatus, String? paymentStatus}) async {
+    final body = <String, dynamic>{};
+    if (orderStatus != null) body['orderStatus'] = orderStatus;
+    if (paymentStatus != null) body['paymentStatus'] = paymentStatus;
+    final url = '$baseUrl/order/order/change-status/$orderId';
+    print('Change order status REQUEST URL: ' + url);
+    print('Change order status REQUEST BODY: ' + jsonEncode(body));
+    final response = await post('/order/change-status/$orderId',
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+    print('Change order status RESPONSE: ' + response.body);
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to change order status: ${response.statusCode}');
+    }
+  }
+
+
 
   Future<Map<String, dynamic>> getOrderById(String orderId) async {
     final response = await get('/order/get-order-by-id/$orderId');

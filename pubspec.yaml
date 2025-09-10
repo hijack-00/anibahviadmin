@@ -52,6 +52,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.3.10
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -65,8 +67,22 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
+  assets:
+    - assets/
+  # Launcher icon and splash config
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo12.png"
+  adaptive_icon_background: "#F2F5F7"
+  adaptive_icon_foreground: "assets/logo12.png"
+
+flutter_native_splash:
+  color: "#F2F5F7"
+  image: "assets/anibhaviNew12.png"
+  android_12:
+    image: "assets/anibhaviNew12.png"
+    color: "#F2F5F7"
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

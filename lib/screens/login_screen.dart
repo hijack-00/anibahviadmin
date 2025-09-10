@@ -94,6 +94,8 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Image.asset('assets/logowithText.png', height: 100),
+            SizedBox(height: 24),
             TextField(
               controller: _emailController,
               decoration: InputDecoration(
@@ -125,8 +127,16 @@ class _LoginScreenState extends State<LoginScreen> {
             _loading
                 ? CircularProgressIndicator()
                 : ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo,
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      textStyle: TextStyle(fontSize: 16),
+                    ),
                     onPressed: _login,
-                    child: Text('Login'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Text('Login',style: TextStyle(color: Colors.white),),
+                    ),
                   ),
             TextButton(
               onPressed: () {

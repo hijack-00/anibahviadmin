@@ -26,11 +26,13 @@ class _UniversalScaffoldState extends State<UniversalScaffold> {
         Navigator.pushReplacementNamed(context, '/orders');
         break;
       case 2:
-        Navigator.pushReplacementNamed(context, '/catalogue');
+        Navigator.pushReplacementNamed(context, '/users');
         break;
       case 3:
         Navigator.pushReplacementNamed(context, '/invoices');
         break;
+      
+      
     }
   }
 
@@ -91,8 +93,8 @@ class _UniversalScaffoldState extends State<UniversalScaffold> {
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
             BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
-            BottomNavigationBarItem(icon: Icon(Icons.collections), label: 'Catalogue'),
-            BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Invoices'),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Users'),
+            BottomNavigationBarItem(icon: Icon(Icons.local_shipping), label: 'Challan'),
           ],
         ),
       ),
@@ -100,7 +102,48 @@ class _UniversalScaffoldState extends State<UniversalScaffold> {
   }
 }
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> with RouteAware {
+  late Future<Map<String, dynamic>> _ordersFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshData();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _ordersFuture = AppDataRepo().fetchAllOrders();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe to route changes
+    final routeObserver = ModalRoute.of(context)?.navigator?.widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+    routeObserver?.subscribe(this, ModalRoute.of(context)! as PageRoute);
+  }
+
+  @override
+  void dispose() {
+    // Unsubscribe from route changes
+    final routeObserver = ModalRoute.of(context)?.navigator?.widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+    routeObserver?.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when coming back to this page
+    _refreshData();
+  }
+
   @override
   Widget build(BuildContext context) {
     final salesStats = [
@@ -142,6 +185,9 @@ class DashboardScreen extends StatelessWidget {
       {'label': 'View Orders', 'icon': Icons.shopping_cart, 'route': '/orders'},
       {'label': 'View Catalogue', 'icon': Icons.collections, 'route': '/catalogue'},
       {'label': 'View Invoices', 'icon': Icons.receipt_long, 'route': '/invoices'},
+      {'label': 'Sales Report', 'icon': Icons.currency_rupee, 'route': '/reports'},
+
+    
     ];
 
     // Order status colors
@@ -159,11 +205,17 @@ class DashboardScreen extends StatelessWidget {
 
     return UniversalScaffold(
       selectedIndex: 0,
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          _refreshData();
+          await _ordersFuture;
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Dashboard Title & Refresh
             SizedBox(height: 4),
             Text(
@@ -190,10 +242,27 @@ class DashboardScreen extends StatelessWidget {
             Text('Orders at a Glance', style: Theme.of(context).textTheme.titleMedium),
             SizedBox(height: 8),
             FutureBuilder<Map<String, dynamic>>(
-              future: AppDataRepo().fetchAllOrders(),
+              future: _ordersFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
+                  // Skeleton loader for order stats
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(4, (i) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                        child: Container(
+                          width: 100,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          margin: EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      )),
+                    ),
+                  );
                 }
                 if (snapshot.hasError || snapshot.data == null || snapshot.data!['orders'] == null) {
                   return Center(child: Text('Error loading order stats'));
@@ -314,10 +383,29 @@ class DashboardScreen extends StatelessWidget {
             Text('Recent Orders', style: Theme.of(context).textTheme.titleMedium),
             SizedBox(height: 8),
             FutureBuilder<Map<String, dynamic>>(
-              future: AppDataRepo().fetchAllOrders(),
+              future: _ordersFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
+                  // Skeleton loader for recent orders
+                  return Column(
+                    children: List.generate(3, (i) => Card(
+                      color: Colors.white,
+                      margin: EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(width: 120, height: 16, color: Colors.grey.shade200, margin: EdgeInsets.only(bottom: 8)),
+                            Container(width: 80, height: 12, color: Colors.grey.shade200, margin: EdgeInsets.only(bottom: 8)),
+                            Container(width: 180, height: 12, color: Colors.grey.shade200, margin: EdgeInsets.only(bottom: 8)),
+                            Container(width: 60, height: 12, color: Colors.grey.shade200),
+                          ],
+                        ),
+                      ),
+                    )),
+                  );
                 }
                 if (snapshot.hasError) {
                   return Center(child: Text('Error loading orders'));
@@ -342,13 +430,16 @@ class DashboardScreen extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(16),
-                          onTap: () {
-                            Navigator.push(
+                          onTap: () async {
+                            final result = await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => OrderDetailsPage(orderId: order['_id']),
                               ),
                             );
+                            if (result == true) {
+                              _refreshData();
+                            }
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
@@ -358,9 +449,11 @@ class DashboardScreen extends StatelessWidget {
                                 Row(
                                   children: [
                                     Expanded(
-                                      child: Text(
-                                        order['orderUniqueId'] ?? '',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      child: Container(
+                                        child: Text(
+                                          order['orderUniqueId'] ?? '',
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        ),
                                       ),
                                     ),
                                     Container(
@@ -389,11 +482,8 @@ class DashboardScreen extends StatelessWidget {
                                   children: [
                                     if ((shipping['phone'] ?? '').toString().isNotEmpty)
                                       Text(shipping['phone'] ?? '', style: TextStyle(fontSize: 13)),
-                                  
                                     if ((shipping['phone'] ?? '').toString().isNotEmpty)
                                       Text(' • ', style: TextStyle(fontSize: 16, color: Colors.grey)),
-
-
                                     if ((shipping['email'] ?? '').toString().isNotEmpty)
                                       Text(shipping['email'] ?? '', style: TextStyle(fontSize: 13)),
                                   ],
@@ -451,6 +541,7 @@ class DashboardScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

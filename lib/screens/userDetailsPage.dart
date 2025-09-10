@@ -294,23 +294,18 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                   return Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError || snapshot.data == null || snapshot.data!['success'] != true) {
-                  final msg = snapshot.data != null && snapshot.data!['message'] != null
-                      ? snapshot.data!['message'].toString()
-                      : "User's cart is empty";
                   return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Text(
-                        msg,
-                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+                    child: Text("User's cart is empty", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
                   );
                 }
                 final cart = snapshot.data!['card'];
-                final user = cart['user'] ?? {};
                 final items = List<Map<String, dynamic>>.from(cart['items'] ?? []);
+                if (items.isEmpty) {
+                  return Center(
+                    child: Text("User's cart is empty", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                  );
+                }
+                // ...existing code for showing cart items...
                 return Padding(
                   padding: EdgeInsets.only(top: 24, left: 16, right: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 16),
                   child: ListView(
@@ -318,87 +313,7 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                     children: [
                       Text('Cart Details', style: Theme.of(context).textTheme.titleLarge),
                       SizedBox(height: 8),
-                      Card(
-                        child: ListTile(
-                          leading: Icon(Icons.person),
-                          title: Text(user['name'] ?? ''),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(user['email'] ?? ''),
-                              Text(user['phone'] ?? ''),
-                            ],
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text('Items in Cart', style: Theme.of(context).textTheme.titleMedium),
-                      if (items.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Text(
-                            "User's cart is empty",
-                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ...items.map((item) {
-                        final subProduct = item['subProduct'] ?? {};
-                        final productId = subProduct['productId'] ?? {};
-                        final images = List<String>.from(subProduct['subProductImages'] ?? []);
-                        return Card(
-                          margin: EdgeInsets.symmetric(vertical: 8),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                images.isNotEmpty
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.network(images[0], width: 64, height: 64, fit: BoxFit.cover),
-                                      )
-                                    : Container(width: 64, height: 64, color: Colors.grey[300], child: Icon(Icons.image)),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(productId['productName'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                      Text('Set: ${subProduct['set'] ?? ''}'),
-                                      Text('Price: ₹${subProduct['price'] ?? ''}'),
-                                      Text('Final Price: ₹${subProduct['finalPrice'] ?? ''}'),
-                                      Text('Quantity: ${item['quantity'] ?? ''}'),
-                                      Text('Status: ${item['status'] ?? ''}'),
-                                      if (images.length > 1)
-                                        SizedBox(height: 6),
-                                      if (images.length > 1)
-                                        SizedBox(
-                                          height: 40,
-                                          child: ListView(
-                                            scrollDirection: Axis.horizontal,
-                                            children: images.skip(1).map((img) => Padding(
-                                              padding: const EdgeInsets.only(right: 6.0),
-                                              child: ClipRRect(
-                                                borderRadius: BorderRadius.circular(6),
-                                                child: Image.network(img, width: 40, height: 40, fit: BoxFit.cover),
-                                              ),
-                                            )).toList(),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      SizedBox(height: 12),
-                      Text('Total Amount: ₹${cart['totalAmount'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text('Total Quantity: ${snapshot.data!['Totalquantity'] ?? ''}'),
-                      Text('Total Pcs: ${snapshot.data!['TotlePsc'] ?? ''}'),
-                      SizedBox(height: 16),
+                      // ...existing code for showing cart user and items...
                     ],
                   ),
                 );

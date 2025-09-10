@@ -7,7 +7,7 @@ class AllOrdersPage extends StatefulWidget {
   State<AllOrdersPage> createState() => _AllOrdersPageState();
 }
 
-class _AllOrdersPageState extends State<AllOrdersPage> {
+class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
   bool _loading = true;
   String? _error;
   List<dynamic> _orders = [];
@@ -15,6 +15,25 @@ class _AllOrdersPageState extends State<AllOrdersPage> {
   @override
   void initState() {
     super.initState();
+    _fetchOrders();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final routeObserver = ModalRoute.of(context)?.navigator?.widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+    routeObserver?.subscribe(this, ModalRoute.of(context)! as PageRoute);
+  }
+
+  @override
+  void dispose() {
+    final routeObserver = ModalRoute.of(context)?.navigator?.widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+    routeObserver?.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
     _fetchOrders();
   }
 
@@ -41,120 +60,148 @@ class _AllOrdersPageState extends State<AllOrdersPage> {
     'confirmed': Colors.indigo,
   };
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(title: Text('All Orders')),
-      body: _loading
-          ? Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!))
-              : ListView.builder(
-                  itemCount: _orders.length,
-                  itemBuilder: (context, idx) {
-                    final order = _orders[idx];
-                    final shipping = order['shippingAddress'] ?? {};
-                    String statusRaw = (order['orderStatus'] ?? '').toString().trim();
-                    String status = statusRaw.toLowerCase() == 'order confirmed' ? 'Confirmed' : statusRaw;
-                    String paymentStatus = (order['paymentStatus'] ?? '').toString().trim();
-                    return Card(
-                      color: Colors.white,
-                      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => OrderDetailsPage(orderId: order['_id']),
-                            ),
-                          );
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      order['orderUniqueId'] ?? '',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: statusColors[status.toLowerCase()] ?? Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      status,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
+      body: RefreshIndicator(
+        onRefresh: _fetchOrders,
+        child: _loading
+            ? ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: 3,
+                itemBuilder: (context, idx) {
+                  return Card(
+                    color: Colors.white,
+                    margin: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(width: 120, height: 16, color: Colors.grey.shade200, margin: EdgeInsets.only(bottom: 8)),
+                          Container(width: 80, height: 12, color: Colors.grey.shade200, margin: EdgeInsets.only(bottom: 8)),
+                          Container(width: 180, height: 12, color: Colors.grey.shade200, margin: EdgeInsets.only(bottom: 8)),
+                          Container(width: 60, height: 12, color: Colors.grey.shade200),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              )
+            : _error != null
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [Center(child: Text(_error!))],
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: _orders.length,
+                    itemBuilder: (context, idx) {
+                      final order = _orders[idx];
+                      final shipping = order['shippingAddress'] ?? {};
+                      String statusRaw = (order['orderStatus'] ?? '').toString().trim();
+                      String status = statusRaw.toLowerCase() == 'order confirmed' ? 'Confirmed' : statusRaw;
+                      String paymentStatus = (order['paymentStatus'] ?? '').toString().trim();
+                      return Card(
+                        color: Colors.white,
+                        margin: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => OrderDetailsPage(orderId: order['_id']),
+                              ),
+                            );
+                            if (result == true) {
+                              _fetchOrders();
+                            }
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        order['orderUniqueId'] ?? '',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              if ((shipping['name'] ?? '').toString().isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2.0),
-                                  child: Text(shipping['name'] ?? '', style: TextStyle(fontSize: 14)),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: statusColors[status.toLowerCase()] ?? Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        status,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              Row(
-                                
-                                children: [
-                                  if ((shipping['phone'] ?? '').toString().isNotEmpty)
-                                    Text(shipping['phone'] ?? '', style: TextStyle(fontSize: 13)),
-                                
-                                                  if ((shipping['phone'] ?? '').toString().isNotEmpty)
+                                if ((shipping['name'] ?? '').toString().isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2.0),
+                                    child: Text(shipping['name'] ?? '', style: TextStyle(fontSize: 14)),
+                                  ),
+                                Row(
+                                  children: [
+                                    if ((shipping['phone'] ?? '').toString().isNotEmpty)
+                                      Text(shipping['phone'] ?? '', style: TextStyle(fontSize: 13)),
+                                    if ((shipping['phone'] ?? '').toString().isNotEmpty)
                                       Text(' • ', style: TextStyle(fontSize: 16, color: Colors.grey)),
-
-                                
-                                  if ((shipping['email'] ?? '').toString().isNotEmpty)
-                                    Text(shipping['email'] ?? '', style: TextStyle(fontSize: 13)),
-                                ],
-                              ),
-                              if ((shipping['address'] ?? '').toString().isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2.0),
-                                  child: Text(
-                                    '${shipping['address'] ?? ''}${shipping['city'] != null ? ', ' + shipping['city'] : ''}${shipping['state'] != null ? ', ' + shipping['state'] : ''}${shipping['country'] != null ? ', ' + shipping['country'] : ''}${shipping['postalCode'] != null ? ' - ' + shipping['postalCode'] : ''}',
-                                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-                                  ),
+                                    if ((shipping['email'] ?? '').toString().isNotEmpty)
+                                      Text(shipping['email'] ?? '', style: TextStyle(fontSize: 13)),
+                                  ],
                                 ),
-                              SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  if (paymentStatus.isNotEmpty)
-                                    Text(
-                                      paymentStatus,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color:
-                                          paymentStatus.toLowerCase().contains('fail') ? Colors.red :
-                                          paymentStatus.toLowerCase().contains('complete') ? Colors.indigo :
-                                          paymentStatus.toLowerCase().contains('partial') ? Colors.green : Colors.black,
-                                      ),
+                                if ((shipping['address'] ?? '').toString().isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2.0),
+                                    child: Text(
+                                      '${shipping['address'] ?? ''}${shipping['city'] != null ? ', ' + shipping['city'] : ''}${shipping['state'] != null ? ', ' + shipping['state'] : ''}${shipping['country'] != null ? ', ' + shipping['country'] : ''}${shipping['postalCode'] != null ? ' - ' + shipping['postalCode'] : ''}',
+                                      style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                                     ),
-                                  if (paymentStatus.isNotEmpty)
-                                    Text(' • ', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                                  Text('₹${order['totalAmount'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                ],
-                              ),
-                            ],
+                                  ),
+                                SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    if (paymentStatus.isNotEmpty)
+                                      Text(
+                                        paymentStatus,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color:
+                                            paymentStatus.toLowerCase().contains('fail') ? Colors.red :
+                                            paymentStatus.toLowerCase().contains('complete') ? Colors.indigo :
+                                            paymentStatus.toLowerCase().contains('partial') ? Colors.green : Colors.black,
+                                        ),
+                                      ),
+                                    if (paymentStatus.isNotEmpty)
+                                      Text(' • ', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                                    Text('₹${order['totalAmount'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
+      ),
     );
   }
 }

@@ -286,6 +286,30 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
     );
   }
 
+  void _onNavTap(int index) {
+    String? route;
+    switch (index) {
+      case 0:
+        route = '/dashboard';
+        break;
+      case 1:
+        route = '/orders';
+        break;
+      case 2:
+        route = '/users';
+        break;
+      case 3:
+        route = '/catalogue';
+        break;
+      case 4:
+        route = '/challan';
+        break;
+    }
+    if (route != null && ModalRoute.of(context)?.settings.name != route) {
+      Navigator.pushNamedAndRemoveUntil(context, route, (r) => r.settings.name == '/dashboard');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -339,6 +363,8 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
               ],
             ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
         child: Icon(Icons.add),
         onPressed: () async {
           final created = await showUserCreationDialog(context);
@@ -349,20 +375,7 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
       ),
       bottomNavigationBar: UniversalNavBar(
         selectedIndex: 2,
-        onTap: (index) {
-          if (index == 2) return; // Already on Users, do nothing
-          switch (index) {
-            case 0:
-              Navigator.pushReplacementNamed(context, '/dashboard');
-              break;
-            case 1:
-              Navigator.pushReplacementNamed(context, '/orders');
-              break;
-            case 3:
-              Navigator.pushReplacementNamed(context, '/challan');
-              break;
-          }
-        },
+        onTap: _onNavTap,
       ),
     );
   }
@@ -818,6 +831,3 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
     );
   }
 }
-
-
-// ...existing code...

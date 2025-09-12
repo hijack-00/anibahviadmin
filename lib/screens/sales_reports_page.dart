@@ -105,7 +105,7 @@ class _SalesReportsPageState extends State<SalesReportsPage> {
   Widget build(BuildContext context) {
     final sectionData = dummyData[_selectedSection]!;
     return UniversalScaffold(
-      selectedIndex: 3,
+      selectedIndex: -1,
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

@@ -1,7 +1,7 @@
-import 'universal_navbar.dart';
 import 'package:flutter/material.dart';
 import '../services/app_data_repo.dart';
 import 'order_details_page.dart';
+import 'universal_navbar.dart';
 
 class AllOrdersPage extends StatefulWidget {
   @override
@@ -45,6 +45,30 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
     setState(() {
       _loading = false;
     });
+  }
+
+  void _onNavTap(int index) {
+    String? route;
+    switch (index) {
+      case 0:
+        route = '/dashboard';
+        break;
+      case 1:
+        route = '/orders';
+        break;
+      case 2:
+        route = '/users';
+        break;
+      case 3:
+        route = '/catalogue';
+        break;
+      case 4:
+        route = '/challan';
+        break;
+    }
+    if (route != null && ModalRoute.of(context)?.settings.name != route) {
+      Navigator.pushNamedAndRemoveUntil(context, route, (r) => r.settings.name == '/dashboard');
+    }
   }
 
   @override
@@ -209,20 +233,7 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
       ),
       bottomNavigationBar: UniversalNavBar(
         selectedIndex: 1,
-        onTap: (index) {
-          if (index == 1) return; // Already on Orders
-          switch (index) {
-            case 0:
-              Navigator.pushReplacementNamed(context, '/dashboard');
-              break;
-            case 2:
-              Navigator.pushReplacementNamed(context, '/users');
-              break;
-            case 3:
-              Navigator.pushReplacementNamed(context, '/challan');
-              break;
-          }
-        },
+        onTap: _onNavTap,
       ),
     );
   }

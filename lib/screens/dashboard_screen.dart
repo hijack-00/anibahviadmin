@@ -1,7 +1,9 @@
 import 'package:anibhaviadmin/screens/all_orders_page.dart';
 import 'package:anibhaviadmin/screens/order_details_page.dart';
+import 'package:anibhaviadmin/screens/sales_reports_page.dart';
 import 'package:anibhaviadmin/services/app_data_repo.dart';
 import 'package:anibhaviadmin/screens/login_screen.dart';
+import 'package:anibhaviadmin/widgets/add_product_form.dart';
 import 'package:flutter/material.dart';
 import 'dashboard_widgets.dart';
 import '../dialogs/create_order_bottom_sheet.dart';
@@ -16,40 +18,45 @@ class _SalesSummaryCard extends StatelessWidget {
   final String value;
   final String subtitle;
   final Color color;
+    final VoidCallback? onTap; 
   const _SalesSummaryCard({
     required this.title,
     required this.value,
     required this.subtitle,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 120, 
-      // MediaQuery.of(context).size.width / 3 - 20,
-      height: 120,
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.15),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 11)),
-          SizedBox(height: 8),
-          Text(value, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-          SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(color: Colors.white70, fontSize: 12)),
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 120, 
+        // MediaQuery.of(context).size.width / 3 - 20,
+        height: 120,
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.15),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 11)),
+            SizedBox(height: 8),
+            Text(value, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+            SizedBox(height: 4),
+            Text(subtitle, style: TextStyle(color: Colors.white70, fontSize: 12)),
+          ],
+        ),
       ),
     );
   }
@@ -185,7 +192,32 @@ class _DashboardScreenState extends State<DashboardScreen> with RouteAware {
                         Future.microtask(() => showCreateOrderBottomSheet(context));
                       },
                     ),
-                   
+                    ElevatedButton.icon(
+                      icon: Icon(Icons.add_box),
+                      label: Text('Add Product'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                       showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            builder: (context) => Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: AddProductForm(),
+            ),
+          );
+                      },
+                    ),
                     ElevatedButton.icon(
                       icon: Icon(Icons.local_shipping),
                       label: Text('Create Challan'),
@@ -217,30 +249,30 @@ class _DashboardScreenState extends State<DashboardScreen> with RouteAware {
                   ],
                 ),
                 // SALES SUMMARY BLOCK (dummy data)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _SalesSummaryCard(
-                      title: "Yearly Sales",
-                      value: "₹12,00,000",
-                      subtitle: "Revenue",
-                      color: Colors.indigo.shade700,
-                    ),
-                    _SalesSummaryCard(
-                      title: "Monthly Sales",
-                      value: "₹1,00,000",
-                      subtitle: "Revenue",
-                      color: Colors.indigo.shade400,
-                    ),
-                    _SalesSummaryCard(
-                      title: "Weekly Sales",
-                      value: "₹25,000",
-                      subtitle: "Revenue",
-                      color: Colors.indigo.shade200,
-                    ),
-                  ],
-                ),
-                SizedBox(height: 20),
+                // Row(
+                //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                //   children: [
+                //     _SalesSummaryCard(
+                //       title: "Yearly Sales",
+                //       value: "₹12,00,000",
+                //       subtitle: "Revenue",
+                //       color: Colors.indigo.shade700,
+                //     ),
+                //     _SalesSummaryCard(
+                //       title: "Monthly Sales",
+                //       value: "₹1,00,000",
+                //       subtitle: "Revenue",
+                //       color: Colors.indigo.shade400,
+                //     ),
+                //     _SalesSummaryCard(
+                //       title: "Weekly Sales",
+                //       value: "₹25,000",
+                //       subtitle: "Revenue",
+                //       color: Colors.indigo.shade200,
+                //     ),
+                //   ],
+                // ),
+                // SizedBox(height: 20),
                 SizedBox(height: 16),
               ],
             ),
@@ -337,12 +369,19 @@ class _DashboardScreenState extends State<DashboardScreen> with RouteAware {
                     Navigator.of(context).pop(false);
                   },
                   child: Text('Cancel'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.indigo,
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).pop(true);
                   },
                   child: Text('OK'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ],
             );
@@ -374,18 +413,36 @@ class _DashboardScreenState extends State<DashboardScreen> with RouteAware {
                           value: "₹12,00,000",
                           subtitle: "Revenue",
                           color: Colors.indigo.shade700,
+                           onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => SalesReportsPage()),
+        );
+      },
                         ),
                         _SalesSummaryCard(
                           title: "Monthly Sales",
                           value: "₹1,00,000",
                           subtitle: "Revenue",
                           color: Colors.indigo.shade400,
+                           onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => SalesReportsPage()),
+        );
+      },
                         ),
                         _SalesSummaryCard(
                           title: "Weekly Sales",
                           value: "₹25,000",
                           subtitle: "Revenue",
                           color: Colors.indigo.shade200,
+                          onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => SalesReportsPage()),
+        );
+      },
                         ),
                       ],
                     ),

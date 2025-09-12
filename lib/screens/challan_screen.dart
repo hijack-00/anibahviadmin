@@ -260,33 +260,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
               onChanged: (val) => setState(() => searchText = val),
             ),
             SizedBox(height: 12),
-            // Create Buttons
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  icon: Icon(Icons.add),
-                  label: Text('Create Challan'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: _showCreateChallanDialog,
-                ),
-                SizedBox(width: 12),
-                ElevatedButton.icon(
-                  icon: Icon(Icons.undo),
-                  label: Text('Create Return'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[300],
-                    foregroundColor: Colors.indigo,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: _showCreateReturnDialog,
-                ),
-              ],
-            ),
-            SizedBox(height: 12),
             // Filter Section
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -419,23 +392,81 @@ class _ChallanScreenState extends State<ChallanScreen> {
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+        child: Icon(Icons.add),
+        tooltip: 'Create Challan/Return',
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            builder: (context) => Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.add),
+                    label: Text('Create Challan'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: Size(double.infinity, 48),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _showCreateChallanDialog();
+                    },
+                  ),
+                  SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.undo),
+                    label: Text('Create Return'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[300],
+                      foregroundColor: Colors.indigo,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: Size(double.infinity, 48),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _showCreateReturnDialog();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
       bottomNavigationBar: UniversalNavBar(
         selectedIndex: 4,
         onTap: (index) {
-          if (index == 4) return; // Already on Challan
+          String? route;
           switch (index) {
             case 0:
-              Navigator.pushReplacementNamed(context, '/dashboard');
+              route = '/dashboard';
               break;
             case 1:
-              Navigator.pushReplacementNamed(context, '/orders');
+              route = '/orders';
               break;
             case 2:
-              Navigator.pushReplacementNamed(context, '/users');
+              route = '/users';
               break;
             case 3:
-              Navigator.pushReplacementNamed(context, '/reports');
+              route = '/catalogue';
               break;
+            case 4:
+              route = '/challan';
+              break;
+          }
+          if (route != null && ModalRoute.of(context)?.settings.name != route) {
+            Navigator.pushNamedAndRemoveUntil(context, route, (r) => r.settings.name == '/dashboard');
           }
         },
       ),

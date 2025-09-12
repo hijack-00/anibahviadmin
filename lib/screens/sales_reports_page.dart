@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dashboard_screen.dart';
 
 class SalesReportsPage extends StatefulWidget {
   @override
@@ -103,19 +104,21 @@ class _SalesReportsPageState extends State<SalesReportsPage> {
   @override
   Widget build(BuildContext context) {
     final sectionData = dummyData[_selectedSection]!;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Sales & Reports'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.indigo,
-      ),
-      backgroundColor: Colors.white,
+    return UniversalScaffold(
+      selectedIndex: 3,
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            AppBar(
+              title: Text('Sales & Reports'),
+              backgroundColor: Colors.white,
+              elevation: 0,
+              foregroundColor: Colors.indigo,
+              automaticallyImplyLeading: false,
+            ),
+            SizedBox(height: 16),
             // Filter & Section Tabs
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

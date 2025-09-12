@@ -5,6 +5,22 @@ import 'package:http/http.dart' as http;
 import '../models/product.dart';
 
 class ApiService {
+  Future<Map<String, dynamic>> fetchProductDetailById(String productId) async {
+    final response = await get('/subProduct/get_product_by_id/$productId');
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to fetch product details: ${response.statusCode}');
+    }
+  }
+  Future<Map<String, dynamic>> fetchCatalogueProducts() async {
+    final response = await get('/subProduct/get-all-sub-products');
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to fetch catalogue products: {response.statusCode}');
+    }
+  }
   Future<Map<String, dynamic>> deleteOrderById(String orderId) async {
     final response = await post('/order/order-delete/$orderId');
     print('Delete order by id response: ' + response.body);

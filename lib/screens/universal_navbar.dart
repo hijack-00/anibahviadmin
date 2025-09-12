@@ -30,6 +30,7 @@ class UniversalNavBar extends StatelessWidget {
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Users'),
+          BottomNavigationBarItem(icon: Icon(Icons.collections), label: 'Catalogue'),
           BottomNavigationBarItem(icon: Icon(Icons.local_shipping), label: 'Challan'),
         ],
       ),

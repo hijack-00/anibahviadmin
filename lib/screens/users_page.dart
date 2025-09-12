@@ -147,8 +147,12 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
           addressObj['country'],
         ].where((e) => e != null && e.toString().isNotEmpty).join(', ');
         return Card(
+          color: Colors.white,
           margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute(
@@ -157,88 +161,124 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
               );
               _fetchUsers();
             },
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundImage: user['photo'] != null && user['photo'].toString().isNotEmpty
-                        ? NetworkImage(user['photo'])
-                        : null,
-                    child: user['photo'] == null || user['photo'].toString().isEmpty
-                        ? Icon(Icons.person, size: 24)
-                        : null,
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundImage: user['photo'] != null && user['photo'].toString().isNotEmpty
+                            ? NetworkImage(user['photo'])
+                            : null,
+                        child: user['photo'] == null || user['photo'].toString().isEmpty
+                            ? Icon(Icons.person, size: 28, color: Colors.grey)
+                            : null,
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(user['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                            Text(user['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            SizedBox(height: 4),
+                            Text(shopName, style: TextStyle(fontWeight: FontWeight.w600, color: Colors.indigo)),
+                            if ((user['email'] ?? '').toString().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2.0),
+                                child: Text(user['email'], style: TextStyle(color: Colors.grey[800], fontSize: 13)),
+                              ),
+                            if ((user['phone'] ?? '').toString().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2.0),
+                                child: Text(user['phone'], style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[800], fontSize: 13)),
+                              ),
+                            if (address.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2.0),
+                                child: Text(address, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                              ),
+                            SizedBox(height: 8),
+                            Row(
+                              children: [
+                                cache == null
+                                    ? Expanded(
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 60,
+                                              height: 22,
+                                              decoration: BoxDecoration(
+                                                color: Colors.yellow[100],
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                            SizedBox(width: 12),
+                                            Container(
+                                              width: 80,
+                                              height: 22,
+                                              decoration: BoxDecoration(
+                                                color: Colors.indigo[100],
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : Expanded(
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.yellow[100],
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Text('Orders: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                  Text('${cache['orderCount']}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                ],
+                                              ),
+                                            ),
+                                            SizedBox(width: 12),
+                                            Container(
+                                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue[100],
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Text('Spent: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                  Text('₹${cache['totalSpent'].toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                              ],
                             ),
-                            Icon(user['isActive'] ? Icons.check_circle : Icons.cancel, color: user['isActive'] ? Colors.green : Colors.red, size: 18),
                           ],
                         ),
-                        SizedBox(height: 2),
-                        Text(user['email'] ?? '', style: TextStyle(fontSize: 13, color: Colors.grey[700]), overflow: TextOverflow.ellipsis),
-                        if (shopName.toString().isNotEmpty)
-                          Text('Shop: $shopName', style: TextStyle(fontSize: 13, color: Colors.indigo), overflow: TextOverflow.ellipsis),
-                        if (address.isNotEmpty)
-                          Text('Address: $address', style: TextStyle(fontSize: 12, color: Colors.grey[600]), maxLines: 2, overflow: TextOverflow.ellipsis),
-                        SizedBox(height: 4),
-                        cache == null
-                          ? Row(
-                              children: [
-                                Container(
-                                  width: 60,
-                                  height: 18,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Container(
-                                  width: 70,
-                                  height: 18,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Row(
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.indigo.shade50,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text('Orders: ${cache['orderCount']}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.indigo)),
-                                ),
-                                SizedBox(width: 8),
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.shade50,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text('Spent: ₹${(cache['totalSpent'] as double).toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green[800])),
-                                ),
-                              ],
-                            ),
-                      ],
-                    ),
+                      ),
+                      // Removed chevron arrow to avoid overlay with status icon
+                    ],
                   ),
-                ],
-              ),
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Icon(
+                    user['isActive'] == true ? Icons.check_circle : Icons.cancel,
+                    color: user['isActive'] == true ? Colors.green : Colors.red,
+                    size: 22,
+                  ),
+                ),
+              ],
             ),
           ),
         );

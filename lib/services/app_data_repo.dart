@@ -6,6 +6,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
 class AppDataRepo {
+  Future<Map<String, dynamic>> fetchProductDetailById(String productId) async {
+    return await ApiService().fetchProductDetailById(productId);
+  }
+  Future<List<Map<String, dynamic>>> fetchCatalogueProducts() async {
+    final api = ApiService();
+    final response = await api.fetchCatalogueProducts();
+    if (response['success'] == true && response['data'] is List) {
+      return List<Map<String, dynamic>>.from(response['data']);
+    } else {
+      return [];
+    }
+  }
   Future<Map<String, dynamic>> deleteOrderById(String orderId) async {
     return await _api.deleteOrderById(orderId);
   }

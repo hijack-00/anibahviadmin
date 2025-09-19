@@ -72,6 +72,14 @@ class UniversalScaffold extends StatefulWidget {
 }
 
 class _UniversalScaffoldState extends State<UniversalScaffold> {
+  // Drawer button with arrow icon at right
+  Widget _drawerButton(String title, String route) {
+    return ListTile(
+      title: Text(title),
+      trailing: Icon(Icons.arrow_forward_ios, size: 18, color: Colors.indigo),
+      onTap: () => Navigator.pushNamed(context, route),
+    );
+  }
   void _onItemTapped(int index) {
     String? route;
     switch (index) {
@@ -128,6 +136,55 @@ class _UniversalScaffoldState extends State<UniversalScaffold> {
           ),
         ),
       ),
+       drawer: Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(color: Colors.indigo),
+            child: Text('Menu', style: TextStyle(color: Colors.white, fontSize: 24)),
+          ),
+          _drawerButton('Sales Order', '/sales-order'),
+          Divider(),
+          // _drawerButton('Notes', '/notes'),
+          // Divider(),
+          // _drawerButton('LR Upload', '/lr-upload'),
+          // Divider(),
+          // _drawerButton('Transport Name Entry', '/transport-entry'),
+          // Divider(),
+          // _drawerButton('PDF Share', '/pdf-share'),
+          // Divider(),
+          // _drawerButton('Barcode Scan/Manual', '/barcode'),
+          // Divider(),
+          // _drawerButton('Franchisee Selection', '/franchisee-select'),
+          // Divider(),
+          _drawerButton('Sales Return', '/sales-return'),
+          Divider(),
+          _drawerButton('Stock Adjustment', '/stock-adjustment'),
+          Divider(),
+          // _drawerButton('Refund/Credit Note', '/refund-credit'),
+          // Divider(),
+          // _drawerButton('Return Challan', '/return-challan'),
+          // Divider(),
+          // _drawerButton('Reports Graph', '/reports-graph'),
+          // Divider(),
+          _drawerButton('Notifications', '/notifications'),
+          Divider(),
+          _drawerButton('Stock Management', '/stock-management'),
+          Divider(),
+          _drawerButton('Customer Ledger', '/customer-ledger'),
+          Divider(),
+          _drawerButton('WhatsApp Notifications', '/whatsapp-notifications'),
+          Divider(),
+          _drawerButton('Backend User Data', '/user-data'),
+          Divider(),
+          _drawerButton('Push Notifications', '/push-notifications'),
+          Divider(),
+          _drawerButton('Catalogue Upload', '/catalogue-upload'),
+          Divider(),
+        ],
+      ),
+    ),
       body: widget.body,
       bottomNavigationBar: UniversalNavBar(
         selectedIndex: widget.selectedIndex,

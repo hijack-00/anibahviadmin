@@ -38,8 +38,15 @@ class _CataloguePageState extends State<CataloguePage> {
           if (products.isEmpty) {
             return Center(child: Text('No products found'));
           }
-          return ListView.builder(
-            padding: EdgeInsets.all(16),
+          // Use GridView for smaller cards
+          return GridView.builder(
+            padding: EdgeInsets.all(12),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3, // Show 3 cards per row
+              childAspectRatio: 0.7, // Adjust for 6-7 cards per screen
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
             itemCount: products.length,
             itemBuilder: (context, index) {
               final product = products[index];
@@ -48,14 +55,6 @@ class _CataloguePageState extends State<CataloguePage> {
               final price = product['finalPrice'] ?? product['price'] ?? '-';
               final images = product['subProductImages'] ?? product['images'] ?? [];
               final imageUrl = images.isNotEmpty ? images[0] : null;
-              final lotNumber = product['lotNumber'] ?? '';
-              final parentName = productId['parentProductName'] ?? '';
-              final pcsInSet = product['set'] ?? '-';
-              final lotStock = product['lotStock'] ?? '-';
-              final singlePicPrice = product['singlePicPrice'] ?? '-';
-              final dateOfOpening = product['dateOfOpening'] ?? product['createdAt'] ?? '-';
-              final sizes = product['sizes'] ?? [];
-              final status = product['status'] == true ? 'In Stock' : 'Out of Stock';
 
               return GestureDetector(
                 onTap: () {
@@ -69,78 +68,41 @@ class _CataloguePageState extends State<CataloguePage> {
                   }
                 },
                 child: Card(
-                  margin: EdgeInsets.only(bottom: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: EdgeInsets.all(8),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         if (imageUrl != null)
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(imageUrl, height: 160, width: double.infinity, fit: BoxFit.cover),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              imageUrl,
+                              height: 80,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.indigo.shade100,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text('Set', style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
-                            ),
-                            SizedBox(width: 8),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: status == 'In Stock' ? Colors.green.shade100 : Colors.red.shade100,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(status, style: TextStyle(color: status == 'In Stock' ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
-                            ),
-                          ],
+                        Text(
+                          name,
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                         ),
-                        SizedBox(height: 8),
-                        Text('$name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                        if (lotNumber != '') Text('Lot: $lotNumber', style: TextStyle(color: Colors.grey)),
-                        if (parentName != '') Text('Parent: $parentName', style: TextStyle(color: Colors.grey)),
-                        SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text('Pcs in Set: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                            Text('$pcsInSet', style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
-                            SizedBox(width: 16),
-                            Text('Final Lot Price: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                            Text('₹$price', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text('Lot Stock: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                            Text('$lotStock pcs', style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
-                            SizedBox(width: 16),
-                            Text('Single Pic Price: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                            Text('₹$singlePicPrice', style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        SizedBox(height: 8),
-                        Text('Date of Opening: $dateOfOpening', style: TextStyle(color: Colors.grey)),
-                        SizedBox(height: 8),
-                        if (sizes.isNotEmpty)
-                          Wrap(
-                            spacing: 8,
-                            children: sizes.map<Widget>((sz) {
-                              final size = sz['size'] ?? '-';
-                              return Chip(
-                                label: Text(size.toString()),
-                                backgroundColor: Colors.indigo.shade50,
-                              );
-                            }).toList(),
+                        SizedBox(height: 4),
+                        Text(
+                          '₹$price',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
                           ),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   ),

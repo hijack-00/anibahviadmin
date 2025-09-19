@@ -1,3 +1,4 @@
+import 'package:anibhaviadmin/screens/accessUserPage.dart';
 import 'package:anibhaviadmin/screens/users_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,22 +6,35 @@ import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'package:anibhaviadmin/screens/all_orders_page.dart';
-// import 'screens/catalogue_screen.dart';
-// import 'screens/inventory_screen.dart';
-// import 'screens/job_slip_screen.dart';
-// import 'screens/dispatch_screen.dart';
-// import 'screens/invoice_screen.dart';
+
 import 'screens/sales_reports_page.dart';
 import 'screens/catalogue_page.dart';
-// import 'screens/dispatch_detail_screen.dart';
+
 import 'screens/order_detail_screen.dart';
-// import 'screens/job_slip_detail_screen.dart';
-// import 'screens/catalogue_detail_screen.dart';
-// import 'screens/inventory_detail_screen.dart';
-// import 'screens/invoice_detail_screen.dart';
+
 import 'screens/report_detail_screen.dart';
 import 'screens/challan_screen.dart';
 import 'screens/product_detail_page.dart';
+import 'screens/notes_page.dart';
+import 'screens/lr_upload_page.dart';
+import 'screens/transport_entry_page.dart';
+import 'screens/pdf_share_page.dart';
+import 'screens/barcode_page.dart';
+import 'screens/franchisee_select_page.dart';
+import 'screens/sales_return_page.dart';
+import 'screens/stock_adjustment_page.dart';
+import 'screens/refund_credit_page.dart';
+import 'screens/return_challan_page.dart';
+import 'screens/reports_graph_page.dart';
+import 'screens/notifications_page.dart';
+import 'screens/stock_management_page.dart';
+import 'screens/customer_ledger_page.dart';
+import 'screens/whatsapp_notifications_page.dart';
+import 'screens/user_data_page.dart';
+import 'screens/push_notifications_page.dart';
+
+import 'screens/catalogue_upload_page.dart';
+import 'screens/sales_order_page.dart';
 
 void main() {
   runApp(ProviderScope(child: MyApp()));
@@ -93,6 +107,27 @@ class MyApp extends StatelessWidget {
             final productId = ModalRoute.of(context)?.settings.arguments as String? ?? '';
             return ProductDetailPage(productId: productId);
           },
+          // Add new routes below
+          '/sales-order': (context) => SalesOrderPage(),
+          // '/notes': (context) => NotesPage(),
+          // '/lr-upload': (context) => LRUploadPage(),
+          // '/transport-entry': (context) => TransportEntryPage(),
+          // '/pdf-share': (context) => PDFSharePage(),
+          // '/barcode': (context) => BarcodePage(),
+          // '/franchisee-select': (context) => FranchiseeSelectPage(),
+          '/sales-return': (context) => SalesReturnPage(),
+          '/stock-adjustment': (context) => StockAdjustmentPage(),
+          // '/refund-credit': (context) => RefundCreditPage(),
+          // '/return-challan': (context) => ReturnChallanPage(),
+          // '/reports-graph': (context) => ReportsGraphPage(),
+          '/notifications': (context) => NotificationsPage(),
+          '/access-user': (context) => AccessUserPage(),
+          '/stock-management': (context) => StockManagementPage(),
+          '/customer-ledger': (context) => CustomerLedgerPage(),
+          '/whatsapp-notifications': (context) => WhatsAppNotificationsPage(),
+          '/user-data': (context) => UserDataPage(),
+          '/push-notifications': (context) => PushNotificationsPage(),
+          '/catalogue-upload': (context) => CatalogueUploadPage(),
         },
       ),
     );

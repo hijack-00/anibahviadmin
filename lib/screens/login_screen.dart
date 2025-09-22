@@ -31,59 +31,39 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-  final apiService = ApiService();
-  final fullUrl = apiService.baseUrl + '/admin/admin-login';
-  print('Login endpoint URL: ' + fullUrl);
+  setState(() {
+    _error = null;
+    _loading = true;
+  });
+  if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
     setState(() {
-      _error = null;
-      _loading = true;
+      _error = 'Please enter email/mobile and password';
+      _loading = false;
     });
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      setState(() {
-        _error = 'Please enter email/mobile and password';
-        _loading = false;
-      });
-      return;
-    }
-    final requestBody = {
-      'email': _emailController.text.toString(),
-      'password': _passwordController.text.toString(),
-    };
-    print('Login request body: ' + jsonEncode(requestBody));
-    try {
-      // Use AppDataRepo to call the API and save user data
-      final apiService = ApiService();
-  final response = await apiService.post('/admin/admin-login',
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
-      );
-  print('Login response code: ' + response.statusCode.toString());
-  print('Login response: ' + response.body);
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        if (data['status'] == true && data['data'] != null) {
-          await _appDataRepo.saveUserData(data['data']['user'], data['data']['token']);
-          setState(() { _loading = false; });
-          Navigator.pushReplacementNamed(context, '/dashboard');
-        } else {
-          setState(() {
-            _error = data['message'] ?? 'Login failed';
-            _loading = false;
-          });
-        }
-      } else {
-        setState(() {
-          _error = 'Login failed: ${response.statusCode}';
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-        _loading = false;
-      });
-    }
+    return;
   }
+  try {
+    final response = await _appDataRepo.adminLogin(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
+    if (response['status'] == true && response['data'] != null) {
+      await _appDataRepo.saveUserData(response['data']['user'], response['data']['token']);
+      setState(() { _loading = false; });
+      Navigator.pushReplacementNamed(context, '/dashboard');
+    } else {
+      setState(() {
+        _error = response['message'] ?? 'Login failed';
+        _loading = false;
+      });
+    }
+  } catch (e) {
+    setState(() {
+      _error = e.toString().replaceAll('Exception: ', '');
+      _loading = false;
+    });
+  }
+}
 
   @override
   Widget build(BuildContext context) {

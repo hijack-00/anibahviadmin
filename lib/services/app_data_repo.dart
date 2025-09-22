@@ -1,46 +1,113 @@
-
-
 import 'dart:convert';
+import 'dart:io';
 import 'package:anibhaviadmin/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'api_service.dart';
 
 class AppDataRepo {
+  static final AppDataRepo _instance = AppDataRepo._internal();
+  factory AppDataRepo() => _instance;
+  AppDataRepo._internal();
+
+  final ApiService _api = ApiService();
+
   Future<Map<String, dynamic>> fetchProductDetailById(String productId) async {
-    return await ApiService().fetchProductDetailById(productId);
+    return await _api.fetchProductDetailById(productId);
   }
-  Future<List<Map<String, dynamic>>> fetchCatalogueProducts() async {
-    final api = ApiService();
-    final response = await api.fetchCatalogueProducts();
+
+  Future<List<Map<String, dynamic>>> fetchAllProducts() async {
+    final response = await _api.getAllProducts();
     if (response['success'] == true && response['data'] is List) {
       return List<Map<String, dynamic>>.from(response['data']);
     } else {
       return [];
     }
   }
+
+
+  Future<Map<String, dynamic>> adminLogin(String email, String password) async {
+  return await _api.adminLogin(email: email, password: password);
+}
+
+
+  Future<Map<String, dynamic>> createSubProduct({
+    required List<File> images,
+    required String productId,
+    required String name,
+    required String description,
+    required String color,
+    required List<String> selectedSizes,
+    required String lotNumber,
+    required int singlePicPrice,
+    required String barcode,
+    required int pcsInSet,
+    required DateTime dateOfOpening,
+    required bool status,
+    required String stock,
+    required int lotStock,
+    required bool isActive,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String filnalLotPrice,
+  }) async {
+    return await _api.createSubProduct(
+      images: images,
+      productId: productId,
+      name: name,
+      description: description,
+      color: color,
+      selectedSizes: selectedSizes,
+      lotNumber: lotNumber,
+      singlePicPrice: singlePicPrice,
+      barcode: barcode,
+      pcsInSet: pcsInSet,
+      dateOfOpening: dateOfOpening,
+      status: status,
+      stock: stock,
+      lotStock: lotStock,
+      isActive: isActive,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      filnalLotPrice: filnalLotPrice,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> fetchCatalogueProducts() async {
+    final response = await _api.fetchCatalogueProducts();
+    if (response['success'] == true && response['data'] is List) {
+      return List<Map<String, dynamic>>.from(response['data']);
+    } else {
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> deleteOrderById(String orderId) async {
     return await _api.deleteOrderById(orderId);
   }
+
   Future<Map<String, dynamic>> deleteUserById(String userId) async {
     return await _api.deleteUserById(userId);
   }
+
   Future<Map<String, dynamic>> fetchOrdersByUserId(String userId) async {
     return await _api.getOrdersByUserId(userId);
   }
+
   Future<Map<String, dynamic>> fetchCartByUserId(String userId) async {
     return await _api.getCartByUserId(userId);
   }
+
   Future<Map<String, dynamic>> fetchAllOrders() async {
     return await _api.getAllOrders();
   }
 
-    Future<Map<String, dynamic>> changeOrderStatus(String orderId, {String? orderStatus, String? paymentStatus}) async {
+  Future<Map<String, dynamic>> changeOrderStatus(String orderId, {String? orderStatus, String? paymentStatus}) async {
     return await _api.changeOrderStatus(orderId, orderStatus: orderStatus, paymentStatus: paymentStatus);
   }
 
   Future<Map<String, dynamic>> fetchOrderById(String orderId) async {
     return await _api.getOrderById(orderId);
   }
+
   Future<Map<String, dynamic>> fetchUserDetailsById(String userId) async {
     return await _api.getUserDetailsById(userId);
   }
@@ -48,11 +115,6 @@ class AppDataRepo {
   Future<Map<String, dynamic>> toggleUserStatus(String userId) async {
     return await _api.toggleUserStatus(userId);
   }
-  static final AppDataRepo _instance = AppDataRepo._internal();
-  factory AppDataRepo() => _instance;
-  AppDataRepo._internal();
-
-  final ApiService _api = ApiService();
 
   // Store responses for UI access
   static List<Map<String, dynamic>> users = [];
@@ -73,11 +135,8 @@ class AppDataRepo {
 
   // Send OTP for user signup and store response
   Future<Map<String, dynamic>> sendOtpForUserSignup(String email) async {
-    final body = {'email': email};
-    print('Send OTP request body: ' + jsonEncode(body));
     final response = await _api.sendOtpForUserSignup(email);
     lastOtpResponse = response;
-    print('Send OTP response: ' + response.toString());
     return response;
   }
 
@@ -89,14 +148,6 @@ class AppDataRepo {
     required String otp,
     required String password,
   }) async {
-    final body = {
-      'fullName': fullName,
-      'mobile': mobile,
-      'email': email,
-      'otp': otp,
-      'password': password,
-    };
-    print('Verify OTP request body: ' + jsonEncode(body));
     final response = await _api.verifyOtpForUserSignup(
       fullName: fullName,
       mobile: mobile,
@@ -105,7 +156,6 @@ class AppDataRepo {
       password: password,
     );
     lastVerifyOtpResponse = response;
-    print('Verify OTP response: ' + response.toString());
     return response;
   }
 
@@ -123,20 +173,6 @@ class AppDataRepo {
     required String shopname,
     required String photoPath,
   }) async {
-    final fields = {
-      'userId': userId,
-      'name': name,
-      'email': email,
-      'street': street,
-      'city': city,
-      'state': state,
-      'zipCode': zipCode,
-      'country': country,
-      'phone': phone,
-      'shopname': shopname,
-      'photoPath': photoPath,
-    };
-    print('Update user request fields: ' + fields.toString());
     final response = await _api.updateUserWithPhoto(
       userId: userId,
       name: name,
@@ -151,9 +187,9 @@ class AppDataRepo {
       photoPath: photoPath,
     );
     lastUpdateUserResponse = response;
-    print('Update user response: ' + response.toString());
     return response;
   }
+
   static const String _userKey = 'user_data';
   static const String _tokenKey = 'user_token';
 
@@ -186,11 +222,4 @@ class AppDataRepo {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_tokenKey) != null;
   }
-
-
-
-
-
-
-
 }

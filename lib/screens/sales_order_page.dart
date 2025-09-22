@@ -1,3 +1,5 @@
+import 'package:anibhaviadmin/screens/catalogue_page.dart';
+import 'package:anibhaviadmin/screens/users_page.dart';
 import 'package:flutter/material.dart';
 
 class SalesOrderPage extends StatefulWidget {
@@ -41,103 +43,115 @@ class _SalesOrderPageState extends State<SalesOrderPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Customer create/search
-            Card(
-              child: ListTile(
-                leading: Icon(Icons.person, color: Colors.indigo),
-                title: TextField(
-                  controller: customerController,
-                  decoration: InputDecoration(
-                    labelText: 'Customer Name',
-                    border: InputBorder.none,
+           
+              // Customer create/search (clickable)
+              Card(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => UsersPage(showActive: true),
+                      ),
+                    );
+                  },
+                  child: ListTile(
+                    minTileHeight: 80,
+                    leading: Icon(Icons.person, color: Colors.indigo),
+                    title: Text("Customer Create/Search"),
+                    trailing: IconButton(
+                      icon: Icon(Icons.search),
+                      onPressed: isEditable ? () {} : null,
+                    ),
                   ),
-                  onChanged: (val) => setState(() => selectedCustomer = val),
-                  enabled: isEditable,
-                ),
-                trailing: IconButton(
-                  icon: Icon(Icons.search),
-                  onPressed: isEditable ? () {} : null,
                 ),
               ),
-            ),
             SizedBox(height: 12),
             // Catalogue section
             Card(
-              child: ListTile(
-                leading: Icon(Icons.collections, color: Colors.indigo),
-                title: DropdownButtonFormField<String>(
-                  value: selectedCatalogue,
-                  items: ['Catalogue 1', 'Catalogue 2', 'Catalogue 3']
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                      .toList(),
-                  decoration: InputDecoration(labelText: 'Select Catalogue'),
-                  onChanged: isEditable ? (val) => setState(() => selectedCatalogue = val) : null,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CataloguePage(),
+                      ),
+                    );
+                  },
+                  child: ListTile(
+                    minTileHeight: 80,
+                    leading: Icon(Icons.person, color: Colors.indigo),
+                    title: Text("Catalogues"),
+                    trailing: IconButton(
+                      icon: Icon(Icons.search),
+                      onPressed: isEditable ? () {} : null,
+                    ),
+                  ),
                 ),
               ),
-            ),
             SizedBox(height: 12),
             // Notes option
-            Card(
-              child: ListTile(
-                leading: Icon(Icons.note, color: Colors.indigo),
-                title: TextField(
-                  decoration: InputDecoration(labelText: 'Notes', border: InputBorder.none),
-                  onChanged: isEditable ? (val) => setState(() => notes = val) : null,
-                  enabled: isEditable,
-                ),
-              ),
-            ),
-            SizedBox(height: 12),
+            // Card(
+            //   child: ListTile(
+            //     leading: Icon(Icons.note, color: Colors.indigo),
+            //     title: TextField(
+            //       decoration: InputDecoration(labelText: 'Notes', border: InputBorder.none),
+            //       onChanged: isEditable ? (val) => setState(() => notes = val) : null,
+            //       enabled: isEditable,
+            //     ),
+            //   ),
+            // ),
+            // SizedBox(height: 12),
             // LR upload option
-            Card(
-              child: ListTile(
-                leading: Icon(Icons.upload_file, color: Colors.indigo),
-                title: Text(lrFile ?? 'No LR uploaded'),
-                trailing: ElevatedButton(
-                  child: Text('Upload',style: TextStyle(color: Colors.white),),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-                  onPressed: isEditable
-                      ? () {
-                          setState(() {
-                            lrFile = 'LR_${DateTime.now().millisecondsSinceEpoch}.pdf';
-                          });
-                        }
-                      : null,
-                ),
-              ),
-            ),
+            // Card(
+            //   child: ListTile(
+            //     leading: Icon(Icons.upload_file, color: Colors.indigo),
+            //     title: Text(lrFile ?? 'No LR uploaded'),
+            //     trailing: ElevatedButton(
+            //       child: Text('Upload',style: TextStyle(color: Colors.white),),
+            //       style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+            //       onPressed: isEditable
+            //           ? () {
+            //               setState(() {
+            //                 lrFile = 'LR_${DateTime.now().millisecondsSinceEpoch}.pdf';
+            //               });
+            //             }
+            //           : null,
+            //     ),
+            //   ),
+            // ),
             SizedBox(height: 12),
             // Transport name entry
-            Card(
-              child: ListTile(
-                leading: Icon(Icons.local_shipping, color: Colors.indigo),
-                title: TextField(
-                  decoration: InputDecoration(labelText: 'Transport Name', border: InputBorder.none),
-                  onChanged: isEditable ? (val) => setState(() => transportName = val) : null,
-                  enabled: isEditable,
-                ),
-              ),
-            ),
-            SizedBox(height: 12),
+            // Card(
+            //   child: ListTile(
+            //     leading: Icon(Icons.local_shipping, color: Colors.indigo),
+            //     title: TextField(
+            //       decoration: InputDecoration(labelText: 'Transport Name', border: InputBorder.none),
+            //       onChanged: isEditable ? (val) => setState(() => transportName = val) : null,
+            //       enabled: isEditable,
+            //     ),
+            //   ),
+            // ),
+            // SizedBox(height: 12),
             // PDF share
-            Card(
-              child: ListTile(
-                leading: Icon(Icons.picture_as_pdf, color: Colors.indigo),
-                title: DropdownButtonFormField<String>(
-                  value: selectedPDF,
-                  items: ['Catalogue_2025.pdf', 'Price_List.pdf', 'Delivery_Challan.pdf']
-                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                      .toList(),
-                  decoration: InputDecoration(labelText: 'Share PDF'),
-                  onChanged: isEditable ? (val) => setState(() => selectedPDF = val) : null,
-                ),
-                trailing: IconButton(
-                  icon: Icon(Icons.share, color: Colors.green),
-                  onPressed: isEditable && selectedPDF != null ? () {} : null,
-                ),
-              ),
-            ),
-            SizedBox(height: 12),
+            // Card(
+            //   child: ListTile(
+            //     leading: Icon(Icons.picture_as_pdf, color: Colors.indigo),
+            //     title: DropdownButtonFormField<String>(
+            //       value: selectedPDF,
+            //       items: ['Catalogue_2025.pdf', 'Price_List.pdf', 'Delivery_Challan.pdf']
+            //           .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+            //           .toList(),
+            //       decoration: InputDecoration(labelText: 'Share PDF'),
+            //       onChanged: isEditable ? (val) => setState(() => selectedPDF = val) : null,
+            //     ),
+            //     trailing: IconButton(
+            //       icon: Icon(Icons.share, color: Colors.green),
+            //       onPressed: isEditable && selectedPDF != null ? () {} : null,
+            //     ),
+            //   ),
+            // ),
+            // SizedBox(height: 12),
             // Sales order to Delivery Challan convert
             Card(
               child: ListTile(

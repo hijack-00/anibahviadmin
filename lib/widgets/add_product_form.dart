@@ -1,4 +1,11 @@
 import 'package:flutter/material.dart';
+import '../widgets/barcode_generator.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
+import '../services/app_data_repo.dart';
+
+
 
 class AddProductForm extends StatefulWidget {
   final void Function()? onSubmit;
@@ -11,23 +18,34 @@ class AddProductForm extends StatefulWidget {
 class _AddProductFormState extends State<AddProductForm> {
   final _formKey = GlobalKey<FormState>();
 
+    bool _isSubmitting = false;
+
+
+  List<Map<String, dynamic>> products = [];
+  bool loadingProducts = false;
+  String selectedProductId = '';
+  Map<String, dynamic>? selectedProduct;
+
+
   TextEditingController nameController = TextEditingController();
   String parentProduct = '';
   TextEditingController lotNumberController = TextEditingController();
   int pcsInSet = 1;
   int lotStock = 1;
-  double singlePicPrice = 1;
+  int singlePicPrice = 1;
   DateTime? dateOfOpening;
   TextEditingController descriptionController = TextEditingController();
   String status = 'In Stock';
   TextEditingController barcodeController = TextEditingController();
+  String generatedBarcode = '';
   List<String> selectedSizes = [];
   List<String> availableSizes = ['28', '30', '32', '34', '36', '38', '40'];
-  List<String> imageUrls = [];
+  List<File> imageFiles = [];
   String finalPrice = '0';
 
-  List<String> parentProductOptions = ['Denim Jeans', 'Cargo', 'Bootcut Jeans', 'Tapered Jeans', 'Slim Jeans'];
-  List<String> statusOptions = ['In Stock', 'Low Stock', 'Out of Stock'];
+  List<String> statusOptions = ['In Stock', 'Out of Stock'];
+  List<String> activeOptions = ['Active', 'Inactive'];
+  String activeStatus = 'Active';
 
   void _selectDate(BuildContext context) async {
     final picked = await showDatePicker(
@@ -41,6 +59,22 @@ class _AddProductFormState extends State<AddProductForm> {
         dateOfOpening = picked;
       });
     }
+  }
+
+  Future<void> _fetchProducts() async {
+    setState(() { loadingProducts = true; });
+    final repo = AppDataRepo();
+    final res = await repo.fetchAllProducts();
+    setState(() {
+      products = res;
+      loadingProducts = false;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProducts();
   }
 
   Widget numberField({
@@ -175,14 +209,14 @@ class _AddProductFormState extends State<AddProductForm> {
           height: 100,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: imageUrls.length,
+            itemCount: imageFiles.length,
             separatorBuilder: (_, __) => SizedBox(width: 8),
             itemBuilder: (context, idx) => Stack(
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    imageUrls[idx],
+                  child: Image.file(
+                    imageFiles[idx],
                     width: 100,
                     height: 100,
                     fit: BoxFit.cover,
@@ -195,7 +229,7 @@ class _AddProductFormState extends State<AddProductForm> {
                     icon: Icon(Icons.close, color: Colors.red),
                     onPressed: () {
                       setState(() {
-                        imageUrls.removeAt(idx);
+                        imageFiles.removeAt(idx);
                       });
                     },
                   ),
@@ -206,17 +240,29 @@ class _AddProductFormState extends State<AddProductForm> {
         ),
         SizedBox(height: 8),
         ElevatedButton.icon(
-          onPressed: () {
-            setState(() {
-              imageUrls.add('https://via.placeholder.com/100');
-            });
+          onPressed: () async {
+            if (imageFiles.length >= 8) return;
+            final picker = ImagePicker();
+            final picked = await picker.pickMultiImage();
+            if (picked != null) {
+              setState(() {
+                imageFiles.addAll(picked.map((x) => File(x.path)));
+                if (imageFiles.length > 8) imageFiles = imageFiles.sublist(0, 8);
+              });
+            }
           },
           icon: Icon(Icons.upload),
-          label: Text('Upload Image'),
+          label: Text('Upload Images (3-8)'),
         ),
+        if (imageFiles.length < 3)
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Text('Please upload at least 3 images.', style: TextStyle(color: Colors.red)),
+          ),
       ],
     );
   }
+
 
   Widget _sizesSection() {
     return Column(
@@ -256,6 +302,19 @@ class _AddProductFormState extends State<AddProductForm> {
     );
   }
 
+  // Generates a valid random EAN13 barcode
+  String _generateRandomEAN13() {
+    final rand = List.generate(12, (_) => (1 + (DateTime.now().microsecond + DateTime.now().millisecond) % 9).toString());
+    final base = rand.join();
+    int sum = 0;
+    for (int i = 0; i < base.length; i++) {
+      int digit = int.parse(base[i]);
+      sum += (i % 2 == 0) ? digit : digit * 3;
+    }
+    int checkDigit = (10 - (sum % 10)) % 10;
+    return base + checkDigit.toString();
+  }
+
   Widget _barcodeSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,14 +329,19 @@ class _AddProductFormState extends State<AddProductForm> {
                 decoration: InputDecoration(
                   labelText: 'Barcode Number',
                   border: OutlineInputBorder(),
+                  counterText: '', // Hide character counter
                 ),
+                keyboardType: TextInputType.number,
               ),
             ),
             SizedBox(width: 8),
             ElevatedButton(
               onPressed: () {
+                // Always generate a new random EAN13 barcode
+                String randomBarcode = _generateRandomEAN13();
                 setState(() {
-                  barcodeController.text = '1234567890123';
+                  barcodeController.text = randomBarcode;
+                  generatedBarcode = randomBarcode;
                 });
               },
               child: Text('Generate Barcode'),
@@ -285,16 +349,15 @@ class _AddProductFormState extends State<AddProductForm> {
           ],
         ),
         SizedBox(height: 8),
-        if (barcodeController.text.isNotEmpty)
+        if (generatedBarcode.isNotEmpty)
           Column(
             children: [
-              Image.network(
-                'https://barcode.tec-it.com/barcode.ashx?data=${barcodeController.text}&code=EAN13',
+              SizedBox(
                 height: 48,
-                fit: BoxFit.contain,
+                child: BarcodeGenerator(barcode: generatedBarcode),
               ),
               SizedBox(height: 8),
-              Text(barcodeController.text, style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(generatedBarcode, style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
       ],
@@ -303,6 +366,16 @@ class _AddProductFormState extends State<AddProductForm> {
 
   @override
   Widget build(BuildContext context) {
+    int lotPrice = 0;
+if (selectedProduct != null) {
+  final price = selectedProduct!['price'] is int || selectedProduct!['price'] is double
+      ? int.tryParse(selectedProduct!['price'].toString()) ?? 0
+      : 0;
+  final pcs = pcsInSet;
+  lotPrice = price * pcs;
+}
+final String filnalLotPrice = lotPrice.toString();
+  
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
       child: Form(
@@ -312,36 +385,38 @@ class _AddProductFormState extends State<AddProductForm> {
           children: [
             _imageUploadSection(),
             SizedBox(height: 16),
+            loadingProducts
+                ? Center(child: CircularProgressIndicator())
+                : DropdownButtonFormField<String>(
+                    value: selectedProductId.isNotEmpty ? selectedProductId : null,
+                   items: products.map((prod) => DropdownMenuItem(
+  value: prod['_id']?.toString() ?? '',
+  child: Text(prod['productName']?.toString() ?? ''),
+)).toList(),
+                    decoration: InputDecoration(
+                      labelText: 'Select Product',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (val) {
+                      final prod = products.firstWhere((p) => p['_id'] == val, orElse: () => {});
+                      setState(() {
+                        selectedProductId = val ?? '';
+                        selectedProduct = prod;
+                        lotNumberController.text = prod['productName'] ?? '';
+                        // singlePicPrice = prod['price'] is int || prod['price'] is double ? double.parse(prod['price'].toString()) : 1;
+                       singlePicPrice = prod['price'] is int || prod['price'] is double
+    ? int.tryParse(prod['price'].toString().split('.').first) ?? 1
+    : 1; 
+                      });
+                    },
+                  ),
+            SizedBox(height: 16),
             TextField(
               controller: nameController,
               decoration: InputDecoration(
-                labelText: 'Name (Color)',
+                labelText: 'Color',
                 border: OutlineInputBorder(),
               ),
-            ),
-            SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: parentProduct.isNotEmpty ? parentProduct : null,
-              items: [
-                ...parentProductOptions.map((opt) => DropdownMenuItem(
-                  value: opt,
-                  child: Text(opt),
-                )),
-                if (parentProduct.isNotEmpty && !parentProductOptions.contains(parentProduct))
-                  DropdownMenuItem(
-                    value: parentProduct,
-                    child: Text(parentProduct),
-                  ),
-              ],
-              decoration: InputDecoration(
-                labelText: 'Parent Product',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (val) {
-                setState(() {
-                  parentProduct = val ?? '';
-                });
-              },
             ),
             SizedBox(height: 16),
             TextField(
@@ -350,6 +425,7 @@ class _AddProductFormState extends State<AddProductForm> {
                 labelText: 'Lot Number',
                 border: OutlineInputBorder(),
               ),
+              readOnly: true,
             ),
             SizedBox(height: 16),
             numberField(
@@ -364,7 +440,7 @@ class _AddProductFormState extends State<AddProductForm> {
               onChanged: (val) => setState(() => lotStock = val),
             ),
             SizedBox(height: 16),
-            doubleNumberField(
+            numberField(
               label: 'Single Pic Price',
               value: singlePicPrice,
               onChanged: (val) => setState(() => singlePicPrice = val),
@@ -381,6 +457,14 @@ class _AddProductFormState extends State<AddProductForm> {
                 IconButton(
                   icon: Icon(Icons.calendar_today),
                   onPressed: () => _selectDate(context),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      dateOfOpening = DateTime.now();
+                    });
+                  },
+                  child: Text('Today'),
                 ),
               ],
             ),
@@ -401,7 +485,7 @@ class _AddProductFormState extends State<AddProductForm> {
                 child: Text(opt),
               )).toList(),
               decoration: InputDecoration(
-                labelText: 'Status',
+                labelText: 'Stock Status',
                 border: OutlineInputBorder(),
               ),
               onChanged: (val) {
@@ -411,18 +495,90 @@ class _AddProductFormState extends State<AddProductForm> {
               },
             ),
             SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: activeStatus,
+              items: activeOptions.map((opt) => DropdownMenuItem(
+                value: opt,
+                child: Text(opt),
+              )).toList(),
+              decoration: InputDecoration(
+                labelText: 'Active Status',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (val) {
+                setState(() {
+                  activeStatus = val ?? 'Active';
+                });
+              },
+            ),
+            SizedBox(height: 16),
             _barcodeSection(),
             SizedBox(height: 16),
             _sizesSection(),
             SizedBox(height: 24),
-            Text('Final Price: ₹$finalPrice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.green)),
+            Text('Final Lot Price: ₹$filnalLotPrice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.green)),
             SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: widget.onSubmit,
-                    child: Text('Add Product'),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () async {
+                            if (imageFiles.length < 3) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload at least 3 images.')));
+                              return;
+                            }
+                            if (selectedProductId.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Select a product.')));
+                              return;
+                            }
+                            setState(() => _isSubmitting = true);
+                            try {
+                              final repo = AppDataRepo();
+                              final res = await repo.createSubProduct(
+                                images: imageFiles,
+                                productId: selectedProductId,
+                                name: nameController.text,
+                                description: descriptionController.text,
+                                color: nameController.text,
+                                selectedSizes: selectedSizes,
+                                lotNumber: lotNumberController.text,
+                                singlePicPrice: singlePicPrice,
+                                barcode: barcodeController.text,
+                                pcsInSet: pcsInSet,
+                                dateOfOpening: dateOfOpening ?? DateTime.now(),
+                                status: status == 'In Stock',
+                                stock: status,
+                                lotStock: lotStock,
+                                isActive: activeStatus == 'Active',
+                                createdAt: DateTime.now(),
+                                updatedAt: DateTime.now(),
+                                filnalLotPrice: filnalLotPrice, // <-- changed here
+                              );
+                              if (res['success'] == true) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sub-product created successfully!')));
+                                if (widget.onSubmit != null) widget.onSubmit!();
+                                Navigator.of(context).pop(true);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to create sub-product.')));
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                            } finally {
+                              setState(() => _isSubmitting = false);
+                            }
+                          },
+                    child: _isSubmitting
+                        ? SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text('Add Product'),
                   ),
                 ),
                 SizedBox(width: 16),

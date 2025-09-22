@@ -1,12 +1,150 @@
-
-
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/product.dart';
 
 class ApiService {
+
+  // final String baseUrl = "https://api.sddipl.com/api";
+  static const String baseUrl = "https://api.sddipl.com/api";
+  static Map<String, String> defaultHeaders = {
+    "Content-Type": "application/json",
+  };
+
+
+
+
+  Future<Map<String, dynamic>> adminLogin({
+  required String email,
+  required String password,
+}) async {
+  final url = "$baseUrl/admin/admin-login";
+  final response = await http.post(
+    Uri.parse(url),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({'email': email, 'password': password}),
+  );
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  } else {
+    throw Exception('Login failed: ${response.statusCode}');
+  }
+}
+  
+
+
+    Future<Map<String, dynamic>> getAllProducts() async {
+    final url = "$baseUrl/product/get-all-products";
+    final response = await http.get(Uri.parse(url), headers: defaultHeaders);
+    return jsonDecode(response.body);
+  }
+
+
+  Future<Map<String, dynamic>> createSubProduct({
+    required List<File> images,
+    required String productId,
+    required String name,
+    required String description,
+    required String color,
+    required List<String> selectedSizes,
+    required String lotNumber,
+    required int singlePicPrice,
+    required String barcode,
+    required int pcsInSet,
+    required DateTime dateOfOpening,
+    required bool status,
+    required String stock,
+    required int lotStock,
+    required bool isActive,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String filnalLotPrice, // <-- changed here
+  }) async {
+    final url = "$baseUrl/subProduct/create-sub-product";
+    final fields = <String, String>{
+      "productId": productId,
+      "name": name,
+      "description": description,
+      "color": color,
+      "selectedSizes": jsonEncode(selectedSizes),
+      "lotNumber": lotNumber,
+      "singlePicPrice": singlePicPrice.toString(),
+      "barcode": barcode,
+      "pcsInSet": pcsInSet.toString(),
+      "dateOfOpening": dateOfOpening.toIso8601String(),
+      "status": status.toString(),
+      "stock": stock,
+      "lotStock": lotStock.toString(),
+      "isActive": isActive.toString(),
+      "createdAt": createdAt.toIso8601String(),
+      "updatedAt": updatedAt.toIso8601String(),
+      "filnalLotPrice": filnalLotPrice, // <-- changed here
+    };
+    final files = <String, File>{};
+    List<File> imageList = images; // or whatever your images list is called
+final multipleFiles = <String, List<File>>{
+  'subProductImages': imageList,
+};
+return await postMultipart(url, fields, {}, multipleFiles);
+    // You must have a postMultipart helper defined in this file:
+    return await postMultipart(url, fields, files, {});
+  }
+
+
+
+  // Add your postMultipart helper here if not present
+  Future<Map<String, dynamic>> postMultipart(
+    String url,
+    Map<String, String> fields,
+    Map<String, File> singleFiles,
+    Map<String, List<File>> multipleFiles,
+  ) async {
+     print('--- Multipart Request ---');
+  print('URL: $url');
+  print('Fields: $fields');
+  print('Single Files: ${singleFiles.keys.map((k) => '$k: ${singleFiles[k]?.path}').toList()}');
+  print('Multiple Files: ${multipleFiles.keys.map((k) => '$k: ${multipleFiles[k]?.map((f) => f.path).toList()}').toList()}');
+
+    var request = http.MultipartRequest("POST", Uri.parse(url));
+    request.fields.addAll(fields);
+
+    for (var entry in singleFiles.entries) {
+      if (await entry.value.exists()) {
+        request.files.add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
+      }
+    }
+
+    for (var entry in multipleFiles.entries) {
+  for (var file in entry.value) {
+    if (await file.exists()) {
+      request.files.add(await http.MultipartFile.fromPath(entry.key, file.path));
+    }
+  }
+}
+  print('Sending multipart request...');
+
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+      print('Response status: ${response.statusCode}');
+  print('Response body: ${response.body}');
+  print('--- End Multipart Request ---');
+
+ if (!response.headers['content-type']!.contains('application/json')) {
+    throw Exception('Server did not return JSON. Response: ${response.body}');
+  }
+    return jsonDecode(response.body);
+  }
+
+
+
+
+  
   Future<Map<String, dynamic>> fetchProductDetailById(String productId) async {
+     final url = '$baseUrl/subProduct/get_product_by_id/$productId';
+  print('Product Details API URL: $url');
+ 
     final response = await get('/subProduct/get_product_by_id/$productId');
+    
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
@@ -190,7 +328,6 @@ class ApiService {
       throw Exception('Failed to fetch users: ${response.statusCode}');
     }
   }
-  final String baseUrl = "https://api.sddipl.com/api";
 
   Future<http.Response> get(String endpoint, {Map<String, String>? headers}) async {
     final url = Uri.parse('$baseUrl$endpoint');

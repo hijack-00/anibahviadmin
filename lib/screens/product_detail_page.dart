@@ -1,5 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
 import '../services/app_data_repo.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:http/http.dart' as http;
 
 class ProductDetailPage extends StatefulWidget {
   final String productId;
@@ -12,303 +17,51 @@ class ProductDetailPage extends StatefulWidget {
 class _ProductDetailPageState extends State<ProductDetailPage> {
   late Future<Map<String, dynamic>> _productFuture;
 
-  // Editable fields
-  TextEditingController nameController = TextEditingController();
-  String parentProduct = '';
-  TextEditingController lotNumberController = TextEditingController();
-  int pcsInSet = 1;
-  int lotStock = 1;
-  double singlePicPrice = 1;
-  DateTime? dateOfOpening;
-  TextEditingController descriptionController = TextEditingController();
-  String status = 'In Stock';
-  TextEditingController barcodeController = TextEditingController();
   List<String> selectedSizes = [];
-  List<String> availableSizes = [];
   List<String> imageUrls = [];
-  String finalPrice = '0';
 
-  List<String> parentProductOptions = ['Denim Jeans', 'Cargo', 'Bootcut Jeans', 'Tapered Jeans', 'Slim Jeans'];
-  List<String> statusOptions = ['In Stock', 'Low Stock', 'Out of Stock'];
+
+
+Future<void> _downloadBarcodePdf(String barcode) async {
+  final pdf = pw.Document();
+  final barcodeUrl = 'https://barcode.tec-it.com/barcode.ashx?data=$barcode&code=EAN13';
+
+  // Download the barcode image as bytes
+  final response = await http.get(Uri.parse(barcodeUrl));
+  final imageBytes = response.bodyBytes;
+
+  pdf.addPage(
+    pw.Page(
+      build: (pw.Context context) {
+        return pw.Column(
+          mainAxisAlignment: pw.MainAxisAlignment.center,
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Text('Barcode', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 16),
+            pw.Image(pw.MemoryImage(imageBytes), height: 80),
+            pw.SizedBox(height: 16),
+            pw.Text(barcode, style: pw.TextStyle(fontSize: 20)),
+          ],
+        );
+      },
+    ),
+  );
+
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+    name: 'barcode_$barcode.pdf',
+  );
+}
+
+
+
+
 
   @override
   void initState() {
     super.initState();
     _productFuture = AppDataRepo().fetchProductDetailById(widget.productId);
-  }
-
-  void _selectDate(BuildContext context) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: dateOfOpening ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(() {
-        dateOfOpening = picked;
-      });
-    }
-  }
-
-  Widget _imageUploadSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Product Images', style: TextStyle(fontWeight: FontWeight.bold)),
-        SizedBox(height: 8),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: imageUrls.length,
-            separatorBuilder: (_, __) => SizedBox(width: 8),
-            itemBuilder: (context, idx) => Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    imageUrls[idx],
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: IconButton(
-                    icon: Icon(Icons.close, color: Colors.red),
-                    onPressed: () {
-                      setState(() {
-                        imageUrls.removeAt(idx);
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        SizedBox(height: 8),
-        ElevatedButton.icon(
-          onPressed: () {
-            // Dummy: Add a placeholder image
-            // setState(() {
-            //   imageUrls.add('https://via.placeholder.com/100');
-            // });
-          },
-          icon: Icon(Icons.upload),
-          label: Text('Upload Image'),
-        ),
-      ],
-    );
-  }
-
-  Widget _sizesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Available Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-        Wrap(
-          spacing: 8,
-          children: availableSizes.map((size) {
-            return ChoiceChip(
-              label: Text(size),
-              selected: false,
-              onSelected: (_) {
-                setState(() {
-                  selectedSizes.add(size);
-                });
-              },
-            );
-          }).toList(),
-        ),
-        SizedBox(height: 8),
-        Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-        Wrap(
-          spacing: 8,
-          children: selectedSizes.map((size) {
-            return Chip(
-              label: Text(size),
-              onDeleted: () {
-                setState(() {
-                  selectedSizes.remove(size);
-                });
-              },
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _barcodeSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Barcode', style: TextStyle(fontWeight: FontWeight.bold)),
-        SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: barcodeController,
-                decoration: InputDecoration(
-                  labelText: 'Barcode Number',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: () {
-                // Dummy: Generate barcode number
-                setState(() {
-                  barcodeController.text = '1234567890123';
-                });
-              },
-              child: Text('Generate Barcode'),
-            ),
-          ],
-        ),
-        SizedBox(height: 8),
-        if (barcodeController.text.isNotEmpty)
-          Column(
-            children: [
-              Image.network(
-                'https://barcode.tec-it.com/barcode.ashx?data=${barcodeController.text}&code=EAN13',
-                height: 48,
-                fit: BoxFit.contain,
-              ),
-              SizedBox(height: 8),
-              Text(barcodeController.text, style: TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
-      ],
-    );
-  }
-
-  Widget numberField({
-    required String label,
-    required int value,
-    required void Function(int) onChanged,
-  }) {
-    TextEditingController controller = TextEditingController(text: value.toString());
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
-        SizedBox(height: 4),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.only(left: 12, right: 12),
-                ),
-                onChanged: (val) {
-                  final num = int.tryParse(val) ?? value;
-                  onChanged(num);
-                },
-              ),
-            ),
-            SizedBox(width: 4),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 24,
-                  width: 32,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.arrow_drop_up),
-                    onPressed: () {
-                      onChanged(value + 1);
-                    },
-                  ),
-                ),
-                SizedBox(
-                  height: 24,
-                  width: 32,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.arrow_drop_down),
-                    onPressed: () {
-                      if (value > 1) onChanged(value - 1);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget doubleNumberField({
-    required String label,
-    required double value,
-    required void Function(double) onChanged,
-  }) {
-    TextEditingController controller = TextEditingController(text: value.toStringAsFixed(0));
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
-        SizedBox(height: 4),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.only(left: 12, right: 12),
-                ),
-                onChanged: (val) {
-                  final num = double.tryParse(val) ?? value;
-                  onChanged(num);
-                },
-              ),
-            ),
-            SizedBox(width: 4),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 24,
-                  width: 32,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.arrow_drop_up),
-                    onPressed: () {
-                      onChanged(value + 1);
-                    },
-                  ),
-                ),
-                SizedBox(
-                  height: 24,
-                  width: 32,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.arrow_drop_down),
-                    onPressed: () {
-                      if (value > 1) onChanged(value - 1);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    );
   }
 
   @override
@@ -328,157 +81,159 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           if (snapshot.hasError) {
             return Center(child: Text('Error loading product details'));
           }
+          print('Product Details API response: ${snapshot.data}');
           final data = snapshot.data?['data'] ?? {};
           final productId = data['productId'] ?? {};
           final images = data['subProductImages'] ?? [];
-          final sizesApi = data['sizes'] ?? [];
           final statusApi = data['status'] == true ? 'In Stock' : 'Out of Stock';
+          final sizesApiRaw = data['sizes'] ?? [];
+          List<String> sizesApi;
+          if (sizesApiRaw is String) {
+            try {
+              sizesApi = List<String>.from(jsonDecode(sizesApiRaw));
+            } catch (e) {
+              sizesApi = [];
+            }
+          } else if (sizesApiRaw is List) {
+            sizesApi = sizesApiRaw.map((e) => e.toString()).toList();
+          } else {
+            sizesApi = [];
+          }
+          selectedSizes = List<String>.from(sizesApi);
 
-          // Fill fields with API data if not already set
-          nameController.text = data['color']?.toString() ?? nameController.text;
-          parentProduct = productId['productName']?.toString() ?? parentProduct;
-          lotNumberController.text = data['lotNumber']?.toString() ?? lotNumberController.text;
-          pcsInSet = int.tryParse(data['set']?.toString() ?? '') ?? pcsInSet;
-          lotStock = int.tryParse(data['lotStock']?.toString() ?? '') ?? lotStock;
-          singlePicPrice = double.tryParse(data['singlePicPrice']?.toString() ?? '') ?? singlePicPrice;
-          finalPrice = data['finalPrice']?.toString() ?? data['price']?.toString() ?? finalPrice;
-          descriptionController.text = ''; // Not from API
-          status = statusApi;
-          barcodeController.text = barcodeController.text;
-          availableSizes = sizesApi.map<String>((sz) => sz['size'].toString()).toList();
-          if (imageUrls.isEmpty && images.isNotEmpty) imageUrls = List<String>.from(images);
+          // Robustly parse images into a list of URLs
+          List<String> parsedImages = [];
+          if (images is String) {
+            parsedImages = images.split(',').map((e) => e.trim()).toList();
+          } else if (images is List) {
+            for (var item in images) {
+              if (item is String && item.contains(',')) {
+                parsedImages.addAll(item.split(',').map((e) => e.trim()));
+              } else if (item != null) {
+                parsedImages.add(item.toString());
+              }
+            }
+          }
+          if (imageUrls.isEmpty && parsedImages.isNotEmpty) imageUrls = parsedImages;
+
+          // Prepare fields for display
+          final color = data['color']?.toString() ?? '';
+          final parentProduct = productId['productName']?.toString() ?? '';
+          final lotNumber = data['lotNumber']?.toString() ?? '';
+          final pcsInSet = data['pcsInSet']?.toString() ?? '';
+          final lotStock = data['lotStock']?.toString() ?? '';
+          final singlePicPrice = data['singlePicPrice']?.toString() ?? '';
+          // --- Price logic: check all possible locations ---
+          final price = data['filnalLotPrice']?.toString()
+              ?? data['price']?.toString()
+              ?? productId['price']?.toString()
+              ?? '-';
+          final description = data['description']?.toString() ?? '';
+          final barcode = data['barcode']?.toString() ?? '';
 
           return ListView(
             padding: EdgeInsets.all(16),
             children: [
-              _imageUploadSection(),
-              SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Name (Color)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: parentProductOptions.contains(parentProduct) ? parentProduct : null,
-                items: [
-                  ...parentProductOptions.map((opt) => DropdownMenuItem(
-                    value: opt,
-                    child: Text(opt),
-                  )),
-                  if (parentProduct.isNotEmpty && !parentProductOptions.contains(parentProduct))
-                    DropdownMenuItem(
-                      value: parentProduct,
-                      child: Text(parentProduct),
+              // Images
+              if (imageUrls.isNotEmpty)
+                SizedBox(
+                  height: 120,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: imageUrls.length,
+                    separatorBuilder: (_, __) => SizedBox(width: 8),
+                    itemBuilder: (context, idx) => ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        imageUrls[idx],
+                        width: 120,
+                        height: 120,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 120,
+                          height: 120,
+                          color: Colors.grey[300],
+                          child: Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
                     ),
-                ],
-                decoration: InputDecoration(
-                  labelText: 'Parent Product',
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (val) {
-                  setState(() {
-                    parentProduct = val ?? '';
-                  });
-                },
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: lotNumberController,
-                decoration: InputDecoration(
-                  labelText: 'Lot Number',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              SizedBox(height: 16),
-              numberField(
-                label: 'Pcs in Set',
-                value: pcsInSet,
-                onChanged: (val) => setState(() => pcsInSet = val),
-              ),
-              SizedBox(height: 16),
-              numberField(
-                label: 'Lot Stock',
-                value: lotStock,
-                onChanged: (val) => setState(() => lotStock = val),
-              ),
-              SizedBox(height: 16),
-              doubleNumberField(
-                label: 'Single Pic Price',
-                value: singlePicPrice,
-                onChanged: (val) => setState(() => singlePicPrice = val),
-              ),
-              SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text('Date of Opening', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
-                  Text(dateOfOpening != null
-                      ? '${dateOfOpening!.day}/${dateOfOpening!.month}/${dateOfOpening!.year}'
-                      : 'Select Date'),
-                  IconButton(
-                    icon: Icon(Icons.calendar_today),
-                    onPressed: () => _selectDate(context),
-                  ),
-                ],
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
                 ),
-                maxLines: 2,
-              ),
               SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: status,
-                items: statusOptions.map((opt) => DropdownMenuItem(
-                  value: opt,
-                  child: Text(opt),
-                )).toList(),
-                decoration: InputDecoration(
-                  labelText: 'Status',
-                  border: OutlineInputBorder(),
+              _detailRow('Color', color),
+              _detailRow('Parent Product', parentProduct),
+              _detailRow('Lot Number', lotNumber),
+              _detailRow('Pcs in Set', pcsInSet),
+              _detailRow('Lot Stock', lotStock),
+              _detailRow('Single Pic Price', singlePicPrice),
+              _detailRow('Status', statusApi),
+              _detailRow('Description', description),
+              // _detailRow('Barcode', barcode),
+              // SizedBox(height: 16),
+              if (barcode.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Barcode:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    Image.network(
+                      'https://barcode.tec-it.com/barcode.ashx?data=$barcode&code=EAN13',
+                      height: 60,
+                      fit: BoxFit.contain,
+                    ),
+                    SizedBox(height: 8),
+                    Text(barcode, style: TextStyle(fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => _downloadBarcodePdf(barcode),
+                      icon: Icon(Icons.download),
+                      label: Text('Download Barcode PDF'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-                onChanged: (val) {
-                  setState(() {
-                    status = val ?? 'In Stock';
-                  });
-                },
+              SizedBox(height: 16),
+              Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
+              Wrap(
+                spacing: 8,
+                children: selectedSizes.map((size) => Chip(label: Text(size))).toList(),
               ),
-              SizedBox(height: 16),
-              _barcodeSection(),
-              SizedBox(height: 16),
-              _sizesSection(),
               SizedBox(height: 24),
-              Text('Final Price: ₹$finalPrice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.green)),
-              SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      child: Text('Update'),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      child: Text('Cancel'),
-                    ),
-                  ),
-                ],
-              ),
+              Text('Final Price: ₹$price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.green)),
               SizedBox(height: 24),
             ],
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {},
+        label: Text('Update'),
+        icon: Icon(Icons.edit),
+        backgroundColor: Colors.indigo,
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              '$label:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: Text(value.isNotEmpty ? value : '-', style: TextStyle(fontSize: 16)),
+          ),
+        ],
       ),
     );
   }

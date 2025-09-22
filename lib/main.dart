@@ -6,33 +6,20 @@ import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'package:anibhaviadmin/screens/all_orders_page.dart';
-
 import 'screens/sales_reports_page.dart';
 import 'screens/catalogue_page.dart';
-
 import 'screens/order_detail_screen.dart';
-
 import 'screens/report_detail_screen.dart';
 import 'screens/challan_screen.dart';
 import 'screens/product_detail_page.dart';
-import 'screens/notes_page.dart';
-import 'screens/lr_upload_page.dart';
-import 'screens/transport_entry_page.dart';
-import 'screens/pdf_share_page.dart';
-import 'screens/barcode_page.dart';
-import 'screens/franchisee_select_page.dart';
 import 'screens/sales_return_page.dart';
 import 'screens/stock_adjustment_page.dart';
-import 'screens/refund_credit_page.dart';
-import 'screens/return_challan_page.dart';
-import 'screens/reports_graph_page.dart';
 import 'screens/notifications_page.dart';
 import 'screens/stock_management_page.dart';
 import 'screens/customer_ledger_page.dart';
 import 'screens/whatsapp_notifications_page.dart';
 import 'screens/user_data_page.dart';
 import 'screens/push_notifications_page.dart';
-
 import 'screens/catalogue_upload_page.dart';
 import 'screens/sales_order_page.dart';
 
@@ -108,7 +95,7 @@ class MyApp extends StatelessWidget {
             return ProductDetailPage(productId: productId);
           },
           // Add new routes below
-          '/sales-order': (context) => SalesOrderPage(),
+          // '/sales-order': (context) => SalesOrderPage(),
           // '/notes': (context) => NotesPage(),
           // '/lr-upload': (context) => LRUploadPage(),
           // '/transport-entry': (context) => TransportEntryPage(),
@@ -124,9 +111,9 @@ class MyApp extends StatelessWidget {
           '/access-user': (context) => AccessUserPage(),
           '/stock-management': (context) => StockManagementPage(),
           '/customer-ledger': (context) => CustomerLedgerPage(),
-          '/whatsapp-notifications': (context) => WhatsAppNotificationsPage(),
+          // '/whatsapp-notifications': (context) => WhatsAppNotificationsPage(),
           '/user-data': (context) => UserDataPage(),
-          '/push-notifications': (context) => PushNotificationsPage(),
+          // '/push-notifications': (context) => PushNotificationsPage(),
           '/catalogue-upload': (context) => CatalogueUploadPage(),
         },
       ),

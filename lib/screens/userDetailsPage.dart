@@ -1,4 +1,5 @@
 
+import 'package:anibhaviadmin/screens/order_details_page.dart';
 import 'package:flutter/material.dart';
 import '../services/app_data_repo.dart';
 import 'package:shimmer/shimmer.dart';
@@ -120,147 +121,158 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                         final orderDate = order['orderDate'] ?? '';
                         return Card(
                           margin: EdgeInsets.symmetric(vertical: 8),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(order['orderUniqueId'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                    ),
-                                    Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: statusColor,
-                                        borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+      onTap: () async {
+        Navigator.of(context).pop(); // Close bottom sheet first
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => OrderDetailsPage(orderId: order['_id']),
+          ),
+        );
+      },
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(order['orderUniqueId'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                       ),
-                                      child: Text(status, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                                    ),
-                                  ],
-                                ),
-                                if ((shipping['name'] ?? '').toString().isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2.0),
-                                    child: Text(shipping['name'] ?? '', style: TextStyle(fontSize: 14)),
-                                  ),
-                                Row(
-                                  children: [
-                                    if ((shipping['phone'] ?? '').toString().isNotEmpty)
-                                      Text(shipping['phone'] ?? '', style: TextStyle(fontSize: 13)),
-                                    if ((shipping['phone'] ?? '').toString().isNotEmpty)
-                                      Text(' • ', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                                    if ((shipping['email'] ?? '').toString().isNotEmpty)
-                                      Text(shipping['email'] ?? '', style: TextStyle(fontSize: 13)),
-                                  ],
-                                ),
-                                if ((shipping['address'] ?? '').toString().isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2.0),
-                                    child: Text(
-                                      '${shipping['address'] ?? ''}${shipping['city'] != null ? ', ' + shipping['city'] : ''}${shipping['state'] != null ? ', ' + shipping['state'] : ''}${shipping['country'] != null ? ', ' + shipping['country'] : ''}${shipping['postalCode'] != null ? ' - ' + shipping['postalCode'] : ''}',
-                                      style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-                                    ),
-                                  ),
-                                SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    if (paymentStatus.isNotEmpty)
-                                      Text(paymentStatus, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: paymentColor)),
-                                    if (paymentStatus.isNotEmpty)
-                                      Text(' • ', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                                    Text('₹${order['totalAmount'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                  ],
-                                ),
-                                SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.shade100,
-                                        borderRadius: BorderRadius.circular(8),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: statusColor,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(status, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                                       ),
-                                      child: Text('Received: ₹$recAmount', style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  if ((shipping['name'] ?? '').toString().isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2.0),
+                                      child: Text(shipping['name'] ?? '', style: TextStyle(fontSize: 14)),
                                     ),
-                                    SizedBox(width: 8),
-                                    if (pendAmount != 0)
+                                  Row(
+                                    children: [
+                                      if ((shipping['phone'] ?? '').toString().isNotEmpty)
+                                        Text(shipping['phone'] ?? '', style: TextStyle(fontSize: 13)),
+                                      if ((shipping['phone'] ?? '').toString().isNotEmpty)
+                                        Text(' • ', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                                      if ((shipping['email'] ?? '').toString().isNotEmpty)
+                                        Text(shipping['email'] ?? '', style: TextStyle(fontSize: 13)),
+                                    ],
+                                  ),
+                                  if ((shipping['address'] ?? '').toString().isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2.0),
+                                      child: Text(
+                                        '${shipping['address'] ?? ''}${shipping['city'] != null ? ', ' + shipping['city'] : ''}${shipping['state'] != null ? ', ' + shipping['state'] : ''}${shipping['country'] != null ? ', ' + shipping['country'] : ''}${shipping['postalCode'] != null ? ' - ' + shipping['postalCode'] : ''}',
+                                        style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                                      ),
+                                    ),
+                                  SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      if (paymentStatus.isNotEmpty)
+                                        Text(paymentStatus, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: paymentColor)),
+                                      if (paymentStatus.isNotEmpty)
+                                        Text(' • ', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                                      Text('₹${order['totalAmount'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    ],
+                                  ),
+                                  SizedBox(height: 6),
+                                  Row(
+                                    children: [
                                       Container(
                                         padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: Colors.red.shade100,
+                                          color: Colors.green.shade100,
                                           borderRadius: BorderRadius.circular(8),
                                         ),
-                                        child: Text('Pending: ₹$pendAmount', style: TextStyle(color: Colors.red.shade800, fontWeight: FontWeight.bold)),
+                                        child: Text('Received: ₹$recAmount', style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold)),
                                       ),
-                                    if (pendAmount == 0)
-                                      Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.green.shade200,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text('Fully Paid', style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold)),
-                                      ),
-                                  ],
-                                ),
-                                SizedBox(height: 6),
-                                Text('Payment Method: $paymentMethod', style: TextStyle(fontWeight: FontWeight.w500)),
-                                if (coupon.toString().isNotEmpty)
-                                  Text('Coupon: $coupon', style: TextStyle(fontWeight: FontWeight.w500)),
-                                if (discountCupan.toString().isNotEmpty)
-                                  Text('Discount Coupon: ₹$discountCupan', style: TextStyle(fontWeight: FontWeight.w500)),
-                                if (rewardPoints.toString().isNotEmpty)
-                                  Text('Reward Points: $rewardPoints', style: TextStyle(fontWeight: FontWeight.w500)),
-                                if (shippingCost.toString().isNotEmpty)
-                                  Text('Shipping Cost: ₹$shippingCost', style: TextStyle(fontWeight: FontWeight.w500)),
-                                if (orderDate.toString().isNotEmpty)
-                                  Text('Order Date: $orderDate', style: TextStyle(fontWeight: FontWeight.w500)),
-                                SizedBox(height: 8),
-                                Text('Products:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ...products.map((prod) {
-                                  final subProducts = List<Map<String, dynamic>>.from(prod['subProduct'] ?? []);
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: subProducts.map((sub) {
-                                      final productId = sub['productId'] ?? {};
-                                      final images = List<String>.from(sub['subProductImages'] ?? []);
-                                      return Card(
-                                        margin: EdgeInsets.symmetric(vertical: 4),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: Row(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              images.isNotEmpty
-                                                  ? ClipRRect(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      child: Image.network(images[0], width: 48, height: 48, fit: BoxFit.cover),
-                                                    )
-                                                  : Container(width: 48, height: 48, color: Colors.grey[300], child: Icon(Icons.image)),
-                                              SizedBox(width: 8),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(productId['productName'] ?? '', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                    Text('Set: ${sub['set'] ?? ''}'),
-                                                    Text('Price: ₹${sub['price'] ?? ''}'),
-                                                    Text('Final Price: ₹${sub['finalPrice'] ?? ''}'),
-                                                    Text('Color: ${sub['color'] ?? ''}'),
-                                                    Text('Status: ${sub['status'] ?? ''}'),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
+                                      SizedBox(width: 8),
+                                      if (pendAmount != 0)
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade100,
+                                            borderRadius: BorderRadius.circular(8),
                                           ),
+                                          child: Text('Pending: ₹$pendAmount', style: TextStyle(color: Colors.red.shade800, fontWeight: FontWeight.bold)),
                                         ),
-                                      );
-                                    }).toList(),
-                                  );
-                                }).toList(),
-                              ],
+                                      if (pendAmount == 0)
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.shade200,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text('Fully Paid', style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold)),
+                                        ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 6),
+                                  Text('Payment Method: $paymentMethod', style: TextStyle(fontWeight: FontWeight.w500)),
+                                  if (coupon.toString().isNotEmpty)
+                                    Text('Coupon: $coupon', style: TextStyle(fontWeight: FontWeight.w500)),
+                                  if (discountCupan.toString().isNotEmpty)
+                                    Text('Discount Coupon: ₹$discountCupan', style: TextStyle(fontWeight: FontWeight.w500)),
+                                  if (rewardPoints.toString().isNotEmpty)
+                                    Text('Reward Points: $rewardPoints', style: TextStyle(fontWeight: FontWeight.w500)),
+                                  if (shippingCost.toString().isNotEmpty)
+                                    Text('Shipping Cost: ₹$shippingCost', style: TextStyle(fontWeight: FontWeight.w500)),
+                                  if (orderDate.toString().isNotEmpty)
+                                    Text('Order Date: $orderDate', style: TextStyle(fontWeight: FontWeight.w500)),
+                                  SizedBox(height: 8),
+                                  Text('Products:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ...products.map((prod) {
+                                    final subProducts = List<Map<String, dynamic>>.from(prod['subProduct'] ?? []);
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: subProducts.map((sub) {
+                                        final productId = sub['productId'] ?? {};
+                                        final images = List<String>.from(sub['subProductImages'] ?? []);
+                                        return Card(
+                                          margin: EdgeInsets.symmetric(vertical: 4),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                images.isNotEmpty
+                                                    ? ClipRRect(
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        child: Image.network(images[0], width: 48, height: 48, fit: BoxFit.cover),
+                                                      )
+                                                    : Container(width: 48, height: 48, color: Colors.grey[300], child: Icon(Icons.image)),
+                                                SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(productId['productName'] ?? '', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                      Text('Set: ${sub['set'] ?? ''}'),
+                                                      Text('Price: ₹${sub['price'] ?? ''}'),
+                                                      Text('Final Price: ₹${sub['finalPrice'] ?? ''}'),
+                                                      Text('Color: ${sub['color'] ?? ''}'),
+                                                      Text('Status: ${sub['status'] ?? ''}'),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    );
+                                  }).toList(),
+                                ],
+                              ),
                             ),
                           ),
                         );

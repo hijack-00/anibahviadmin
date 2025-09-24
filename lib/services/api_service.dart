@@ -138,6 +138,45 @@ return await postMultipart(url, fields, {}, multipleFiles);
 
 
 
+  Future<Map<String, dynamic>> updateSubProduct(String id, Map<String, dynamic> updatedFields) async {
+  final url = "$baseUrl/subProduct/update-sub-product/$id";
+    print('Update Product API URL: $url');
+  print('Update Product Request Body: $updatedFields');
+
+  final request = http.MultipartRequest("POST", Uri.parse(url));
+  updatedFields.forEach((key, value) async {
+    if (key == 'subProductImages' && value is List<File>) {
+      for (var file in value) {
+        if (await file.exists()) {
+          request.files.add(await http.MultipartFile.fromPath('subProductImages', file.path));
+        }
+      }
+    } else {
+      request.fields[key] = value.toString();
+    }
+  });
+  final streamedResponse = await request.send();
+  final response = await http.Response.fromStream(streamedResponse);
+   print('Update Product Response Body: ${response.body}');
+
+  return jsonDecode(response.body);
+}
+
+
+
+
+Future<List<Map<String, dynamic>>> fetchAllSizes() async {
+  final url = "$baseUrl/size/get-all-size-with-pagination";
+  final response = await http.get(Uri.parse(url), headers: defaultHeaders);
+  final decoded = jsonDecode(response.body);
+  if (decoded['success'] == true && decoded['data'] is List) {
+    return List<Map<String, dynamic>>.from(decoded['data']);
+  }
+  return [];
+}
+
+
+
   
   Future<Map<String, dynamic>> fetchProductDetailById(String productId) async {
      final url = '$baseUrl/subProduct/get_product_by_id/$productId';

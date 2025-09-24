@@ -5,6 +5,8 @@ import '../services/app_data_repo.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:http/http.dart' as http;
+import 'update_product_page.dart';
+
 
 class ProductDetailPage extends StatefulWidget {
   final String productId;
@@ -208,12 +210,45 @@ Future<void> _downloadBarcodePdf(String barcode) async {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
-        label: Text('Update'),
-        icon: Icon(Icons.edit),
-        backgroundColor: Colors.indigo,
-      ),
+      // floatingActionButton: FloatingActionButton.extended(
+      //   onPressed: () {},
+      //   label: Text('Update'),
+      //   icon: Icon(Icons.edit),
+      //   backgroundColor: Colors.indigo,
+      // ),
+      floatingActionButton: FutureBuilder<Map<String, dynamic>>(
+  future: _productFuture,
+  builder: (context, snapshot) {
+    if (!snapshot.hasData || snapshot.connectionState != ConnectionState.done) {
+      return SizedBox.shrink();
+    }
+    final data = snapshot.data?['data'] ?? {};
+    return FloatingActionButton.extended(
+      onPressed: () async {
+        final result = await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => UpdateProductPage(
+              productData: data,
+              onUpdated: () {
+                setState(() {
+                  _productFuture = AppDataRepo().fetchProductDetailById(widget.productId);
+                });
+              },
+            ),
+          ),
+        );
+        if (result == true) {
+          setState(() {
+            _productFuture = AppDataRepo().fetchProductDetailById(widget.productId);
+          });
+        }
+      },
+      label: Text('Update'),
+      icon: Icon(Icons.edit),
+      backgroundColor: Colors.indigo,
+    );
+  },
+),
     );
   }
 

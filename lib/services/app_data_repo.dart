@@ -23,11 +23,9 @@ class AppDataRepo {
     }
   }
 
-
   Future<Map<String, dynamic>> adminLogin(String email, String password) async {
-  return await _api.adminLogin(email: email, password: password);
-}
-
+    return await _api.adminLogin(email: email, password: password);
+  }
 
   Future<Map<String, dynamic>> createSubProduct({
     required List<File> images,
@@ -190,6 +188,10 @@ class AppDataRepo {
     return response;
   }
 
+  Future<Map<String, dynamic>> updateSubProduct(String id, Map<String, dynamic> updatedFields) async {
+    return await _api.updateSubProduct(id, updatedFields);
+  }
+
   static const String _userKey = 'user_data';
   static const String _tokenKey = 'user_token';
 
@@ -198,6 +200,11 @@ class AppDataRepo {
     await prefs.setString(_userKey, jsonEncode(user));
     await prefs.setString(_tokenKey, token);
   }
+
+
+  Future<List<Map<String, dynamic>>> fetchAllSizes() async {
+  return await _api.fetchAllSizes();
+}
 
   Future<Map<String, dynamic>?> getUserData() async {
     final prefs = await SharedPreferences.getInstance();

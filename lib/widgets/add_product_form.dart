@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import '../services/app_data_repo.dart';
+import '../constants/image_placeholder.dart';
 
 
 
@@ -25,6 +26,8 @@ class _AddProductFormState extends State<AddProductForm> {
   bool loadingProducts = false;
   String selectedProductId = '';
   Map<String, dynamic>? selectedProduct;
+  List<Map<String, dynamic>> sizeOptions = [];
+bool loadingSizes = false;
 
 
   TextEditingController nameController = TextEditingController();
@@ -75,7 +78,20 @@ class _AddProductFormState extends State<AddProductForm> {
   void initState() {
     super.initState();
     _fetchProducts();
+    _fetchSizes();
   }
+
+
+Future<void> _fetchSizes() async {
+  setState(() { loadingSizes = true; });
+  final repo = AppDataRepo();
+  final sizes = await repo.fetchAllSizes();
+  setState(() {
+    sizeOptions = sizes;
+    loadingSizes = false;
+  });
+}
+
 
   Widget numberField({
     required String label,
@@ -200,107 +216,182 @@ class _AddProductFormState extends State<AddProductForm> {
   }
 
   Widget _imageUploadSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Product Images', style: TextStyle(fontWeight: FontWeight.bold)),
-        SizedBox(height: 8),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: imageFiles.length,
-            separatorBuilder: (_, __) => SizedBox(width: 8),
-            itemBuilder: (context, idx) => Stack(
-              children: [
-                ClipRRect(
+  int totalSlots = 8;
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Product Images', style: TextStyle(fontWeight: FontWeight.bold)),
+      SizedBox(height: 8),
+      SizedBox(
+        height: 100,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: totalSlots,
+          separatorBuilder: (_, __) => SizedBox(width: 8),
+          itemBuilder: (context, idx) {
+            if (idx < imageFiles.length) {
+              return Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      imageFiles[idx],
+                      width: 100,
+                      height: 100,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: IconButton(
+                      icon: Icon(Icons.close, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          imageFiles.removeAt(idx);
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              );
+            } else {
+              // Placeholder for empty slots
+              return GestureDetector(
+                onTap: () async {
+                  if (imageFiles.length >= 8) return;
+                  final picker = ImagePicker();
+                  final picked = await picker.pickMultiImage();
+                  if (picked != null) {
+                    setState(() {
+                      imageFiles.addAll(picked.map((x) => File(x.path)));
+                      if (imageFiles.length > 8) imageFiles = imageFiles.sublist(0, 8);
+                    });
+                  }
+                },
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    imageFiles[idx],
+                  child: Image.network(
+                    kImagePlaceholderUrl,
                     width: 100,
                     height: 100,
                     fit: BoxFit.cover,
                   ),
                 ),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: IconButton(
-                    icon: Icon(Icons.close, color: Colors.red),
-                    onPressed: () {
-                      setState(() {
-                        imageFiles.removeAt(idx);
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        SizedBox(height: 8),
-        ElevatedButton.icon(
-          onPressed: () async {
-            if (imageFiles.length >= 8) return;
-            final picker = ImagePicker();
-            final picked = await picker.pickMultiImage();
-            if (picked != null) {
-              setState(() {
-                imageFiles.addAll(picked.map((x) => File(x.path)));
-                if (imageFiles.length > 8) imageFiles = imageFiles.sublist(0, 8);
-              });
+              );
             }
           },
-          icon: Icon(Icons.upload),
-          label: Text('Upload Images (3-8)'),
         ),
-        if (imageFiles.length < 3)
-          Padding(
-            padding: const EdgeInsets.only(top: 4.0),
-            child: Text('Please upload at least 3 images.', style: TextStyle(color: Colors.red)),
-          ),
-      ],
-    );
-  }
+      ),
+      SizedBox(height: 8),
+      ElevatedButton.icon(
+        onPressed: () async {
+          if (imageFiles.length >= 8) return;
+          final picker = ImagePicker();
+          final picked = await picker.pickMultiImage();
+          if (picked != null) {
+            setState(() {
+              imageFiles.addAll(picked.map((x) => File(x.path)));
+              if (imageFiles.length > 8) imageFiles = imageFiles.sublist(0, 8);
+            });
+          }
+        },
+        icon: Icon(Icons.upload),
+        label: Text('Upload Images (3-8)'),
+      ),
+      if (imageFiles.length < 3)
+        Padding(
+          padding: const EdgeInsets.only(top: 4.0),
+          child: Text('Please upload at least 3 images.', style: TextStyle(color: Colors.red)),
+        ),
+    ],
+  );
+}
 
 
-  Widget _sizesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Available Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-        Wrap(
-          spacing: 8,
-          children: availableSizes.map((size) {
-            return ChoiceChip(
-              label: Text(size),
-              selected: false,
-              onSelected: (_) {
-                setState(() {
-                  selectedSizes.add(size);
-                });
-              },
-            );
-          }).toList(),
-        ),
-        SizedBox(height: 8),
-        Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-        Wrap(
-          spacing: 8,
-          children: selectedSizes.map((size) {
-            return Chip(
-              label: Text(size),
-              onDeleted: () {
-                setState(() {
-                  selectedSizes.remove(size);
-                });
-              },
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
+  // Widget _sizesSection() {
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Text('Available Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
+  //       Wrap(
+  //         spacing: 8,
+  //         children: availableSizes.map((size) {
+  //           return ChoiceChip(
+  //             label: Text(size),
+  //             selected: false,
+  //             onSelected: (_) {
+  //               setState(() {
+  //                 selectedSizes.add(size);
+  //               });
+  //             },
+  //           );
+  //         }).toList(),
+  //       ),
+  //       SizedBox(height: 8),
+  //       Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
+  //       Wrap(
+  //         spacing: 8,
+  //         children: selectedSizes.map((size) {
+  //           return Chip(
+  //             label: Text(size),
+  //             onDeleted: () {
+  //               setState(() {
+  //                 selectedSizes.remove(size);
+  //               });
+  //             },
+  //           );
+  //         }).toList(),
+  //       ),
+  //     ],
+  //   );
+  // }
+
+
+Widget _sizesSection() {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Available Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
+      loadingSizes
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: CircularProgressIndicator(),
+            )
+          : Wrap(
+              spacing: 8,
+              children: sizeOptions.map((sizeObj) {
+                final size = sizeObj['size']?.toString() ?? '';
+                return ActionChip(
+                  label: Text(size),
+                  onPressed: () {
+                    setState(() {
+                      selectedSizes.add(size); // Always add, even if already present
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+      SizedBox(height: 8),
+      Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
+      Wrap(
+        spacing: 8,
+        children: selectedSizes.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final size = entry.value;
+          return Chip(
+            label: Text(size),
+            onDeleted: () {
+              setState(() {
+                selectedSizes.removeAt(idx); // Remove only this instance
+              });
+            },
+          );
+        }).toList(),
+      ),
+    ],
+  );
+}
 
   // Generates a valid random EAN13 barcode
   String _generateRandomEAN13() {

@@ -1,13 +1,17 @@
-
 import 'package:flutter/material.dart';
-
 
 class OrderStatCard extends StatelessWidget {
   final String label;
   final int count;
   final Color color;
   final IconData icon;
-  const OrderStatCard({Key? key, required this.label, required this.count, required this.color, required this.icon}) : super(key: key);
+  const OrderStatCard({
+    Key? key,
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.icon,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -28,9 +32,24 @@ class OrderStatCard extends StatelessWidget {
               ),
               // SizedBox(height: 6),
               // SizedBox(height: 2),
-                Text('$count', style: TextStyle(fontSize: 14, color: color,fontWeight: FontWeight.w600)),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
 
-              Text(label, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
         ),
@@ -44,7 +63,13 @@ class UserStatCard extends StatelessWidget {
   final int count;
   final IconData icon;
   final Color color;
-  const UserStatCard({Key? key, required this.label, required this.count, required this.icon, required this.color}) : super(key: key);
+  const UserStatCard({
+    Key? key,
+    required this.label,
+    required this.count,
+    required this.icon,
+    required this.color,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -60,11 +85,23 @@ class UserStatCard extends StatelessWidget {
               CircleAvatar(
                 radius: 25,
                 backgroundColor: color.withOpacity(0.2),
-                child: Icon(icon, color: color, size: 28)),
+                child: Icon(icon, color: color, size: 28),
+              ),
               SizedBox(height: 6),
-              Text('$count', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
               SizedBox(height: 2),
-              Text(label, style: TextStyle(fontSize: 12, color: color), textAlign: TextAlign.center),
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, color: color),
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
         ),
@@ -77,14 +114,23 @@ class QuickActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final String route;
-  const QuickActionButton({Key? key, required this.label, required this.icon, required this.route}) : super(key: key);
+  final Color bgcolor;
+  final Color fgcolor;
+  const QuickActionButton({
+    Key? key,
+    required this.label,
+    required this.icon,
+    required this.route,
+    required this.bgcolor,
+    required this.fgcolor,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.indigo,      
-        foregroundColor: Colors.white,
+        backgroundColor: bgcolor,
+        foregroundColor: fgcolor,
         minimumSize: Size(140, 40),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -102,7 +148,13 @@ class RecentOrderCard extends StatelessWidget {
   final String customer;
   final String status;
   final String total;
-  const RecentOrderCard({Key? key, required this.id, required this.customer, required this.status, required this.total}) : super(key: key);
+  const RecentOrderCard({
+    Key? key,
+    required this.id,
+    required this.customer,
+    required this.status,
+    required this.total,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +181,10 @@ class RecentOrderCard extends StatelessWidget {
           backgroundColor: statusColor.withOpacity(0.2),
           child: Icon(Icons.shopping_cart, color: statusColor),
         ),
-        title: Text('Order #$id', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          'Order #$id',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         subtitle: Text('Customer: $customer\nStatus: $status'),
         trailing: Text(total, style: TextStyle(fontWeight: FontWeight.bold)),
         onTap: () {
@@ -144,7 +199,12 @@ class KpiCard extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
-  const KpiCard({Key? key, required this.title, required this.value, required this.icon}) : super(key: key);
+  const KpiCard({
+    Key? key,
+    required this.title,
+    required this.value,
+    required this.icon,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -154,7 +214,6 @@ class KpiCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.indigo,
           borderRadius: BorderRadius.circular(12),
-        
         ),
         width: 90,
         height: 100,
@@ -164,9 +223,22 @@ class KpiCard extends StatelessWidget {
           children: [
             Icon(icon, size: 23, color: Colors.white),
             SizedBox(height: 3),
-            Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
             SizedBox(height: 1),
-            Text(title, style: TextStyle(fontSize: 9, color: Colors.white), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(
+              title,
+              style: TextStyle(fontSize: 9, color: Colors.white),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
@@ -174,13 +246,16 @@ class KpiCard extends StatelessWidget {
   }
 }
 
-
-
 class ShortcutButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final String route;
-  const ShortcutButton({Key? key, required this.label, required this.icon, required this.route}) : super(key: key);
+  const ShortcutButton({
+    Key? key,
+    required this.label,
+    required this.icon,
+    required this.route,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

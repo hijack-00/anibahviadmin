@@ -36,15 +36,18 @@ dependencies:
   geocoding: ^3.0.0
   image_picker: ^1.1.2
   shimmer: ^2.0.0
-  fl_chart: ^0.65.0
+  # fl_chart: ^0.65.0
   barcode_widget: ^2.0.4
   pdf: ^3.10.4
   printing: ^5.12.0
-
+  fl_chart: ^0.66.0
+  intl: ^0.18.1
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.5.3
+  # simple_barcode_scanner: ^0.0.10
+  # flutter_barcode_scanner: ^2.0.0 
 
 dev_dependencies:
   flutter_test:

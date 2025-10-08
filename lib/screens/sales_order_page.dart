@@ -43,52 +43,49 @@ class _SalesOrderPageState extends State<SalesOrderPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-           
-              // Customer create/search (clickable)
-              Card(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => UsersPage(showActive: true),
-                      ),
-                    );
-                  },
-                  child: ListTile(
-                    minTileHeight: 80,
-                    leading: Icon(Icons.person, color: Colors.indigo),
-                    title: Text("Customer Create/Search"),
-                    trailing: IconButton(
-                      icon: Icon(Icons.search),
-                      onPressed: isEditable ? () {} : null,
+            // Customer create/search (clickable)
+            Card(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => UsersPage(showActive: true),
                     ),
+                  );
+                },
+                child: ListTile(
+                  minTileHeight: 80,
+                  leading: Icon(Icons.person, color: Colors.indigo),
+                  title: Text("Customer Create/Search"),
+                  trailing: IconButton(
+                    icon: Icon(Icons.search),
+                    onPressed: isEditable ? () {} : null,
                   ),
                 ),
               ),
+            ),
             SizedBox(height: 12),
             // Catalogue section
             Card(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CataloguePage(),
-                      ),
-                    );
-                  },
-                  child: ListTile(
-                    minTileHeight: 80,
-                    leading: Icon(Icons.person, color: Colors.indigo),
-                    title: Text("Catalogues"),
-                    trailing: IconButton(
-                      icon: Icon(Icons.search),
-                      onPressed: isEditable ? () {} : null,
-                    ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => CataloguePage()));
+                },
+                child: ListTile(
+                  minTileHeight: 80,
+                  leading: Icon(Icons.person, color: Colors.indigo),
+                  title: Text("Catalogues"),
+                  trailing: IconButton(
+                    icon: Icon(Icons.search),
+                    onPressed: isEditable ? () {} : null,
                   ),
                 ),
               ),
+            ),
             SizedBox(height: 12),
             // Notes option
             // Card(
@@ -156,10 +153,16 @@ class _SalesOrderPageState extends State<SalesOrderPage> {
             Card(
               child: ListTile(
                 leading: Icon(Icons.swap_horiz, color: Colors.indigo),
-                title: Text(convertedToChallan ? 'Converted to Delivery Challan' : 'Convert to Delivery Challan'),
+                title: Text(
+                  convertedToChallan
+                      ? 'Converted to Delivery Challan'
+                      : 'Convert to Delivery Challan',
+                ),
                 trailing: ElevatedButton(
-                  child: Text('Convert',style: TextStyle(color: Colors.white),),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+                  child: Text('Convert', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                  ),
                   onPressed: isEditable && !convertedToChallan
                       ? () {
                           setState(() {
@@ -177,8 +180,13 @@ class _SalesOrderPageState extends State<SalesOrderPage> {
               child: ListTile(
                 leading: Icon(Icons.qr_code_scanner, color: Colors.indigo),
                 title: TextField(
-                  decoration: InputDecoration(labelText: 'Barcode / Manual Entry', border: InputBorder.none),
-                  onChanged: isEditable ? (val) => setState(() => barcode = val) : null,
+                  decoration: InputDecoration(
+                    labelText: 'Barcode / Manual Entry',
+                    border: InputBorder.none,
+                  ),
+                  onChanged: isEditable
+                      ? (val) => setState(() => barcode = val)
+                      : null,
                   enabled: isEditable,
                 ),
                 trailing: IconButton(
@@ -195,8 +203,10 @@ class _SalesOrderPageState extends State<SalesOrderPage> {
                 title: Text('Mismatch Check (SO vs DC)'),
                 subtitle: Text(mismatchStatus ?? 'No mismatch detected'),
                 trailing: ElevatedButton(
-                  child: Text('Check',style: TextStyle(color: Colors.white),),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+                  child: Text('Check', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                  ),
                   onPressed: isEditable
                       ? () {
                           setState(() {
@@ -213,8 +223,13 @@ class _SalesOrderPageState extends State<SalesOrderPage> {
               child: ListTile(
                 leading: Icon(Icons.confirmation_number, color: Colors.indigo),
                 title: TextField(
-                  decoration: InputDecoration(labelText: 'Lot No.', border: InputBorder.none),
-                  onChanged: isEditable ? (val) => setState(() => lotNo = val) : null,
+                  decoration: InputDecoration(
+                    labelText: 'Lot No.',
+                    border: InputBorder.none,
+                  ),
+                  onChanged: isEditable
+                      ? (val) => setState(() => lotNo = val)
+                      : null,
                   enabled: isEditable,
                 ),
               ),
@@ -239,9 +254,14 @@ class _SalesOrderPageState extends State<SalesOrderPage> {
             Card(
               color: isEditable ? Colors.green.shade50 : Colors.red.shade50,
               child: ListTile(
-                leading: Icon(isEditable ? Icons.edit : Icons.lock, color: isEditable ? Colors.green : Colors.red),
+                leading: Icon(
+                  isEditable ? Icons.edit : Icons.lock,
+                  color: isEditable ? Colors.green : Colors.red,
+                ),
                 title: Text(isEditable ? 'Editable' : 'Locked (DC Created)'),
-                subtitle: Text('You can edit until Delivery Challan is created.'),
+                subtitle: Text(
+                  'You can edit until Delivery Challan is created.',
+                ),
               ),
             ),
           ],

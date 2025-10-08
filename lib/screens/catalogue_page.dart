@@ -16,8 +16,8 @@ class _CataloguePageState extends State<CataloguePage> {
 
   @override
   void initState() {
-  super.initState();
-  _productsFuture = AppDataRepo().fetchCatalogueProducts();
+    super.initState();
+    _productsFuture = AppDataRepo().fetchCatalogueProducts();
   }
 
   @override
@@ -40,8 +40,7 @@ class _CataloguePageState extends State<CataloguePage> {
           if (_allProducts.isEmpty) {
             _allProducts = snapshot.data ?? [];
             _filteredProducts = _allProducts;
-              print('Catalogue API response: ${snapshot.data}');
-
+            print('Catalogue API response: ${snapshot.data}');
           }
           return Column(
             children: [
@@ -58,7 +57,11 @@ class _CataloguePageState extends State<CataloguePage> {
                     setState(() {
                       _filteredProducts = _allProducts.where((product) {
                         final productId = product['productId'] ?? {};
-                        final name = productId['productName']?.toString().toLowerCase() ?? '';
+                        final name =
+                            productId['productName']
+                                ?.toString()
+                                .toLowerCase() ??
+                            '';
                         return name.contains(val.toLowerCase());
                       }).toList();
                     });
@@ -67,51 +70,63 @@ class _CataloguePageState extends State<CataloguePage> {
               ),
               Expanded(
                 child: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {
-            _productsFuture = AppDataRepo().fetchCatalogueProducts();
-            _allProducts = [];
-            _filteredProducts = [];
-          });
-          await _productsFuture;
-        },
+                  onRefresh: () async {
+                    setState(() {
+                      _productsFuture = AppDataRepo().fetchCatalogueProducts();
+                      _allProducts = [];
+                      _filteredProducts = [];
+                    });
+                    await _productsFuture;
+                  },
                   child: _filteredProducts.isEmpty
                       ? Center(child: Text('No products found'))
                       : GridView.builder(
                           padding: EdgeInsets.all(12),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            childAspectRatio: 0.7,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                childAspectRatio: 0.7,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
                           itemCount: _filteredProducts.length,
                           itemBuilder: (context, index) {
                             final product = _filteredProducts[index];
                             final productId = product['productId'] ?? {};
                             final name = productId['productName'] ?? 'No Name';
-                          final price = product['finalPrice'] ??
-              product['price'] ??
-              productId['price'] ??
-              '-';
-                dynamic imagesRaw = product['subProductImages'] ?? product['images'] ?? [];
-List<String> images = [];
-if (imagesRaw is String) {
-  // Split by comma and trim
-  images = imagesRaw.split(',').map((e) => e.trim()).toList();
-} else if (imagesRaw is List) {
-  for (var item in imagesRaw) {
-    if (item is String && item.contains(',')) {
-      images.addAll(item.split(',').map((e) => e.trim()));
-    } else if (item != null) {
-      images.add(item.toString());
-    }
-  }
-} else {
-  images = [];
-}
-final imageUrl = images.isNotEmpty ? images[0] : null;
-                  
+                            final price =
+                                product['finalPrice'] ??
+                                product['price'] ??
+                                productId['price'] ??
+                                '-';
+                            dynamic imagesRaw =
+                                product['subProductImages'] ??
+                                product['images'] ??
+                                [];
+                            List<String> images = [];
+                            if (imagesRaw is String) {
+                              // Split by comma and trim
+                              images = imagesRaw
+                                  .split(',')
+                                  .map((e) => e.trim())
+                                  .toList();
+                            } else if (imagesRaw is List) {
+                              for (var item in imagesRaw) {
+                                if (item is String && item.contains(',')) {
+                                  images.addAll(
+                                    item.split(',').map((e) => e.trim()),
+                                  );
+                                } else if (item != null) {
+                                  images.add(item.toString());
+                                }
+                              }
+                            } else {
+                              images = [];
+                            }
+                            final imageUrl = images.isNotEmpty
+                                ? images[0]
+                                : null;
+
                             return GestureDetector(
                               onTap: () {
                                 final id = product['_id'] ?? productId['_id'];
@@ -124,27 +139,50 @@ final imageUrl = images.isNotEmpty ? images[0] : null;
                                 }
                               },
                               child: Card(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 elevation: 2,
                                 child: Padding(
                                   padding: EdgeInsets.all(8),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       if (imageUrl != null)
                                         ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                           child: Image.network(
                                             imageUrl,
                                             height: 80,
                                             width: double.infinity,
                                             fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (
+                                                  context,
+                                                  error,
+                                                  stackTrace,
+                                                ) => Container(
+                                                  height: 80,
+                                                  width: double.infinity,
+                                                  color: Colors.grey.shade200,
+                                                  child: Icon(
+                                                    Icons.image_not_supported,
+                                                    color: Colors.grey,
+                                                    size: 40,
+                                                  ),
+                                                ),
                                           ),
                                         ),
                                       SizedBox(height: 8),
                                       Text(
                                         name,
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                         textAlign: TextAlign.center,
@@ -173,34 +211,34 @@ final imageUrl = images.isNotEmpty ? images[0] : null;
         },
       ),
       floatingActionButton: FloatingActionButton(
-  backgroundColor: Colors.indigo,
-  foregroundColor: Colors.white,
-  child: Icon(Icons.add),
-  tooltip: 'Add Product',
-  onPressed: () async {
-    final result = await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+        child: Icon(Icons.add),
+        tooltip: 'Add Product',
+        onPressed: () async {
+          final result = await showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            builder: (context) => Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: AddProductForm(),
+            ),
+          );
+          if (result == true) {
+            setState(() {
+              _productsFuture = AppDataRepo().fetchCatalogueProducts();
+              _allProducts = [];
+              _filteredProducts = [];
+            });
+          }
+        },
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: AddProductForm(),
-      ),
-    );
-    if (result == true) {
-      setState(() {
-        _productsFuture = AppDataRepo().fetchCatalogueProducts();
-        _allProducts = [];
-        _filteredProducts = [];
-      });
-    }
-  },
-),
       bottomNavigationBar: UniversalNavBar(
         selectedIndex: 3,
         onTap: (index) {
@@ -223,7 +261,11 @@ final imageUrl = images.isNotEmpty ? images[0] : null;
               break;
           }
           if (route != null && ModalRoute.of(context)?.settings.name != route) {
-            Navigator.pushNamedAndRemoveUntil(context, route, (r) => r.settings.name == '/dashboard');
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              route,
+              (r) => r.settings.name == '/dashboard',
+            );
           }
         },
       ),

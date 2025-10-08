@@ -8,8 +8,7 @@ import 'screens/dashboard_screen.dart';
 import 'package:anibhaviadmin/screens/all_orders_page.dart';
 import 'screens/sales_reports_page.dart';
 import 'screens/catalogue_page.dart';
-import 'screens/order_detail_screen.dart';
-import 'screens/report_detail_screen.dart';
+import 'screens/order_details_page.dart';
 import 'screens/challan_screen.dart';
 import 'screens/product_detail_page.dart';
 import 'screens/sales_return_page.dart';
@@ -30,6 +29,8 @@ void main() {
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -79,19 +80,20 @@ class MyApp extends StatelessWidget {
           '/orders': (context) => AllOrdersPage(),
           '/challan': (context) => ChallanScreen(),
           '/reports': (context) => SalesReportsPage(),
-          '/users': (context) =>  UsersPage(showActive: true),
+          '/users': (context) => UsersPage(showActive: true),
           '/order_detail': (context) {
             final orderId =
                 ModalRoute.of(context)?.settings.arguments as String? ?? '';
-            return OrderDetailScreen(orderId: orderId);
+            return OrderDetailsPage(orderId: orderId);
           },
-          '/report_detail': (context) {
-            final reportType =
-                ModalRoute.of(context)?.settings.arguments as String? ?? '';
-            return ReportDetailScreen(reportType: reportType);
-          },
+          // '/report_detail': (context) {
+          //   final reportType =
+          //       ModalRoute.of(context)?.settings.arguments as String? ?? '';
+          //   return ReportDetailScreen(reportType: reportType);
+          // },
           '/product-detail': (context) {
-            final productId = ModalRoute.of(context)?.settings.arguments as String? ?? '';
+            final productId =
+                ModalRoute.of(context)?.settings.arguments as String? ?? '';
             return ProductDetailPage(productId: productId);
           },
           // Add new routes below

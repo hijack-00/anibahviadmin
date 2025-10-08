@@ -4,41 +4,33 @@ import 'package:http/http.dart' as http;
 import '../models/product.dart';
 
 class ApiService {
-
-  // final String baseUrl = "https://api.sddipl.com/api";
   static const String baseUrl = "https://api.sddipl.com/api";
   static Map<String, String> defaultHeaders = {
     "Content-Type": "application/json",
   };
 
-
-
-
   Future<Map<String, dynamic>> adminLogin({
-  required String email,
-  required String password,
-}) async {
-  final url = "$baseUrl/admin/admin-login";
-  final response = await http.post(
-    Uri.parse(url),
-    headers: {"Content-Type": "application/json"},
-    body: jsonEncode({'email': email, 'password': password}),
-  );
-  if (response.statusCode == 200) {
-    return jsonDecode(response.body);
-  } else {
-    throw Exception('Login failed: ${response.statusCode}');
+    required String email,
+    required String password,
+  }) async {
+    final url = "$baseUrl/admin/admin-login";
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Login failed: ${response.statusCode}');
+    }
   }
-}
-  
 
-
-    Future<Map<String, dynamic>> getAllProducts() async {
+  Future<Map<String, dynamic>> getAllProducts() async {
     final url = "$baseUrl/product/get-all-products";
     final response = await http.get(Uri.parse(url), headers: defaultHeaders);
     return jsonDecode(response.body);
   }
-
 
   Future<Map<String, dynamic>> createSubProduct({
     required List<File> images,
@@ -82,15 +74,11 @@ class ApiService {
     };
     final files = <String, File>{};
     List<File> imageList = images; // or whatever your images list is called
-final multipleFiles = <String, List<File>>{
-  'subProductImages': imageList,
-};
-return await postMultipart(url, fields, {}, multipleFiles);
+    final multipleFiles = <String, List<File>>{'subProductImages': imageList};
+    return await postMultipart(url, fields, {}, multipleFiles);
     // You must have a postMultipart helper defined in this file:
     return await postMultipart(url, fields, files, {});
   }
-
-
 
   // Add your postMultipart helper here if not present
   Future<Map<String, dynamic>> postMultipart(
@@ -99,105 +87,174 @@ return await postMultipart(url, fields, {}, multipleFiles);
     Map<String, File> singleFiles,
     Map<String, List<File>> multipleFiles,
   ) async {
-     print('--- Multipart Request ---');
-  print('URL: $url');
-  print('Fields: $fields');
-  print('Single Files: ${singleFiles.keys.map((k) => '$k: ${singleFiles[k]?.path}').toList()}');
-  print('Multiple Files: ${multipleFiles.keys.map((k) => '$k: ${multipleFiles[k]?.map((f) => f.path).toList()}').toList()}');
+    print('--- Multipart Request ---');
+    print('URL: $url');
+    print('Fields: $fields');
+    print(
+      'Single Files: ${singleFiles.keys.map((k) => '$k: ${singleFiles[k]?.path}').toList()}',
+    );
+    print(
+      'Multiple Files: ${multipleFiles.keys.map((k) => '$k: ${multipleFiles[k]?.map((f) => f.path).toList()}').toList()}',
+    );
 
     var request = http.MultipartRequest("POST", Uri.parse(url));
     request.fields.addAll(fields);
 
     for (var entry in singleFiles.entries) {
       if (await entry.value.exists()) {
-        request.files.add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
+        request.files.add(
+          await http.MultipartFile.fromPath(entry.key, entry.value.path),
+        );
       }
     }
 
     for (var entry in multipleFiles.entries) {
-  for (var file in entry.value) {
-    if (await file.exists()) {
-      request.files.add(await http.MultipartFile.fromPath(entry.key, file.path));
+      for (var file in entry.value) {
+        if (await file.exists()) {
+          request.files.add(
+            await http.MultipartFile.fromPath(entry.key, file.path),
+          );
+        }
+      }
     }
-  }
-}
-  print('Sending multipart request...');
+    print('Sending multipart request...');
 
     var streamedResponse = await request.send();
     var response = await http.Response.fromStream(streamedResponse);
-      print('Response status: ${response.statusCode}');
-  print('Response body: ${response.body}');
-  print('--- End Multipart Request ---');
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+    print('--- End Multipart Request ---');
 
- if (!response.headers['content-type']!.contains('application/json')) {
-    throw Exception('Server did not return JSON. Response: ${response.body}');
-  }
+    if (!response.headers['content-type']!.contains('application/json')) {
+      throw Exception('Server did not return JSON. Response: ${response.body}');
+    }
     return jsonDecode(response.body);
   }
 
-
-
-
-  Future<Map<String, dynamic>> updateSubProduct(String id, Map<String, dynamic> updatedFields) async {
-  final url = "$baseUrl/subProduct/update-sub-product/$id";
+  Future<Map<String, dynamic>> updateSubProduct(
+    String id,
+    Map<String, dynamic> updatedFields,
+  ) async {
+    final url = "$baseUrl/subProduct/update-sub-product/$id";
     print('Update Product API URL: $url');
-  print('Update Product Request Body: $updatedFields');
+    print('Update Product Request Body: $updatedFields');
 
-  final request = http.MultipartRequest("POST", Uri.parse(url));
-  updatedFields.forEach((key, value) async {
-    if (key == 'subProductImages' && value is List<File>) {
-      for (var file in value) {
-        if (await file.exists()) {
-          request.files.add(await http.MultipartFile.fromPath('subProductImages', file.path));
+    final request = http.MultipartRequest("POST", Uri.parse(url));
+    updatedFields.forEach((key, value) async {
+      if (key == 'subProductImages' && value is List<File>) {
+        for (var file in value) {
+          if (await file.exists()) {
+            request.files.add(
+              await http.MultipartFile.fromPath('subProductImages', file.path),
+            );
+          }
         }
+      } else {
+        request.fields[key] = value.toString();
       }
-    } else {
-      request.fields[key] = value.toString();
-    }
-  });
-  final streamedResponse = await request.send();
-  final response = await http.Response.fromStream(streamedResponse);
-   print('Update Product Response Body: ${response.body}');
+    });
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    print('Update Product Response Body: ${response.body}');
 
-  return jsonDecode(response.body);
-}
-
-
-
-
-Future<List<Map<String, dynamic>>> fetchAllSizes() async {
-  final url = "$baseUrl/size/get-all-size-with-pagination";
-  final response = await http.get(Uri.parse(url), headers: defaultHeaders);
-  final decoded = jsonDecode(response.body);
-  if (decoded['success'] == true && decoded['data'] is List) {
-    return List<Map<String, dynamic>>.from(decoded['data']);
+    return jsonDecode(response.body);
   }
-  return [];
-}
 
+  static Future<Map<String, dynamic>?> getUserRewardPoints(
+    String userId,
+  ) async {
+    final url = Uri.parse('$baseUrl/reward/get-all-rewards-by-id/$userId');
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    return null;
+  }
 
+  Future<List<Map<String, dynamic>>> fetchAllSizes() async {
+    final url = "$baseUrl/size/get-all-size-with-pagination";
+    final response = await http.get(Uri.parse(url), headers: defaultHeaders);
+    final decoded = jsonDecode(response.body);
+    if (decoded['success'] == true && decoded['data'] is List) {
+      return List<Map<String, dynamic>>.from(decoded['data']);
+    }
+    return [];
+  }
 
-  
   Future<Map<String, dynamic>> fetchProductDetailById(String productId) async {
-     final url = '$baseUrl/subProduct/get_product_by_id/$productId';
-  print('Product Details API URL: $url');
- 
+    final url = '$baseUrl/subProduct/get_product_by_id/$productId';
+    print('Product Details API URL: $url');
+
     final response = await get('/subProduct/get_product_by_id/$productId');
-    
+
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      throw Exception('Failed to fetch product details: ${response.statusCode}');
+      throw Exception(
+        'Failed to fetch product details: ${response.statusCode}',
+      );
     }
   }
+
   Future<Map<String, dynamic>> fetchCatalogueProducts() async {
     final response = await get('/subProduct/get-all-sub-products');
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      throw Exception('Failed to fetch catalogue products: {response.statusCode}');
+      throw Exception(
+        'Failed to fetch catalogue products: {response.statusCode}',
+      );
     }
   }
+
+  Future<Map<String, dynamic>> fetchJeansShirtRevenueAndOrder() async {
+    final url = "$baseUrl/salesAndReports/get-jeans-shirt-revenue-and-order";
+    final response = await get(
+      '/salesAndReports/get-jeans-shirt-revenue-and-order',
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to fetch jeans/shirt revenue and order');
+    }
+  }
+
+  Future<Map<String, dynamic>> createOrderByAdmin(
+    Map<String, dynamic> orderData,
+  ) async {
+    final url = "$baseUrl/order/create-order-by-admin";
+    final response = await post(
+      '/order/create-order-by-admin',
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(orderData),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to create order: ${response.statusCode}');
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchSalesData() async {
+    final url = "$baseUrl/salesAndReports/get-SalesData";
+    final response = await get('/salesAndReports/get-SalesData');
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to fetch sales data');
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchTopProducts() async {
+    final url = "$baseUrl/salesAndReports/get-top-products";
+    final response = await get('/salesAndReports/get-top-products');
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to fetch top products');
+    }
+  }
+
   Future<Map<String, dynamic>> deleteOrderById(String orderId) async {
     final response = await post('/order/order-delete/$orderId');
     print('Delete order by id response: ' + response.body);
@@ -207,6 +264,7 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
       throw Exception('Failed to delete order: ${response.statusCode}');
     }
   }
+
   Future<Map<String, dynamic>> deleteUserById(String userId) async {
     final response = await get('/user/delete-user/$userId');
     print('Delete user by id response: ' + response.body);
@@ -216,6 +274,7 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
       throw Exception('Failed to delete user: ${response.statusCode}');
     }
   }
+
   Future<Map<String, dynamic>> getOrdersByUserId(String userId) async {
     final response = await get('/order/get-all-orders-by-user/$userId');
     print('Get orders by user id response: ' + response.body);
@@ -225,6 +284,7 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
       throw Exception('Failed to fetch orders: ${response.statusCode}');
     }
   }
+
   Future<Map<String, dynamic>> getCartByUserId(String userId) async {
     final response = await get('/card/get-card-by-user-id/$userId');
     print('Get cart by user id response: ' + response.body);
@@ -234,6 +294,7 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
       throw Exception('Failed to fetch cart: {response.statusCode}');
     }
   }
+
   Future<Map<String, dynamic>> getAllOrders() async {
     final response = await get('/order/get-all-orders');
     print('Get all orders response: ' + response.body);
@@ -244,15 +305,19 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
     }
   }
 
-
-  Future<Map<String, dynamic>> changeOrderStatus(String orderId, {String? orderStatus, String? paymentStatus}) async {
+  Future<Map<String, dynamic>> changeOrderStatus(
+    String orderId, {
+    String? orderStatus,
+    String? paymentStatus,
+  }) async {
     final body = <String, dynamic>{};
     if (orderStatus != null) body['orderStatus'] = orderStatus;
     if (paymentStatus != null) body['paymentStatus'] = paymentStatus;
     final url = '$baseUrl/order/order/change-status/$orderId';
     print('Change order status REQUEST URL: ' + url);
     print('Change order status REQUEST BODY: ' + jsonEncode(body));
-    final response = await post('/order/change-status/$orderId',
+    final response = await post(
+      '/order/change-status/$orderId',
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
@@ -264,8 +329,6 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
     }
   }
 
-
-
   Future<Map<String, dynamic>> getOrderById(String orderId) async {
     final response = await get('/order/get-order-by-id/$orderId');
     print('Get order by id response: ' + response.body);
@@ -275,10 +338,12 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
       throw Exception('Failed to fetch order details: ${response.statusCode}');
     }
   }
+
   Future<Map<String, dynamic>> sendOtpForUserSignup(String email) async {
     final body = jsonEncode({'email': email});
     print('Send OTP request body: ' + body);
-    final response = await post('/user/send-otp-for-user-signup',
+    final response = await post(
+      '/user/send-otp-for-user-signup',
       headers: {'Content-Type': 'application/json'},
       body: body,
     );
@@ -305,7 +370,8 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
       'password': password,
     });
     print('Verify OTP request body: ' + body);
-    final response = await post('/user/verify-otp-for-user-signup',
+    final response = await post(
+      '/user/verify-otp-for-user-signup',
       headers: {'Content-Type': 'application/json'},
       body: body,
     );
@@ -354,6 +420,7 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
       throw Exception('Failed to update user: ${response.statusCode}');
     }
   }
+
   Future<List<Map<String, dynamic>>> getAllUsers() async {
     final response = await get('/user/get-all-user');
     if (response.statusCode == 200) {
@@ -368,17 +435,29 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
     }
   }
 
-  Future<http.Response> get(String endpoint, {Map<String, String>? headers}) async {
+  Future<http.Response> get(
+    String endpoint, {
+    Map<String, String>? headers,
+  }) async {
     final url = Uri.parse('$baseUrl$endpoint');
     return await http.get(url, headers: headers);
   }
 
-  Future<http.Response> post(String endpoint, {Map<String, String>? headers, Object? body}) async {
+  Future<http.Response> post(
+    String endpoint, {
+    Map<String, String>? headers,
+    Object? body,
+  }) async {
     final url = Uri.parse('$baseUrl$endpoint');
     return await http.post(url, headers: headers, body: body);
   }
 
-  Future<http.Response> multipart(String endpoint, Map<String, String> fields, List<http.MultipartFile> files, {Map<String, String>? headers}) async {
+  Future<http.Response> multipart(
+    String endpoint,
+    Map<String, String> fields,
+    List<http.MultipartFile> files, {
+    Map<String, String>? headers,
+  }) async {
     final url = Uri.parse('$baseUrl$endpoint');
     var request = http.MultipartRequest('POST', url);
     request.fields.addAll(fields);
@@ -389,17 +468,15 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-  final response = await post('/admin-login',
+    final response = await post(
+      '/admin-login',
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password}),
     );
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = json.decode(response.body);
       if (data['status'] == true && data['data'] != null) {
-        return {
-          'user': data['data']['user'],
-          'token': data['data']['token'],
-        };
+        return {'user': data['data']['user'], 'token': data['data']['token']};
       } else {
         throw Exception(data['message'] ?? 'Login failed');
       }
@@ -419,7 +496,6 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
     }
   }
 
-
   Future<Map<String, dynamic>> getUserDetailsById(String userId) async {
     final response = await get('/user/get-all-user-by-id/$userId');
     if (response.statusCode == 200) {
@@ -437,7 +513,4 @@ Future<List<Map<String, dynamic>>> fetchAllSizes() async {
       throw Exception('Failed to toggle user status: ${response.statusCode}');
     }
   }
-
-
-
 }

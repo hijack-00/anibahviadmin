@@ -27,8 +27,8 @@ Future<bool?> showUserCreationDialog(BuildContext context) async {
   );
 }
 
-
-class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMixin {
+class _UsersPageState extends State<UsersPage>
+    with SingleTickerProviderStateMixin {
   bool _disposed = false;
   List<Map<String, dynamic>> _activeUsers = [];
   List<Map<String, dynamic>> _inactiveUsers = [];
@@ -42,7 +42,11 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this, initialIndex: widget.showActive ? 0 : 1);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.showActive ? 0 : 1,
+    );
     _fetchUsers();
   }
 
@@ -54,8 +58,10 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
   }
 
   Future<void> _fetchUsers() async {
-  if (_disposed) return;
-  setState(() { _loading = true; });
+    if (_disposed) return;
+    setState(() {
+      _loading = true;
+    });
     try {
       final repo = AppDataRepo();
       await repo.loadAllUsers();
@@ -69,13 +75,17 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
         _loading = false;
       });
       // Preload orders for all users after fetching
-  await _preloadUserOrders(users);
-  if (_disposed) return;
-  setState(() {}); // trigger rebuild after cache
+      await _preloadUserOrders(users);
+      if (_disposed) return;
+      setState(() {}); // trigger rebuild after cache
     } catch (e) {
-  if (_disposed) return;
-  setState(() { _loading = false; });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load users: $e')));
+      if (_disposed) return;
+      setState(() {
+        _loading = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load users: $e')));
     }
   }
 
@@ -84,10 +94,22 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
     setState(() {
       if (active) {
         _searchActive = value;
-        _filteredActive = _activeUsers.where((u) => (u['name'] ?? '').toLowerCase().contains(_searchActive.toLowerCase())).toList();
+        _filteredActive = _activeUsers
+            .where(
+              (u) => (u['name'] ?? '').toLowerCase().contains(
+                _searchActive.toLowerCase(),
+              ),
+            )
+            .toList();
       } else {
         _searchInactive = value;
-        _filteredInactive = _inactiveUsers.where((u) => (u['name'] ?? '').toLowerCase().contains(_searchInactive.toLowerCase())).toList();
+        _filteredInactive = _inactiveUsers
+            .where(
+              (u) => (u['name'] ?? '').toLowerCase().contains(
+                _searchInactive.toLowerCase(),
+              ),
+            )
+            .toList();
       }
     });
     // Preload orders for filtered users after search
@@ -108,19 +130,23 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
           int orderCount = 0;
           double totalSpent = 0;
           if (resp['success'] == true) {
-            final orders = List<Map<String, dynamic>>.from(resp['orders'] ?? []);
+            final orders = List<Map<String, dynamic>>.from(
+              resp['orders'] ?? [],
+            );
             orderCount = orders.length;
-            totalSpent = orders.fold(0, (sum, o) => sum + (double.tryParse(o['totalAmount']?.toString() ?? '0') ?? 0));
+            totalSpent = orders.fold(
+              0,
+              (sum, o) =>
+                  sum +
+                  (double.tryParse(o['totalAmount']?.toString() ?? '0') ?? 0),
+            );
           }
           _userOrderCache[userId] = {
             'orderCount': orderCount,
             'totalSpent': totalSpent,
           };
         } catch (_) {
-          _userOrderCache[userId] = {
-            'orderCount': 0,
-            'totalSpent': 0.0,
-          };
+          _userOrderCache[userId] = {'orderCount': 0, 'totalSpent': 0.0};
         }
       }
     }
@@ -150,7 +176,9 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
           color: Colors.white,
           margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () async {
@@ -170,10 +198,14 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
                     children: [
                       CircleAvatar(
                         radius: 28,
-                        backgroundImage: user['photo'] != null && user['photo'].toString().isNotEmpty
+                        backgroundImage:
+                            user['photo'] != null &&
+                                user['photo'].toString().isNotEmpty
                             ? NetworkImage(user['photo'])
                             : null,
-                        child: user['photo'] == null || user['photo'].toString().isEmpty
+                        child:
+                            user['photo'] == null ||
+                                user['photo'].toString().isEmpty
                             ? Icon(Icons.person, size: 28, color: Colors.grey)
                             : null,
                       ),
@@ -182,23 +214,54 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(user['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(
+                              user['name'] ?? '',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                             SizedBox(height: 4),
-                            Text(shopName, style: TextStyle(fontWeight: FontWeight.w600, color: Colors.indigo)),
+                            Text(
+                              shopName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.indigo,
+                              ),
+                            ),
                             if ((user['email'] ?? '').toString().isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 2.0),
-                                child: Text(user['email'], style: TextStyle(color: Colors.grey[800], fontSize: 13)),
+                                child: Text(
+                                  user['email'],
+                                  style: TextStyle(
+                                    color: Colors.grey[800],
+                                    fontSize: 13,
+                                  ),
+                                ),
                               ),
                             if ((user['phone'] ?? '').toString().isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 2.0),
-                                child: Text(user['phone'], style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[800], fontSize: 13)),
+                                child: Text(
+                                  user['phone'],
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[800],
+                                    fontSize: 13,
+                                  ),
+                                ),
                               ),
                             if (address.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 2.0),
-                                child: Text(address, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                                child: Text(
+                                  address,
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
                               ),
                             SizedBox(height: 8),
                             Row(
@@ -212,7 +275,8 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
                                               height: 22,
                                               decoration: BoxDecoration(
                                                 color: Colors.yellow[100],
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                             ),
                                             SizedBox(width: 12),
@@ -221,7 +285,8 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
                                               height: 22,
                                               decoration: BoxDecoration(
                                                 color: Colors.indigo[100],
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                             ),
                                           ],
@@ -231,29 +296,65 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
                                         child: Row(
                                           children: [
                                             Container(
-                                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 4,
+                                              ),
                                               decoration: BoxDecoration(
                                                 color: Colors.yellow[100],
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                               child: Row(
                                                 children: [
-                                                  Text('Orders: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                                  Text('${cache['orderCount']}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                  Text(
+                                                    'Orders: ',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    '${cache['orderCount']}',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
                                             ),
                                             SizedBox(width: 12),
                                             Container(
-                                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 4,
+                                              ),
                                               decoration: BoxDecoration(
                                                 color: Colors.blue[100],
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                               child: Row(
                                                 children: [
-                                                  Text('Spent: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                                  Text('₹${cache['totalSpent'].toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                  Text(
+                                                    'Spent: ',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    '₹${cache['totalSpent'].toStringAsFixed(2)}',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
                                             ),
@@ -273,7 +374,9 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
                   top: 12,
                   right: 12,
                   child: Icon(
-                    user['isActive'] == true ? Icons.check_circle : Icons.cancel,
+                    user['isActive'] == true
+                        ? Icons.check_circle
+                        : Icons.cancel,
                     color: user['isActive'] == true ? Colors.green : Colors.red,
                     size: 22,
                   ),
@@ -306,7 +409,11 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
         break;
     }
     if (route != null && ModalRoute.of(context)?.settings.name != route) {
-      Navigator.pushNamedAndRemoveUntil(context, route, (r) => r.settings.name == '/dashboard');
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        route,
+        (r) => r.settings.name == '/dashboard',
+      );
     }
   }
 
@@ -373,10 +480,7 @@ class _UsersPageState extends State<UsersPage> with SingleTickerProviderStateMix
           }
         },
       ),
-      bottomNavigationBar: UniversalNavBar(
-        selectedIndex: 2,
-        onTap: _onNavTap,
-      ),
+      bottomNavigationBar: UniversalNavBar(selectedIndex: 2, onTap: _onNavTap),
     );
   }
 }
@@ -458,35 +562,56 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
   bool _autoLocationLoading = false;
 
   Future<void> _sendOtp() async {
-    setState(() { _emailError = null; _emailLoading = true; });
+    setState(() {
+      _emailError = null;
+      _emailLoading = true;
+    });
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      setState(() { _emailError = 'Please enter email'; _emailLoading = false; });
+      setState(() {
+        _emailError = 'Please enter email';
+        _emailLoading = false;
+      });
       return;
     }
     try {
       final repo = AppDataRepo();
       final resp = await repo.sendOtpForUserSignup(email);
       if (resp['success'] == true) {
-        setState(() { _emailSent = true; _detailsEnabled = true; });
+        setState(() {
+          _emailSent = true;
+          _detailsEnabled = true;
+        });
       } else {
-        setState(() { _emailError = resp['message'] ?? 'Failed to send OTP'; });
+        setState(() {
+          _emailError = resp['message'] ?? 'Failed to send OTP';
+        });
       }
     } catch (e) {
-      setState(() { _emailError = e.toString(); });
+      setState(() {
+        _emailError = e.toString();
+      });
     } finally {
-      setState(() { _emailLoading = false; });
+      setState(() {
+        _emailLoading = false;
+      });
     }
   }
 
   Future<void> _verifyOtpAndDetails() async {
-    setState(() { _detailsError = null; _detailsLoading = true; });
+    setState(() {
+      _detailsError = null;
+      _detailsLoading = true;
+    });
     final otp = _otpController.text.trim();
     final name = _nameController.text.trim();
     final mobile = _mobileController.text.trim();
     final password = _passwordController.text.trim();
     if (otp.isEmpty || name.isEmpty || mobile.isEmpty || password.isEmpty) {
-      setState(() { _detailsError = 'Please fill all fields'; _detailsLoading = false; });
+      setState(() {
+        _detailsError = 'Please fill all fields';
+        _detailsLoading = false;
+      });
       return;
     }
     try {
@@ -498,18 +623,26 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
         otp: otp,
         password: password,
       );
-      if (resp['status'] == true && resp['data'] != null && resp['data']['user'] != null) {
+      if (resp['status'] == true &&
+          resp['data'] != null &&
+          resp['data']['user'] != null) {
         setState(() {
           _userId = resp['data']['user']['_id'];
           _addressEnabled = true;
         });
       } else {
-        setState(() { _detailsError = resp['message'] ?? 'Failed to verify OTP'; });
+        setState(() {
+          _detailsError = resp['message'] ?? 'Failed to verify OTP';
+        });
       }
     } catch (e) {
-      setState(() { _detailsError = e.toString(); });
+      setState(() {
+        _detailsError = e.toString();
+      });
     } finally {
-      setState(() { _detailsLoading = false; });
+      setState(() {
+        _detailsLoading = false;
+      });
     }
   }
 
@@ -524,11 +657,15 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
   }
 
   Future<void> _autoDetectLocation() async {
-    setState(() { _autoLocationLoading = true; });
+    setState(() {
+      _autoLocationLoading = true;
+    });
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       print('Location services are disabled.');
-      setState(() { _autoLocationLoading = false; });
+      setState(() {
+        _autoLocationLoading = false;
+      });
       return;
     }
     LocationPermission permission = await Geolocator.checkPermission();
@@ -536,19 +673,30 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         print('Location permissions are denied');
-        setState(() { _autoLocationLoading = false; });
+        setState(() {
+          _autoLocationLoading = false;
+        });
         return;
       }
     }
     if (permission == LocationPermission.deniedForever) {
       print('Location permissions are permanently denied.');
-      setState(() { _autoLocationLoading = false; });
+      setState(() {
+        _autoLocationLoading = false;
+      });
       return;
     }
     try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      print('Auto location output: ${position.latitude}, ${position.longitude}');
-      List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      print(
+        'Auto location output: ${position.latitude}, ${position.longitude}',
+      );
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
         setState(() {
@@ -563,12 +711,17 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
     } catch (e) {
       print('Auto location error: $e');
     } finally {
-      setState(() { _autoLocationLoading = false; });
+      setState(() {
+        _autoLocationLoading = false;
+      });
     }
   }
 
   Future<void> _createUser() async {
-    setState(() { _addressError = null; _addressLoading = true; });
+    setState(() {
+      _addressError = null;
+      _addressLoading = true;
+    });
     try {
       final repo = AppDataRepo();
       final resp = await repo.updateUserWithPhoto(
@@ -586,14 +739,22 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
       );
       if (resp['success'] == true) {
         Navigator.of(context).pop(true);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('User Created Successfully!')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('User Created Successfully!')));
       } else {
-        setState(() { _addressError = resp['message'] ?? 'Failed to update user'; });
+        setState(() {
+          _addressError = resp['message'] ?? 'Failed to update user';
+        });
       }
     } catch (e) {
-      setState(() { _addressError = e.toString(); });
+      setState(() {
+        _addressError = e.toString();
+      });
     } finally {
-      setState(() { _addressLoading = false; });
+      setState(() {
+        _addressLoading = false;
+      });
     }
   }
 
@@ -638,7 +799,16 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
                     child: ElevatedButton(
                       style: buttonStyle,
                       onPressed: _emailLoading || _emailSent ? null : _sendOtp,
-                      child: _emailLoading ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text('Send OTP'),
+                      child: _emailLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text('Send OTP'),
                     ),
                   ),
                 ],
@@ -646,7 +816,10 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
               if (_emailError != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 6.0),
-                  child: Text(_emailError!, style: TextStyle(color: Colors.red)),
+                  child: Text(
+                    _emailError!,
+                    style: TextStyle(color: Colors.red),
+                  ),
                 ),
               Divider(height: 16),
               // Step 2: User Details
@@ -710,8 +883,20 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
                   Expanded(
                     child: ElevatedButton(
                       style: buttonStyle,
-                      onPressed: _detailsLoading || !_detailsEnabled || _addressEnabled ? null : _verifyOtpAndDetails,
-                      child: _detailsLoading ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text('Verify & Next'),
+                      onPressed:
+                          _detailsLoading || !_detailsEnabled || _addressEnabled
+                          ? null
+                          : _verifyOtpAndDetails,
+                      child: _detailsLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text('Verify & Next'),
                     ),
                   ),
                 ],
@@ -719,7 +904,10 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
               if (_detailsError != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 6.0),
-                  child: Text(_detailsError!, style: TextStyle(color: Colors.red)),
+                  child: Text(
+                    _detailsError!,
+                    style: TextStyle(color: Colors.red),
+                  ),
                 ),
               Divider(height: 16),
               // Step 3: Address/Photo
@@ -727,8 +915,12 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
                 onTap: _addressEnabled ? _pickPhoto : null,
                 child: CircleAvatar(
                   radius: 32,
-                  backgroundImage: _photoFile != null ? FileImage(_photoFile!) : null,
-                  child: _photoFile == null ? Icon(Icons.camera_alt, size: 24) : null,
+                  backgroundImage: _photoFile != null
+                      ? FileImage(_photoFile!)
+                      : null,
+                  child: _photoFile == null
+                      ? Icon(Icons.camera_alt, size: 24)
+                      : null,
                 ),
               ),
               SizedBox(height: 6),
@@ -746,8 +938,19 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
                   Expanded(
                     child: ElevatedButton(
                       style: buttonStyle,
-                      onPressed: _addressEnabled && !_autoLocationLoading ? _autoDetectLocation : null,
-                      child: _autoLocationLoading ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text('Auto Detect Location'),
+                      onPressed: _addressEnabled && !_autoLocationLoading
+                          ? _autoDetectLocation
+                          : null,
+                      child: _autoLocationLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text('Auto Detect Location'),
                     ),
                   ),
                 ],
@@ -800,15 +1003,26 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
                 enabled: _addressEnabled,
                 keyboardType: TextInputType.text,
               ),
-              
+
               SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
                     child: ElevatedButton(
                       style: buttonStyle,
-                      onPressed: _addressLoading || !_addressEnabled ? null : _createUser,
-                      child: _addressLoading ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text('Create User'),
+                      onPressed: _addressLoading || !_addressEnabled
+                          ? null
+                          : _createUser,
+                      child: _addressLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text('Create User'),
                     ),
                   ),
                 ],
@@ -816,7 +1030,10 @@ class _UserCreationDialogState extends State<_UserCreationDialog> {
               if (_addressError != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 6.0),
-                  child: Text(_addressError!, style: TextStyle(color: Colors.red)),
+                  child: Text(
+                    _addressError!,
+                    style: TextStyle(color: Colors.red),
+                  ),
                 ),
             ],
           ),

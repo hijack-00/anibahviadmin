@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:anibhaviadmin/services/api_service.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppDataRepo {
@@ -94,12 +95,62 @@ class AppDataRepo {
     return await _api.getCartByUserId(userId);
   }
 
+  Future<Map<String, dynamic>> getJeansShirtRevenueAndOrder() async {
+    return await _api.fetchJeansShirtRevenueAndOrder();
+  }
+
+  Future<Map<String, dynamic>> getSalesData() async {
+    return await _api.fetchSalesData();
+  }
+
+  // In app_data_repo.dart
+  Future<Map<String, dynamic>> createOrderByAdmin(
+    Map<String, dynamic> orderData,
+  ) async {
+    final response = await http.post(
+      Uri.parse('${ApiService.baseUrl}/order/create-order-by-admin'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(orderData),
+    );
+    final body = jsonDecode(response.body);
+    return {
+      "success": response.statusCode == 200 || response.statusCode == 201,
+      "data": body,
+      "status": response.statusCode,
+      "message": body['message'] ?? '',
+    };
+  }
+
+  Future<int> fetchUserRewardPoints(String userId) async {
+    final data = await ApiService.getUserRewardPoints(userId);
+    if (data != null &&
+        data['data'] != null &&
+        data['data']['points'] != null) {
+      return data['data']['points'] is int
+          ? data['data']['points']
+          : int.tryParse(data['data']['points'].toString()) ?? 0;
+    }
+    return 0;
+  }
+
+  Future<Map<String, dynamic>> getTopProducts() async {
+    return await _api.fetchTopProducts();
+  }
+
   Future<Map<String, dynamic>> fetchAllOrders() async {
     return await _api.getAllOrders();
   }
 
-  Future<Map<String, dynamic>> changeOrderStatus(String orderId, {String? orderStatus, String? paymentStatus}) async {
-    return await _api.changeOrderStatus(orderId, orderStatus: orderStatus, paymentStatus: paymentStatus);
+  Future<Map<String, dynamic>> changeOrderStatus(
+    String orderId, {
+    String? orderStatus,
+    String? paymentStatus,
+  }) async {
+    return await _api.changeOrderStatus(
+      orderId,
+      orderStatus: orderStatus,
+      paymentStatus: paymentStatus,
+    );
   }
 
   Future<Map<String, dynamic>> fetchOrderById(String orderId) async {
@@ -188,7 +239,10 @@ class AppDataRepo {
     return response;
   }
 
-  Future<Map<String, dynamic>> updateSubProduct(String id, Map<String, dynamic> updatedFields) async {
+  Future<Map<String, dynamic>> updateSubProduct(
+    String id,
+    Map<String, dynamic> updatedFields,
+  ) async {
     return await _api.updateSubProduct(id, updatedFields);
   }
 
@@ -201,20 +255,16 @@ class AppDataRepo {
     await prefs.setString(_tokenKey, token);
   }
 
-
   Future<List<Map<String, dynamic>>> fetchAllSizes() async {
-  return await _api.fetchAllSizes();
-}
+    return await _api.fetchAllSizes();
+  }
 
   Future<Map<String, dynamic>?> getUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final userStr = prefs.getString(_userKey);
     final token = prefs.getString(_tokenKey);
     if (userStr != null && token != null) {
-      return {
-        'user': jsonDecode(userStr),
-        'token': token,
-      };
+      return {'user': jsonDecode(userStr), 'token': token};
     }
     return null;
   }

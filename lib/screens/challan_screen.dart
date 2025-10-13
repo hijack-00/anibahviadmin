@@ -4,6 +4,8 @@ import '../widgets/searchable_dropdown.dart';
 import 'package:fl_chart/fl_chart.dart'; // For graph view
 
 class ChallanScreen extends StatefulWidget {
+  const ChallanScreen({super.key});
+
   @override
   State<ChallanScreen> createState() => _ChallanScreenState();
 }
@@ -66,19 +68,29 @@ class _ChallanScreenState extends State<ChallanScreen> {
   ];
 
   List<String> statuses = [
-    'All', 'Pending', 'Approved', 'Completed', 'Dispatched', 'Rejected'
+    'All',
+    'Pending',
+    'Approved',
+    'Completed',
+    'Dispatched',
+    'Rejected',
   ];
 
   List<String> reportTypes = ['Daily', 'Monthly', 'Yearly'];
 
   List<Map<String, dynamic>> get filteredChallans {
     return challans.where((c) {
-      final matchesSearch = c['number'].toLowerCase().contains(searchText.toLowerCase()) ||
-        c['shop'].toLowerCase().contains(searchText.toLowerCase()) ||
-        c['client'].toLowerCase().contains(searchText.toLowerCase());
-      final matchesStatus = selectedStatus == 'All' || c['status'] == selectedStatus;
-      final matchesFrom = fromDate == null || c['date'].isAfter(fromDate!.subtract(Duration(days: 1)));
-      final matchesTo = toDate == null || c['date'].isBefore(toDate!.add(Duration(days: 1)));
+      final matchesSearch =
+          c['number'].toLowerCase().contains(searchText.toLowerCase()) ||
+          c['shop'].toLowerCase().contains(searchText.toLowerCase()) ||
+          c['client'].toLowerCase().contains(searchText.toLowerCase());
+      final matchesStatus =
+          selectedStatus == 'All' || c['status'] == selectedStatus;
+      final matchesFrom =
+          fromDate == null ||
+          c['date'].isAfter(fromDate!.subtract(Duration(days: 1)));
+      final matchesTo =
+          toDate == null || c['date'].isBefore(toDate!.add(Duration(days: 1)));
       return matchesSearch && matchesStatus && matchesFrom && matchesTo;
     }).toList();
   }
@@ -117,7 +129,10 @@ class _ChallanScreenState extends State<ChallanScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.white,
-          title: Text('Create Challan', style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
+          title: Text(
+            'Create Challan',
+            style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold),
+          ),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,7 +170,13 @@ class _ChallanScreenState extends State<ChallanScreen> {
                   },
                 ),
                 SizedBox(height: 12),
-                Text('Notes (optional)', style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
+                Text(
+                  'Notes (optional)',
+                  style: TextStyle(
+                    color: Colors.indigo,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 TextField(
                   decoration: InputDecoration(hintText: 'Add notes'),
                   onChanged: (val) {
@@ -186,7 +207,10 @@ class _ChallanScreenState extends State<ChallanScreen> {
                     children: [
                       Icon(Icons.auto_fix_high, color: Colors.indigo),
                       SizedBox(width: 8),
-                      Text('Auto Stock Adjustment Enabled', style: TextStyle(color: Colors.indigo)),
+                      Text(
+                        'Auto Stock Adjustment Enabled',
+                        style: TextStyle(color: Colors.indigo),
+                      ),
                     ],
                   ),
                 ),
@@ -224,7 +248,10 @@ class _ChallanScreenState extends State<ChallanScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.white,
-          title: Text('Create Return', style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
+          title: Text(
+            'Create Return',
+            style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold),
+          ),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +299,10 @@ class _ChallanScreenState extends State<ChallanScreen> {
                     children: [
                       Icon(Icons.auto_fix_high, color: Colors.indigo),
                       SizedBox(width: 8),
-                      Text('Auto Stock Adjustment Enabled', style: TextStyle(color: Colors.indigo)),
+                      Text(
+                        'Auto Stock Adjustment Enabled',
+                        style: TextStyle(color: Colors.indigo),
+                      ),
                     ],
                   ),
                 ),
@@ -346,7 +376,13 @@ class _ChallanScreenState extends State<ChallanScreen> {
         padding: EdgeInsets.all(16),
         child: Column(
           children: [
-            Text('Delivery Challan & Return Graph', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo)),
+            Text(
+              'Delivery Challan & Return Graph',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.indigo,
+              ),
+            ),
             SizedBox(height: 16),
             SizedBox(
               height: 180,
@@ -374,10 +410,21 @@ class _ChallanScreenState extends State<ChallanScreen> {
                         showTitles: true,
                         reservedSize: 32,
                         getTitlesWidget: (value, meta) {
-                          final labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                          final labels = [
+                            'Mon',
+                            'Tue',
+                            'Wed',
+                            'Thu',
+                            'Fri',
+                            'Sat',
+                            'Sun',
+                          ];
                           return Padding(
                             padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(labels[value.toInt() % labels.length], style: TextStyle(color: Colors.indigo)),
+                            child: Text(
+                              labels[value.toInt() % labels.length],
+                              style: TextStyle(color: Colors.indigo),
+                            ),
                           );
                         },
                       ),
@@ -385,22 +432,66 @@ class _ChallanScreenState extends State<ChallanScreen> {
                   ),
                   borderData: FlBorderData(show: false),
                   barGroups: [
-                    BarChartGroupData(x: 0, barRods: [
-                      BarChartRodData(toY: 10, color: Colors.indigo.shade400, width: 16),
-                      BarChartRodData(toY: 3, color: Colors.red.shade400, width: 16),
-                    ]),
-                    BarChartGroupData(x: 1, barRods: [
-                      BarChartRodData(toY: 8, color: Colors.indigo.shade400, width: 16),
-                      BarChartRodData(toY: 2, color: Colors.red.shade400, width: 16),
-                    ]),
-                    BarChartGroupData(x: 2, barRods: [
-                      BarChartRodData(toY: 12, color: Colors.indigo.shade400, width: 16),
-                      BarChartRodData(toY: 4, color: Colors.red.shade400, width: 16),
-                    ]),
-                    BarChartGroupData(x: 3, barRods: [
-                      BarChartRodData(toY: 7, color: Colors.indigo.shade400, width: 16),
-                      BarChartRodData(toY: 1, color: Colors.red.shade400, width: 16),
-                    ]),
+                    BarChartGroupData(
+                      x: 0,
+                      barRods: [
+                        BarChartRodData(
+                          toY: 10,
+                          color: Colors.indigo.shade400,
+                          width: 16,
+                        ),
+                        BarChartRodData(
+                          toY: 3,
+                          color: Colors.red.shade400,
+                          width: 16,
+                        ),
+                      ],
+                    ),
+                    BarChartGroupData(
+                      x: 1,
+                      barRods: [
+                        BarChartRodData(
+                          toY: 8,
+                          color: Colors.indigo.shade400,
+                          width: 16,
+                        ),
+                        BarChartRodData(
+                          toY: 2,
+                          color: Colors.red.shade400,
+                          width: 16,
+                        ),
+                      ],
+                    ),
+                    BarChartGroupData(
+                      x: 2,
+                      barRods: [
+                        BarChartRodData(
+                          toY: 12,
+                          color: Colors.indigo.shade400,
+                          width: 16,
+                        ),
+                        BarChartRodData(
+                          toY: 4,
+                          color: Colors.red.shade400,
+                          width: 16,
+                        ),
+                      ],
+                    ),
+                    BarChartGroupData(
+                      x: 3,
+                      barRods: [
+                        BarChartRodData(
+                          toY: 7,
+                          color: Colors.indigo.shade400,
+                          width: 16,
+                        ),
+                        BarChartRodData(
+                          toY: 1,
+                          color: Colors.red.shade400,
+                          width: 16,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -411,7 +502,10 @@ class _ChallanScreenState extends State<ChallanScreen> {
               children: [
                 Icon(Icons.circle, color: Colors.indigo, size: 12),
                 SizedBox(width: 4),
-                Text('Delivery Challan', style: TextStyle(color: Colors.indigo)),
+                Text(
+                  'Delivery Challan',
+                  style: TextStyle(color: Colors.indigo),
+                ),
                 SizedBox(width: 16),
                 Icon(Icons.circle, color: Colors.redAccent, size: 12),
                 SizedBox(width: 4),
@@ -435,40 +529,79 @@ class _ChallanScreenState extends State<ChallanScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Reports', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo)),
+            Text(
+              'Reports',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.indigo,
+              ),
+            ),
             SizedBox(height: 12),
             Row(
-              children: reportTypes.map((type) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: ChoiceChip(
-                  label: Text(type, style: TextStyle(fontWeight: FontWeight.w500)),
-                  selected: selectedReport == type,
-                  selectedColor: Colors.indigo,
-                  backgroundColor: Colors.white,
-                  labelStyle: TextStyle(color: selectedReport == type ? Colors.white : Colors.indigo),
-                  onSelected: (_) => setState(() => selectedReport = type),
-                ),
-              )).toList(),
+              children: reportTypes
+                  .map(
+                    (type) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                      child: ChoiceChip(
+                        label: Text(
+                          type,
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        selected: selectedReport == type,
+                        selectedColor: Colors.indigo,
+                        backgroundColor: Colors.white,
+                        labelStyle: TextStyle(
+                          color: selectedReport == type
+                              ? Colors.white
+                              : Colors.indigo,
+                        ),
+                        onSelected: (_) =>
+                            setState(() => selectedReport = type),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
             SizedBox(height: 16),
             Text(
               '$selectedReport Report',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.indigo,
+              ),
             ),
             SizedBox(height: 8),
             // Dummy report data
-            ...filteredChallans.take(2).map((c) => ListTile(
-              leading: Icon(Icons.receipt_long, color: Colors.indigo),
-              title: Text('Challan #${c['number']}'),
-              subtitle: Text('Amount: ₹${c['amount']} | Pieces: ${c['pieces']}'),
-              trailing: Text(c['status'], style: TextStyle(color: Colors.indigo)),
-            )),
-            ...returns.take(2).map((r) => ListTile(
-              leading: Icon(Icons.undo, color: Colors.redAccent),
-              title: Text('Return #${r['number']}'),
-              subtitle: Text('Amount: ₹${r['amount']} | Reason: ${r['reason']}'),
-              trailing: Text(r['client'], style: TextStyle(color: Colors.indigo)),
-            )),
+            ...filteredChallans
+                .take(2)
+                .map(
+                  (c) => ListTile(
+                    leading: Icon(Icons.receipt_long, color: Colors.indigo),
+                    title: Text('Challan #${c['number']}'),
+                    subtitle: Text(
+                      'Amount: ₹${c['amount']} | Pieces: ${c['pieces']}',
+                    ),
+                    trailing: Text(
+                      c['status'],
+                      style: TextStyle(color: Colors.indigo),
+                    ),
+                  ),
+                ),
+            ...returns
+                .take(2)
+                .map(
+                  (r) => ListTile(
+                    leading: Icon(Icons.undo, color: Colors.redAccent),
+                    title: Text('Return #${r['number']}'),
+                    subtitle: Text(
+                      'Amount: ₹${r['amount']} | Reason: ${r['reason']}',
+                    ),
+                    trailing: Text(
+                      r['client'],
+                      style: TextStyle(color: Colors.indigo),
+                    ),
+                  ),
+                ),
           ],
         ),
       ),
@@ -486,12 +619,21 @@ class _ChallanScreenState extends State<ChallanScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Elegant header
-              Text('Challan & Return', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28, color: Colors.indigo)),
+              Text(
+                'Challan & Return',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 28,
+                  color: Colors.indigo,
+                ),
+              ),
               SizedBox(height: 8),
               // Search Bar
               Card(
                 elevation: 1,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8),
                   child: TextField(
@@ -509,17 +651,29 @@ class _ChallanScreenState extends State<ChallanScreen> {
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: statuses.map((status) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: ChoiceChip(
-                      label: Text(status, style: TextStyle(fontWeight: FontWeight.w500)),
-                      selected: selectedStatus == status,
-                      selectedColor: Colors.indigo,
-                      backgroundColor: Colors.white,
-                      labelStyle: TextStyle(color: selectedStatus == status ? Colors.white : Colors.indigo),
-                      onSelected: (_) => setState(() => selectedStatus = status),
-                    ),
-                  )).toList(),
+                  children: statuses
+                      .map(
+                        (status) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                          child: ChoiceChip(
+                            label: Text(
+                              status,
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            selected: selectedStatus == status,
+                            selectedColor: Colors.indigo,
+                            backgroundColor: Colors.white,
+                            labelStyle: TextStyle(
+                              color: selectedStatus == status
+                                  ? Colors.white
+                                  : Colors.indigo,
+                            ),
+                            onSelected: (_) =>
+                                setState(() => selectedStatus = status),
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
               ),
               SizedBox(height: 12),
@@ -529,29 +683,45 @@ class _ChallanScreenState extends State<ChallanScreen> {
                 child: Row(
                   children: [
                     if (fromDate == null)
-                      Text('From:', style: TextStyle(fontWeight: FontWeight.w500)),
-                    if (fromDate == null)
-                      SizedBox(width: 8),
+                      Text(
+                        'From:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    if (fromDate == null) SizedBox(width: 8),
                     OutlinedButton(
                       onPressed: _pickFromDate,
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                      child: Text(fromDate == null ? 'Select' : '${fromDate!.toLocal()}'.split(' ')[0]),
+                      child: Text(
+                        fromDate == null
+                            ? 'Select'
+                            : '${fromDate!.toLocal()}'.split(' ')[0],
+                      ),
                     ),
                     SizedBox(width: 16),
                     Text(':', style: TextStyle(fontWeight: FontWeight.w500)),
                     SizedBox(width: 16),
                     if (toDate == null)
-                      Text('To:', style: TextStyle(fontWeight: FontWeight.w500)),
-                    if (toDate == null)
-                      SizedBox(width: 8),
+                      Text(
+                        'To:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    if (toDate == null) SizedBox(width: 8),
                     OutlinedButton(
                       onPressed: _pickToDate,
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                      child: Text(toDate == null ? 'Select' : '${toDate!.toLocal()}'.split(' ')[0]),
+                      child: Text(
+                        toDate == null
+                            ? 'Select'
+                            : '${toDate!.toLocal()}'.split(' ')[0],
+                      ),
                     ),
                     SizedBox(width: 8),
                     IconButton(
@@ -571,34 +741,50 @@ class _ChallanScreenState extends State<ChallanScreen> {
               // Graph & Reports
               Row(
                 children: [
-                  Expanded(child: ElevatedButton.icon(
-                    icon: Icon(Icons.bar_chart, color: Colors.white),
-                    label: Text(showGraph ? 'Hide Graph' : 'Show Graph', style: TextStyle(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigo,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => setState(() => showGraph = !showGraph),
-                  )),
-                  SizedBox(width: 12),
-                  Expanded(child: ElevatedButton.icon(
-                    icon: Icon(Icons.receipt_long, color: Colors.white),
-                    label: Text('Show Reports', style: TextStyle(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigo,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.white,
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.bar_chart, color: Colors.white),
+                      label: Text(
+                        showGraph ? 'Hide Graph' : 'Show Graph',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        builder: (context) => _buildReportSection(),
-                      );
-                    },
-                  )),
+                      ),
+                      onPressed: () => setState(() => showGraph = !showGraph),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.receipt_long, color: Colors.white),
+                      label: Text(
+                        'Show Reports',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          backgroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(24),
+                            ),
+                          ),
+                          builder: (context) => _buildReportSection(),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
               if (showGraph) _buildGraphSection(),
@@ -612,7 +798,9 @@ class _ChallanScreenState extends State<ChallanScreen> {
                     final c = filteredChallans[i];
                     return Card(
                       elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       color: Colors.white,
                       margin: EdgeInsets.symmetric(horizontal: 2, vertical: 2),
                       child: Padding(
@@ -626,65 +814,153 @@ class _ChallanScreenState extends State<ChallanScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      Text('Challan #${c['number']}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Text(
+                                        'Challan #${c['number']}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
                                       if (c['editable'])
                                         Padding(
-                                          padding: const EdgeInsets.only(left: 8.0),
+                                          padding: const EdgeInsets.only(
+                                            left: 8.0,
+                                          ),
                                           child: Container(
-                                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
                                             decoration: BoxDecoration(
                                               color: Colors.indigo.shade50,
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
-                                            child: Text('Editable', style: TextStyle(color: Colors.indigo, fontSize: 10)),
+                                            child: Text(
+                                              'Editable',
+                                              style: TextStyle(
+                                                color: Colors.indigo,
+                                                fontSize: 10,
+                                              ),
+                                            ),
                                           ),
                                         ),
                                     ],
                                   ),
                                   SizedBox(height: 4),
-                                  Text('Date: ${c['date'].toLocal().toString().split(' ')[0]}', style: TextStyle(color: Colors.grey[700], fontSize: 13)),
-                                  Text('Shop: ${c['shop']}', style: TextStyle(fontSize: 13)),
-                                  Text('Client: ${c['client']}', style: TextStyle(fontSize: 13)),
+                                  Text(
+                                    'Date: ${c['date'].toLocal().toString().split(' ')[0]}',
+                                    style: TextStyle(
+                                      color: Colors.grey[700],
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Shop: ${c['shop']}',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                  Text(
+                                    'Client: ${c['client']}',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
                                   Row(
                                     children: [
-                                      Text('Amount: ', style: TextStyle(fontSize: 13)),
-                                      Text('₹${c['amount']}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo, fontSize: 13)),
+                                      Text(
+                                        'Amount: ',
+                                        style: TextStyle(fontSize: 13),
+                                      ),
+                                      Text(
+                                        '₹${c['amount']}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.indigo,
+                                          fontSize: 13,
+                                        ),
+                                      ),
                                       SizedBox(width: 8),
-                                      Text('Pieces: ${c['pieces']}', style: TextStyle(fontSize: 13)),
+                                      Text(
+                                        'Pieces: ${c['pieces']}',
+                                        style: TextStyle(fontSize: 13),
+                                      ),
                                     ],
                                   ),
-                                  Text('Items: ${c['items']}', style: TextStyle(fontSize: 13)),
+                                  Text(
+                                    'Items: ${c['items']}',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
                                   Row(
                                     children: [
                                       Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: c['status'] == 'Pending' ? Colors.yellow.shade100 :
-                                                 c['status'] == 'Approved' ? Colors.green.shade100 :
-                                                 c['status'] == 'Rejected' ? Colors.red.shade100 : Colors.grey.shade200,
-                                          borderRadius: BorderRadius.circular(8),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
                                         ),
-                                        child: Text(c['status'], style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                                        decoration: BoxDecoration(
+                                          color: c['status'] == 'Pending'
+                                              ? Colors.yellow.shade100
+                                              : c['status'] == 'Approved'
+                                              ? Colors.green.shade100
+                                              : c['status'] == 'Rejected'
+                                              ? Colors.red.shade100
+                                              : Colors.grey.shade200,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          c['status'],
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
                                       ),
                                       SizedBox(width: 8),
-                                      Text('Delivery: ${c['deliveryPartner']}', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+                                      Text(
+                                        'Delivery: ${c['deliveryPartner']}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      Icon(Icons.upload_file, color: c['lrUploaded'] ? Colors.green : Colors.grey, size: 18),
+                                      Icon(
+                                        Icons.upload_file,
+                                        color: c['lrUploaded']
+                                            ? Colors.green
+                                            : Colors.grey,
+                                        size: 18,
+                                      ),
                                       SizedBox(width: 4),
-                                      Text(c['lrUploaded'] ? 'LR Uploaded' : 'LR Not Uploaded', style: TextStyle(fontSize: 12)),
+                                      Text(
+                                        c['lrUploaded']
+                                            ? 'LR Uploaded'
+                                            : 'LR Not Uploaded',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
                                       SizedBox(width: 12),
                                       if (c['mismatch'])
                                         GestureDetector(
                                           onTap: () => _showMismatchDialog(c),
                                           child: Row(
                                             children: [
-                                              Icon(Icons.warning, color: Colors.red, size: 18),
+                                              Icon(
+                                                Icons.warning,
+                                                color: Colors.red,
+                                                size: 18,
+                                              ),
                                               SizedBox(width: 4),
-                                              Text('Mismatch', style: TextStyle(color: Colors.red, fontSize: 12)),
+                                              Text(
+                                                'Mismatch',
+                                                style: TextStyle(
+                                                  color: Colors.red,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -696,18 +972,32 @@ class _ChallanScreenState extends State<ChallanScreen> {
                             Column(
                               children: [
                                 IconButton(
-                                  icon: Icon(Icons.edit, color: c['editable'] ? Colors.indigo : Colors.grey),
+                                  icon: Icon(
+                                    Icons.edit,
+                                    color: c['editable']
+                                        ? Colors.indigo
+                                        : Colors.grey,
+                                  ),
                                   onPressed: () => _editChallan(c),
-                                  tooltip: c['editable'] ? 'Edit Challan' : 'Not Editable',
+                                  tooltip: c['editable']
+                                      ? 'Edit Challan'
+                                      : 'Not Editable',
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.upload_file, color: Colors.indigo),
+                                  icon: Icon(
+                                    Icons.upload_file,
+                                    color: Colors.indigo,
+                                  ),
                                   onPressed: () {
                                     setState(() {
                                       c['lrUploaded'] = true;
                                     });
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('LR uploaded for Challan #${c['number']}')),
+                                      SnackBar(
+                                        content: Text(
+                                          'LR uploaded for Challan #${c['number']}',
+                                        ),
+                                      ),
                                     );
                                   },
                                   tooltip: 'Upload LR',
@@ -728,7 +1018,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
-        child: Icon(Icons.add),
         tooltip: 'Create Challan/Return',
         onPressed: () {
           showModalBottomSheet(
@@ -748,7 +1037,9 @@ class _ChallanScreenState extends State<ChallanScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.indigo,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       minimumSize: Size(double.infinity, 48),
                     ),
                     onPressed: () {
@@ -763,7 +1054,9 @@ class _ChallanScreenState extends State<ChallanScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[300],
                       foregroundColor: Colors.indigo,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       minimumSize: Size(double.infinity, 48),
                     ),
                     onPressed: () {
@@ -776,6 +1069,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
             ),
           );
         },
+        child: Icon(Icons.add),
       ),
       bottomNavigationBar: UniversalNavBar(
         selectedIndex: 4,
@@ -799,7 +1093,11 @@ class _ChallanScreenState extends State<ChallanScreen> {
               break;
           }
           if (route != null && ModalRoute.of(context)?.settings.name != route) {
-            Navigator.pushNamedAndRemoveUntil(context, route, (r) => r.settings.name == '/dashboard');
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              route,
+              (r) => r.settings.name == '/dashboard',
+            );
           }
         },
       ),

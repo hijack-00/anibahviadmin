@@ -1,9 +1,11 @@
 import 'package:anibhaviadmin/services/api_service.dart';
+import 'package:anibhaviadmin/widgets/barcode_scanner_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/app_data_repo.dart';
 import 'order_details_page.dart';
 import 'universal_navbar.dart';
+
 // import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
 
 class AllOrdersPage extends StatefulWidget {
@@ -329,6 +331,12 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
   }
 }
 
+class _ProductRateController {
+  final TextEditingController controller;
+  _ProductRateController(double value)
+    : controller = TextEditingController(text: value.toStringAsFixed(2));
+}
+
 // --- Create Order Bottom Sheet ---
 class _CreateOrderSheet extends StatefulWidget {
   @override
@@ -340,6 +348,9 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
   List<Map<String, dynamic>> _allCustomers = [];
   Map<String, dynamic>? _selectedCustomer;
   String customerSearch = '';
+  late TextEditingController redeemNowController;
+
+  final Map<String, _ProductRateController> _rateControllers = {};
 
   // Products
   List<Map<String, dynamic>> _allProducts = [];
@@ -380,6 +391,38 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
       print(p);
     }
   }
+
+  // Future<void> _scanAndAddProduct() async {
+  //   try {
+  //     final result = await Navigator.push(
+  //       context,
+  //       MaterialPageRoute(
+  //         builder: (context) => const SimpleBarcodeScannerPage(),
+  //       ),
+  //     );
+
+  //     if (result != null && result is String && result.isNotEmpty) {
+  //       final found = _allProducts.firstWhere(
+  //         (p) => (p['barcode']?.toString() ?? '') == result,
+  //         orElse: () => <String, dynamic>{},
+  //       );
+  //       if (found.isNotEmpty) {
+  //         _addProduct(found);
+  //         ScaffoldMessenger.of(
+  //           context,
+  //         ).showSnackBar(SnackBar(content: Text('Product added!')));
+  //       } else {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(content: Text('No product found for this barcode.')),
+  //         );
+  //       }
+  //     }
+  //   } catch (e) {
+  //     ScaffoldMessenger.of(
+  //       context,
+  //     ).showSnackBar(SnackBar(content: Text('Barcode scan failed: $e')));
+  //   }
+  // }
 
   // Add this helper function:
   String getProductId(dynamic p) {
@@ -492,7 +535,27 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     super.initState();
     _fetchCustomers();
     _fetchProducts();
+    redeemNowController = TextEditingController(text: redeemNow.toString());
+
     // TODO: Fetch user points if needed
+  }
+
+  @override
+  void dispose() {
+    redeemNowController.dispose();
+    for (final c in _rateControllers.values) {
+      c.controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _setRedeemNow(int value, int maxRedeemable) {
+    setState(() {
+      redeemNow = value.clamp(0, maxRedeemable);
+      redeemNowController.text = redeemNow.toString();
+      discountValue = redeemNow * pointValue;
+      _recalculatePrice();
+    });
   }
 
   Future<void> _fetchCustomers() async {
@@ -586,9 +649,26 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
 
   void _addPayment() {
     final amt = double.tryParse(paymentAmountController.text) ?? 0.0;
-    if (amt > 0) {
+    if (amt <= 0) return;
+
+    final remaining = balanceDue;
+    double addAmount = amt;
+
+    if (amt > remaining) {
+      addAmount = remaining;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment amount exceeds balance due. Only ₹${addAmount.toStringAsFixed(2)} will be added.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+
+    if (addAmount > 0) {
       setState(() {
-        payments.add({'method': paymentMethod, 'amount': amt});
+        payments.add({'method': paymentMethod, 'amount': addAmount});
         paymentAmountController.clear();
         _recalculatePrice();
       });
@@ -1473,23 +1553,94 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                   ),
                                   onPressed: _showProductSelectionSheet,
                                 ),
-                                ElevatedButton.icon(
-                                  icon: Icon(Icons.qr_code_scanner),
-                                  label: Text(
-                                    'Scan Barcode',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.indigo,
-                                    foregroundColor: Colors.white,
-                                    minimumSize: Size(100, 45),
-                                    maximumSize: Size(130, 45),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                Builder(
+                                  builder: (sheetContext) => ElevatedButton.icon(
+                                    icon: Icon(Icons.qr_code_scanner),
+                                    label: Text(
+                                      'Scan Barcode',
+                                      style: TextStyle(fontSize: 12),
                                     ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.indigo,
+                                      foregroundColor: Colors.white,
+                                      minimumSize: Size(100, 45),
+                                      maximumSize: Size(130, 45),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      // Use rootNavigator: true here!
+                                      print(
+                                        'Opening scanner from context: $context',
+                                      );
+                                      final barcode = await showDialog<String>(
+                                        context: context,
+                                        builder: (ctx) =>
+                                            const BarcodeScannerPage(),
+                                      );
+                                      print(
+                                        'Scanner returned barcode: $barcode',
+                                      );
+
+                                      if (!mounted) return;
+                                      if (barcode != null &&
+                                          barcode.isNotEmpty) {
+                                        final found = _allProducts.firstWhere(
+                                          (p) =>
+                                              p['barcode']?.toString() ==
+                                              barcode,
+                                          orElse: () => <String, dynamic>{},
+                                        );
+                                        if (found.isNotEmpty) {
+                                          final pid = getProductId(found);
+                                          final idx = _selectedProducts
+                                              .indexWhere(
+                                                (p) => getProductId(p) == pid,
+                                              );
+                                          if (idx >= 0) {
+                                            setState(() {
+                                              _selectedProducts[idx]['quantity'] =
+                                                  (_selectedProducts[idx]['quantity'] ??
+                                                      1) +
+                                                  1;
+                                              _recalculatePrice();
+                                            });
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Product already added. Quantity increased!',
+                                                ),
+                                              ),
+                                            );
+                                          } else {
+                                            setState(() {
+                                              _addProduct(found);
+                                            });
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Product added!'),
+                                              ),
+                                            );
+                                          }
+                                        } else {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'No product found for this barcode.',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
                                   ),
-                                  onPressed: () {},
-                                  // _scanAndAddProduct,
                                 ),
                               ],
                             ),
@@ -1498,77 +1649,14 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                       ),
                     ),
 
-                    // // Product Section
-                    // Text(
-                    //   'Add Product Sets',
-                    //   style: TextStyle(fontWeight: FontWeight.bold),
-                    // ),
-                    // Row(
-                    //   children: [
-                    //     Expanded(
-                    //       child: TextField(
-                    //         decoration: InputDecoration(
-                    //           labelText: 'Enter Barcode',
-                    //         ),
-                    //         inputFormatters: [
-                    //           FilteringTextInputFormatter.digitsOnly,
-                    //         ],
-                    //         keyboardType: TextInputType.number,
-                    //         onChanged: (v) => barcodeInput = v,
-                    //       ),
-                    //     ),
-                    //     SizedBox(
-                    //       width: 150,
-                    //       height: 50,
-                    //       child: ElevatedButton(
-                    //         child: Text('Submit'),
-                    //         style: ElevatedButton.styleFrom(
-                    //           backgroundColor: Colors.indigo,
-                    //           foregroundColor: Colors.white,
-                    //         ),
-                    //         onPressed: () {
-                    //           final found = _allProducts.firstWhere(
-                    //             (p) => p['barcode'] == barcodeInput,
-                    //             orElse: () => <String, dynamic>{},
-                    //           );
-                    //           if (found.isNotEmpty) _addProduct(found);
-                    //         },
-                    //       ),
-                    //     ),
-                    //   ],
-                    // ),
-                    // SizedBox(height: 8),
-                    // Row(
-                    //   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    //   children: [
-                    //     ElevatedButton(
-                    //       child: Text('Manual Selection'),
-                    //       style: ElevatedButton.styleFrom(
-                    //         backgroundColor: Colors.indigo,
-                    //         foregroundColor: Colors.white,
-                    //       ),
-                    //       onPressed: _showProductSelectionSheet,
-                    //     ),
-                    //     ElevatedButton(
-                    //       child: Row(
-                    //         children: [
-                    //           Icon(Icons.qr_code_scanner),
-                    //           Text('Scan Barcode'),
-                    //         ],
-                    //       ),
-                    //       style: ElevatedButton.styleFrom(
-                    //         backgroundColor: Colors.indigo,
-                    //         foregroundColor: Colors.white,
-                    //       ),
-                    //       onPressed: _showProductSelectionSheet,
-                    //     ),
-                    //   ],
-                    // ),
                     Text(
                       'Selected Products',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     ..._selectedProducts.map((p) {
+                      // final String pid = getProductId(p);
+                      final double perPieceRate =
+                          (p['singlePicPrice'] ?? p['price'] ?? 0).toDouble();
                       final int quantity = (p['quantity'] ?? 1) is int
                           ? (p['quantity'] ?? 1)
                           : int.tryParse(p['quantity'].toString()) ?? 1;
@@ -1579,6 +1667,22 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                           ? (p['images'][0] as String?)
                           : null;
                       final String pid = getProductId(p); // <-- Use helper here
+                      if (!_rateControllers.containsKey(pid)) {
+                        _rateControllers[pid] = _ProductRateController(
+                          perPieceRate,
+                        );
+                      } else {
+                        // Keep controller in sync if value changed externally
+                        final ctrl = _rateControllers[pid]!;
+                        final currentText = ctrl.controller.text;
+                        if (double.tryParse(currentText) != perPieceRate) {
+                          ctrl.controller.text = perPieceRate.toStringAsFixed(
+                            2,
+                          );
+                        }
+                      }
+                      final rateController = _rateControllers[pid]!.controller;
+
                       return Card(
                         margin: EdgeInsets.symmetric(vertical: 8),
                         elevation: 2,
@@ -1587,270 +1691,772 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
-                          child: Row(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: imageUrl != null && imageUrl.isNotEmpty
-                                    ? Image.network(
-                                        imageUrl,
-                                        width: 70,
-                                        height: 70,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (c, e, s) => Container(
-                                          width: 70,
-                                          height: 70,
-                                          color: Colors.grey.shade200,
-                                          child: Icon(
-                                            Icons.image,
-                                            color: Colors.grey,
-                                            size: 32,
-                                          ),
-                                        ),
-                                      )
-                                    : Container(
-                                        width: 70,
-                                        height: 70,
-                                        color: Colors.grey.shade100,
-                                        child: Icon(
-                                          Icons.image,
-                                          color: Colors.grey,
-                                          size: 32,
-                                        ),
-                                      ),
-                              ),
-                              SizedBox(width: 12),
-                              // Product Details
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          p['productName'] ?? p['name'] ?? '',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: Icon(
-                                            Icons.delete,
-                                            color: Colors.red,
-                                          ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _removeProduct(
-                                                pid,
-                                              ); // <-- Use helper here
-                                            });
-                                          },
-                                          tooltip: 'Remove',
-                                        ),
-                                      ],
-                                    ),
-
-                                    if (p['availableSizes'] != null)
-                                      Wrap(
-                                        spacing: 6,
-                                        children: (p['availableSizes'] as List)
-                                            .map<Widget>(
-                                              (s) => Chip(
-                                                label: Text(
-                                                  s,
-                                                  style: TextStyle(
-                                                    fontSize: 12,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Product Image
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child:
+                                        imageUrl != null && imageUrl.isNotEmpty
+                                        ? Image.network(
+                                            imageUrl,
+                                            width: 70,
+                                            height: 70,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (c, e, s) =>
+                                                Container(
+                                                  width: 70,
+                                                  height: 70,
+                                                  color: Colors.grey.shade200,
+                                                  child: Icon(
+                                                    Icons.image,
+                                                    color: Colors.grey,
+                                                    size: 32,
                                                   ),
                                                 ),
-                                                backgroundColor:
-                                                    Colors.blue.shade50,
-                                              ),
-                                            )
-                                            .toList(),
-                                      ),
-                                    Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
+                                          )
+                                        : Container(
+                                            width: 70,
+                                            height: 70,
+                                            color: Colors.grey.shade100,
+                                            child: Icon(
+                                              Icons.image,
+                                              color: Colors.grey,
+                                              size: 32,
+                                            ),
+                                          ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  // Product Details
+                                  Expanded(
+                                    child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                p['productName'] ??
+                                                    p['name'] ??
+                                                    '',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(
+                                                Icons.delete,
+                                                color: Colors.red,
+                                              ),
+                                              onPressed: () {
+                                                setState(() {
+                                                  _removeProduct(pid);
+                                                });
+                                              },
+                                              tooltip: 'Remove',
+                                            ),
+                                          ],
+                                        ),
+                                        if (p['availableSizes'] != null)
+                                          Wrap(
+                                            spacing: 6,
+                                            children:
+                                                (p['availableSizes'] as List)
+                                                    .map<Widget>(
+                                                      (s) => Chip(
+                                                        label: Text(
+                                                          s,
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                        backgroundColor:
+                                                            Colors.blue.shade50,
+                                                      ),
+                                                    )
+                                                    .toList(),
+                                          ),
                                         Text(
                                           'Total: $quantity set${quantity > 1 ? 's' : ''} × $pcsInSet pcs = ${quantity * pcsInSet} pieces',
                                           style: TextStyle(fontSize: 12),
                                         ),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              '₹${((p['price'] ?? p['singlePicPrice'] ?? 0) * quantity * pcsInSet).toStringAsFixed(0)}',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                                color: Colors.indigo,
-                                              ),
-                                            ),
-                                            SizedBox(width: 4),
-                                            Text(
-                                              'per set',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    // Quantity and pcs/set controls
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        // Pcs per set selector
+
+                                        // Row(
+                                        //   children: [
+                                        //     Text(
+                                        //       '₹${((p['price'] ?? p['singlePicPrice'] ?? 0) * quantity * pcsInSet).toStringAsFixed(0)}',
+                                        //       style: TextStyle(
+                                        //         fontWeight: FontWeight.bold,
+                                        //         fontSize: 16,
+                                        //         color: Colors.indigo,
+                                        //       ),
+                                        //     ),
+                                        //     SizedBox(width: 4),
+                                        //     Text(
+                                        //       'per set',
+                                        //       style: TextStyle(
+                                        //         fontSize: 12,
+                                        //         color: Colors.grey,
+                                        //       ),
+                                        //     ),
+                                        //   ],
+                                        // ),
+
+                                        // In the selected products card, update the Row that contains the per piece rate TextField and the "₹... per set" text:
+                                        // In the selected products card, update the per piece rate TextField as follows:
+                                        // In the selected products card, update the per piece rate TextField as follows:
                                         Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
                                             Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
-                                                Text('Pcs/set:'),
-                                                ElevatedButton(
-                                                  style: ButtonStyle(
-                                                    shape:
-                                                        MaterialStateProperty.all(
-                                                          CircleBorder(),
-                                                        ),
-                                                    backgroundColor:
-                                                        MaterialStateProperty.all(
-                                                          Colors.indigo,
-                                                        ),
+                                                Text(
+                                                  '₹',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                    color: Colors.indigo,
                                                   ),
-                                                  child: Icon(
-                                                    Icons.remove,
-                                                    color: Colors.white,
-                                                    size: 18,
-                                                  ),
-                                                  onPressed: () {
-                                                    setState(() {
-                                                      if (pcsInSet > 1) {
-                                                        p['pcsInSet'] =
-                                                            (pcsInSet - 1)
-                                                                .toString();
-                                                        _recalculatePrice();
-                                                      }
-                                                    });
-                                                  },
                                                 ),
-                                                Text('$pcsInSet'),
-                                                ElevatedButton(
-                                                  style: ButtonStyle(
-                                                    shape:
-                                                        MaterialStateProperty.all(
-                                                          CircleBorder(),
-                                                        ),
-                                                    backgroundColor:
-                                                        MaterialStateProperty.all(
-                                                          Colors.indigo,
-                                                        ),
+                                                ConstrainedBox(
+                                                  constraints: BoxConstraints(
+                                                    minWidth: 40,
+                                                    maxWidth:
+                                                        110, // Box stops stretching after 10 characters
                                                   ),
-                                                  child: Icon(
-                                                    Icons.add,
-                                                    color: Colors.white,
-                                                    size: 18,
-                                                  ),
-                                                  onPressed: () {
-                                                    setState(() {
-                                                      p['pcsInSet'] =
-                                                          (pcsInSet + 1)
-                                                              .toString();
-                                                      _recalculatePrice();
-                                                    });
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                            SizedBox(width: 12),
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Text('Qty:'),
-                                                    ElevatedButton(
-                                                      style: ButtonStyle(
-                                                        shape:
-                                                            MaterialStateProperty.all(
-                                                              CircleBorder(),
+                                                  child: IntrinsicWidth(
+                                                    child: TextField(
+                                                      controller:
+                                                          rateController,
+                                                      keyboardType:
+                                                          TextInputType.numberWithOptions(
+                                                            decimal: true,
+                                                          ),
+                                                      inputFormatters: [
+                                                        FilteringTextInputFormatter.allow(
+                                                          RegExp(
+                                                            r'^\d*\.?\d{0,2}',
+                                                          ),
+                                                        ),
+                                                        // No LengthLimitingTextInputFormatter here!
+                                                      ],
+                                                      decoration: InputDecoration(
+                                                        isDense: true,
+                                                        contentPadding:
+                                                            EdgeInsets.symmetric(
+                                                              vertical: 4,
+                                                              horizontal: 6,
                                                             ),
-                                                        backgroundColor:
-                                                            MaterialStateProperty.all(
-                                                              Colors.indigo,
-                                                            ),
+                                                        border: OutlineInputBorder(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                6,
+                                                              ),
+                                                        ),
                                                       ),
-                                                      child: Icon(
-                                                        Icons.remove,
-                                                        color: Colors.white,
-                                                        size: 18,
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 16,
+                                                        color: Colors.indigo,
                                                       ),
-                                                      onPressed: quantity > 1
-                                                          ? () {
-                                                              setState(() {
-                                                                _updateProductQuantity(
-                                                                  pid,
-                                                                  -1,
-                                                                ); // <-- Use helper here
-                                                              });
-                                                            }
-                                                          : null,
-                                                    ),
-                                                    Text('$quantity'),
-                                                    ElevatedButton(
-                                                      style: ButtonStyle(
-                                                        shape:
-                                                            MaterialStateProperty.all(
-                                                              CircleBorder(),
-                                                            ),
-                                                        backgroundColor:
-                                                            MaterialStateProperty.all(
-                                                              Colors.indigo,
-                                                            ),
-                                                      ),
-                                                      child: Icon(
-                                                        Icons.add,
-                                                        color: Colors.white,
-                                                        size: 18,
-                                                      ),
-                                                      onPressed: () {
+                                                      onChanged: (val) {
+                                                        final newRate =
+                                                            double.tryParse(
+                                                              val,
+                                                            ) ??
+                                                            perPieceRate;
                                                         setState(() {
-                                                          _updateProductQuantity(
-                                                            pid,
-                                                            1,
-                                                          ); // <-- Use helper here
+                                                          p['singlePicPrice'] =
+                                                              newRate;
+                                                          _recalculatePrice();
                                                         });
                                                       },
                                                     ),
-                                                  ],
+                                                  ),
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'per piece',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+
+                                                // Spacer(),
+                                              ],
+                                            ),
+
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  '₹${(perPieceRate * pcsInSet).toStringAsFixed(2)} per set',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.indigo,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  softWrap: true,
+                                                  textAlign: TextAlign.right,
                                                 ),
                                               ],
                                             ),
                                           ],
                                         ),
+                                        // Row(
+                                        //   children: [
+                                        //     Text(
+                                        //       '₹',
+                                        //       style: TextStyle(
+                                        //         fontWeight: FontWeight.bold,
+                                        //         fontSize: 16,
+                                        //         color: Colors.indigo,
+                                        //       ),
+                                        //     ),
+                                        //     IntrinsicWidth(
+                                        //       // width: 100,
+                                        //       child: TextField(
+                                        //         controller: rateController,
+                                        //         keyboardType:
+                                        //             TextInputType.numberWithOptions(
+                                        //               decimal: true,
+                                        //             ),
+                                        //         inputFormatters: [
+                                        //           FilteringTextInputFormatter.allow(
+                                        //             RegExp(r'^\d*\.?\d{0,2}'),
+                                        //           ),
+                                        //         ],
+                                        //         decoration: InputDecoration(
+                                        //           isDense: true,
+                                        //           contentPadding:
+                                        //               EdgeInsets.symmetric(
+                                        //                 vertical: 4,
+                                        //                 horizontal: 6,
+                                        //               ),
+                                        //           border: OutlineInputBorder(
+                                        //             borderRadius:
+                                        //                 BorderRadius.circular(
+                                        //                   6,
+                                        //                 ),
+                                        //           ),
+                                        //         ),
+                                        //         style: TextStyle(
+                                        //           fontWeight: FontWeight.bold,
+                                        //           fontSize: 16,
+                                        //           color: Colors.indigo,
+                                        //         ),
+                                        //         onChanged: (val) {
+                                        //           final newRate =
+                                        //               double.tryParse(val) ??
+                                        //               perPieceRate;
+                                        //           setState(() {
+                                        //             p['singlePicPrice'] =
+                                        //                 newRate;
+                                        //             _recalculatePrice();
+                                        //           });
+                                        //         },
+                                        //       ),
+                                        //     ),
+                                        //     SizedBox(width: 4),
+                                        //     Text(
+                                        //       'per piece',
+                                        //       style: TextStyle(
+                                        //         fontSize: 12,
+                                        //         color: Colors.grey,
+                                        //       ),
+                                        //     ),
+                                        //     Spacer(),
+                                        //     Text(
+                                        //       '₹${(perPieceRate * pcsInSet).toStringAsFixed(2)} per set',
+                                        //       style: TextStyle(
+                                        //         fontSize: 12,
+                                        //         color: Colors.indigo,
+                                        //         fontWeight: FontWeight.w500,
+                                        //       ),
+                                        //     ),
+                                        //   ],
+                                        // ),
                                       ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
+                              ),
+                              // Bottom row for pcs/set (left) and qty (right)
+                              SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  // Pcs/set at bottom left
+                                  Column(
+                                    children: [
+                                      Text('Pcs/set:'),
+                                      SizedBox(width: 4),
+                                      Row(
+                                        children: [
+                                          ElevatedButton(
+                                            style: ButtonStyle(
+                                              shape: MaterialStateProperty.all(
+                                                CircleBorder(),
+                                              ),
+                                              backgroundColor:
+                                                  MaterialStateProperty.all(
+                                                    Colors.indigo,
+                                                  ),
+                                              minimumSize:
+                                                  MaterialStateProperty.all(
+                                                    Size(32, 32),
+                                                  ),
+                                              padding:
+                                                  MaterialStateProperty.all(
+                                                    EdgeInsets.zero,
+                                                  ),
+                                            ),
+                                            child: Icon(
+                                              Icons.remove,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                if (pcsInSet > 1) {
+                                                  p['pcsInSet'] = (pcsInSet - 1)
+                                                      .toString();
+                                                  _recalculatePrice();
+                                                }
+                                              });
+                                            },
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6.0,
+                                            ),
+                                            child: Text('$pcsInSet'),
+                                          ),
+                                          ElevatedButton(
+                                            style: ButtonStyle(
+                                              shape: MaterialStateProperty.all(
+                                                CircleBorder(),
+                                              ),
+                                              backgroundColor:
+                                                  MaterialStateProperty.all(
+                                                    Colors.indigo,
+                                                  ),
+                                              minimumSize:
+                                                  MaterialStateProperty.all(
+                                                    Size(32, 32),
+                                                  ),
+                                              padding:
+                                                  MaterialStateProperty.all(
+                                                    EdgeInsets.zero,
+                                                  ),
+                                            ),
+                                            child: Icon(
+                                              Icons.add,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                p['pcsInSet'] = (pcsInSet + 1)
+                                                    .toString();
+                                                _recalculatePrice();
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  // Qty at bottom right
+                                  Column(
+                                    children: [
+                                      Text('Qty:'),
+                                      SizedBox(width: 4),
+
+                                      Row(
+                                        children: [
+                                          ElevatedButton(
+                                            style: ButtonStyle(
+                                              shape: MaterialStateProperty.all(
+                                                CircleBorder(),
+                                              ),
+                                              backgroundColor:
+                                                  MaterialStateProperty.all(
+                                                    Colors.indigo,
+                                                  ),
+                                              minimumSize:
+                                                  MaterialStateProperty.all(
+                                                    Size(32, 32),
+                                                  ),
+                                              padding:
+                                                  MaterialStateProperty.all(
+                                                    EdgeInsets.zero,
+                                                  ),
+                                            ),
+                                            child: Icon(
+                                              Icons.remove,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                            onPressed: quantity > 1
+                                                ? () {
+                                                    setState(() {
+                                                      _updateProductQuantity(
+                                                        pid,
+                                                        -1,
+                                                      );
+                                                    });
+                                                  }
+                                                : null,
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6.0,
+                                            ),
+                                            child: Text('$quantity'),
+                                          ),
+                                          ElevatedButton(
+                                            style: ButtonStyle(
+                                              shape: MaterialStateProperty.all(
+                                                CircleBorder(),
+                                              ),
+                                              backgroundColor:
+                                                  MaterialStateProperty.all(
+                                                    Colors.indigo,
+                                                  ),
+                                              minimumSize:
+                                                  MaterialStateProperty.all(
+                                                    Size(32, 32),
+                                                  ),
+                                              padding:
+                                                  MaterialStateProperty.all(
+                                                    EdgeInsets.zero,
+                                                  ),
+                                            ),
+                                            child: Icon(
+                                              Icons.add,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _updateProductQuantity(pid, 1);
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
                       );
+
+                      // return Card(
+                      //   margin: EdgeInsets.symmetric(vertical: 8),
+                      //   elevation: 2,
+                      //   shape: RoundedRectangleBorder(
+                      //     borderRadius: BorderRadius.circular(12),
+                      //   ),
+                      //   child: Padding(
+                      //     padding: const EdgeInsets.all(12.0),
+                      //     child: Row(
+                      //       crossAxisAlignment: CrossAxisAlignment.start,
+                      //       children: [
+                      //         ClipRRect(
+                      //           borderRadius: BorderRadius.circular(8),
+                      //           child: imageUrl != null && imageUrl.isNotEmpty
+                      //               ? Image.network(
+                      //                   imageUrl,
+                      //                   width: 70,
+                      //                   height: 70,
+                      //                   fit: BoxFit.cover,
+                      //                   errorBuilder: (c, e, s) => Container(
+                      //                     width: 70,
+                      //                     height: 70,
+                      //                     color: Colors.grey.shade200,
+                      //                     child: Icon(
+                      //                       Icons.image,
+                      //                       color: Colors.grey,
+                      //                       size: 32,
+                      //                     ),
+                      //                   ),
+                      //                 )
+                      //               : Container(
+                      //                   width: 70,
+                      //                   height: 70,
+                      //                   color: Colors.grey.shade100,
+                      //                   child: Icon(
+                      //                     Icons.image,
+                      //                     color: Colors.grey,
+                      //                     size: 32,
+                      //                   ),
+                      //                 ),
+                      //         ),
+                      //         SizedBox(width: 12),
+                      //         // Product Details
+                      //         Expanded(
+                      //           child: Column(
+                      //             crossAxisAlignment: CrossAxisAlignment.start,
+                      //             children: [
+                      //               Row(
+                      //                 mainAxisAlignment:
+                      //                     MainAxisAlignment.spaceBetween,
+                      //                 children: [
+                      //                   Text(
+                      //                     p['productName'] ?? p['name'] ?? '',
+                      //                     style: TextStyle(
+                      //                       fontWeight: FontWeight.bold,
+                      //                       fontSize: 15,
+                      //                     ),
+                      //                   ),
+                      //                   IconButton(
+                      //                     icon: Icon(
+                      //                       Icons.delete,
+                      //                       color: Colors.red,
+                      //                     ),
+                      //                     onPressed: () {
+                      //                       setState(() {
+                      //                         _removeProduct(
+                      //                           pid,
+                      //                         ); // <-- Use helper here
+                      //                       });
+                      //                     },
+                      //                     tooltip: 'Remove',
+                      //                   ),
+                      //                 ],
+                      //               ),
+
+                      //               if (p['availableSizes'] != null)
+                      //                 Wrap(
+                      //                   spacing: 6,
+                      //                   children: (p['availableSizes'] as List)
+                      //                       .map<Widget>(
+                      //                         (s) => Chip(
+                      //                           label: Text(
+                      //                             s,
+                      //                             style: TextStyle(
+                      //                               fontSize: 12,
+                      //                             ),
+                      //                           ),
+                      //                           backgroundColor:
+                      //                               Colors.blue.shade50,
+                      //                         ),
+                      //                       )
+                      //                       .toList(),
+                      //                 ),
+                      //               Column(
+                      //                 mainAxisAlignment:
+                      //                     MainAxisAlignment.spaceBetween,
+                      //                 crossAxisAlignment:
+                      //                     CrossAxisAlignment.start,
+                      //                 children: [
+                      //                   Text(
+                      //                     'Total: $quantity set${quantity > 1 ? 's' : ''} × $pcsInSet pcs = ${quantity * pcsInSet} pieces',
+                      //                     style: TextStyle(fontSize: 12),
+                      //                   ),
+                      //                   Row(
+                      //                     children: [
+                      //                       Text(
+                      //                         '₹${((p['price'] ?? p['singlePicPrice'] ?? 0) * quantity * pcsInSet).toStringAsFixed(0)}',
+                      //                         style: TextStyle(
+                      //                           fontWeight: FontWeight.bold,
+                      //                           fontSize: 16,
+                      //                           color: Colors.indigo,
+                      //                         ),
+                      //                       ),
+                      //                       SizedBox(width: 4),
+                      //                       Text(
+                      //                         'per set',
+                      //                         style: TextStyle(
+                      //                           fontSize: 12,
+                      //                           color: Colors.grey,
+                      //                         ),
+                      //                       ),
+                      //                     ],
+                      //                   ),
+                      //                 ],
+                      //               ),
+                      //               // Quantity and pcs/set controls
+                      //               Row(
+                      //                 mainAxisAlignment:
+                      //                     MainAxisAlignment.spaceBetween,
+                      //                 crossAxisAlignment:
+                      //                     CrossAxisAlignment.end,
+                      //                 children: [
+                      //                   // Pcs per set selector
+                      //                   Row(
+                      //                     crossAxisAlignment:
+                      //                         CrossAxisAlignment.start,
+                      //                     children: [
+                      //                       Column(
+                      //                         children: [
+                      //                           Text('Pcs/set:'),
+                      //                           Row(
+                      //                             children: [
+                      //                               ElevatedButton(
+                      //                                 style: ButtonStyle(
+                      //                                   shape:
+                      //                                       MaterialStateProperty.all(
+                      //                                         CircleBorder(),
+                      //                                       ),
+                      //                                   backgroundColor:
+                      //                                       MaterialStateProperty.all(
+                      //                                         Colors.indigo,
+                      //                                       ),
+                      //                                 ),
+                      //                                 child: Icon(
+                      //                                   Icons.remove,
+                      //                                   color: Colors.white,
+                      //                                   size: 18,
+                      //                                 ),
+                      //                                 onPressed: () {
+                      //                                   setState(() {
+                      //                                     if (pcsInSet > 1) {
+                      //                                       p['pcsInSet'] =
+                      //                                           (pcsInSet - 1)
+                      //                                               .toString();
+                      //                                       _recalculatePrice();
+                      //                                     }
+                      //                                   });
+                      //                                 },
+                      //                               ),
+                      //                               Text('$pcsInSet'),
+                      //                               ElevatedButton(
+                      //                                 style: ButtonStyle(
+                      //                                   shape:
+                      //                                       MaterialStateProperty.all(
+                      //                                         CircleBorder(),
+                      //                                       ),
+                      //                                   backgroundColor:
+                      //                                       MaterialStateProperty.all(
+                      //                                         Colors.indigo,
+                      //                                       ),
+                      //                                 ),
+                      //                                 child: Icon(
+                      //                                   Icons.add,
+                      //                                   color: Colors.white,
+                      //                                   size: 18,
+                      //                                 ),
+                      //                                 onPressed: () {
+                      //                                   setState(() {
+                      //                                     p['pcsInSet'] =
+                      //                                         (pcsInSet + 1)
+                      //                                             .toString();
+                      //                                     _recalculatePrice();
+                      //                                   });
+                      //                                 },
+                      //                               ),
+                      //                             ],
+                      //                           ),
+                      //                         ],
+                      //                       ),
+                      //                       SizedBox(width: 12),
+                      //                       Row(
+                      //                         mainAxisAlignment:
+                      //                             MainAxisAlignment
+                      //                                 .spaceBetween,
+                      //                         children: [
+                      //                           Column(
+                      //                             children: [
+                      //                               Text('Qty:'),
+                      //                               Row(
+                      //                                 children: [
+                      //                                   ElevatedButton(
+                      //                                     style: ButtonStyle(
+                      //                                       shape:
+                      //                                           MaterialStateProperty.all(
+                      //                                             CircleBorder(),
+                      //                                           ),
+                      //                                       backgroundColor:
+                      //                                           MaterialStateProperty.all(
+                      //                                             Colors.indigo,
+                      //                                           ),
+                      //                                     ),
+                      //                                     child: Icon(
+                      //                                       Icons.remove,
+                      //                                       color: Colors.white,
+                      //                                       size: 18,
+                      //                                     ),
+                      //                                     onPressed:
+                      //                                         quantity > 1
+                      //                                         ? () {
+                      //                                             setState(() {
+                      //                                               _updateProductQuantity(
+                      //                                                 pid,
+                      //                                                 -1,
+                      //                                               ); // <-- Use helper here
+                      //                                             });
+                      //                                           }
+                      //                                         : null,
+                      //                                   ),
+                      //                                   Text('$quantity'),
+                      //                                   ElevatedButton(
+                      //                                     style: ButtonStyle(
+                      //                                       shape:
+                      //                                           MaterialStateProperty.all(
+                      //                                             CircleBorder(),
+                      //                                           ),
+                      //                                       backgroundColor:
+                      //                                           MaterialStateProperty.all(
+                      //                                             Colors.indigo,
+                      //                                           ),
+                      //                                     ),
+                      //                                     child: Icon(
+                      //                                       Icons.add,
+                      //                                       color: Colors.white,
+                      //                                       size: 18,
+                      //                                     ),
+                      //                                     onPressed: () {
+                      //                                       setState(() {
+                      //                                         _updateProductQuantity(
+                      //                                           pid,
+                      //                                           1,
+                      //                                         ); // <-- Use helper here
+                      //                                       });
+                      //                                     },
+                      //                                   ),
+                      //                                 ],
+                      //                               ),
+                      //                             ],
+                      //                           ),
+                      //                         ],
+                      //                       ),
+                      //                     ],
+                      //                   ),
+                      //                 ],
+                      //               ),
+                      //             ],
+                      //           ),
+                      //         ),
+                      //       ],
+                      //     ),
+                      //   ),
+                      // );
                     }),
 
                     // Text(
@@ -2540,22 +3146,69 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                   color: Colors.white,
                                                 ),
                                                 onPressed: redeemNow > 0
-                                                    ? () => setState(() {
-                                                        redeemNow--;
-                                                        discountValue =
-                                                            redeemNow *
-                                                            pointValue;
-                                                        _recalculatePrice();
-                                                      })
+                                                    ? () => _setRedeemNow(
+                                                        redeemNow - 1,
+                                                        maxRedeemable,
+                                                      )
                                                     : null,
+                                                // onPressed: redeemNow > 0
+                                                //     ? () => setState(() {
+                                                //         redeemNow--;
+                                                //         discountValue =
+                                                //             redeemNow *
+                                                //             pointValue;
+                                                //         _recalculatePrice();
+                                                //       })
+                                                //     : null,
                                               ),
-                                              Text(
-                                                '$redeemNow',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 16,
+
+                                              // Text(
+                                              //   '$redeemNow',
+                                              //   style: TextStyle(
+                                              //     fontWeight: FontWeight.bold,
+                                              //     fontSize: 16,
+                                              //   ),
+                                              // ),
+                                              SizedBox(
+                                                width: 100,
+                                                child: TextField(
+                                                  controller:
+                                                      redeemNowController,
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
+                                                  decoration: InputDecoration(
+                                                    isDense: true,
+                                                    contentPadding:
+                                                        EdgeInsets.symmetric(
+                                                          vertical: 8,
+                                                        ),
+                                                    border: OutlineInputBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                  onChanged: (val) {
+                                                    final n =
+                                                        int.tryParse(val) ?? 0;
+                                                    _setRedeemNow(
+                                                      n,
+                                                      maxRedeemable,
+                                                    );
+                                                  },
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter
+                                                        .digitsOnly,
+                                                  ],
                                                 ),
                                               ),
+
                                               ElevatedButton(
                                                 style: ButtonStyle(
                                                   shape:
@@ -2573,14 +3226,21 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                 ),
                                                 onPressed:
                                                     redeemNow < maxRedeemable
-                                                    ? () => setState(() {
-                                                        redeemNow++;
-                                                        discountValue =
-                                                            redeemNow *
-                                                            pointValue;
-                                                        _recalculatePrice();
-                                                      })
+                                                    ? () => _setRedeemNow(
+                                                        redeemNow + 1,
+                                                        maxRedeemable,
+                                                      )
                                                     : null,
+                                                // onPressed:
+                                                //     redeemNow < maxRedeemable
+                                                //     ? () => setState(() {
+                                                //         redeemNow++;
+                                                //         discountValue =
+                                                //             redeemNow *
+                                                //             pointValue;
+                                                //         _recalculatePrice();
+                                                //       })
+                                                //     : null,
                                               ),
                                             ],
                                           ),
@@ -2597,17 +3257,23 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                   foregroundColor: Colors.white,
                                                 ),
                                                 onPressed: maxRedeemable > 0
-                                                    ? () {
-                                                        setState(() {
-                                                          redeemNow =
-                                                              maxRedeemable;
-                                                          discountValue =
-                                                              redeemNow *
-                                                              pointValue;
-                                                          _recalculatePrice();
-                                                        });
-                                                      }
+                                                    ? () => _setRedeemNow(
+                                                        maxRedeemable,
+                                                        maxRedeemable,
+                                                      )
                                                     : null,
+                                                // onPressed: maxRedeemable > 0
+                                                //     ? () {
+                                                //         setState(() {
+                                                //           redeemNow =
+                                                //               maxRedeemable;
+                                                //           discountValue =
+                                                //               redeemNow *
+                                                //               pointValue;
+                                                //           _recalculatePrice();
+                                                //         });
+                                                //       }
+                                                //     : null,
                                               ),
                                               // SizedBox(width: 8),
                                               ElevatedButton(
@@ -2617,14 +3283,20 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                   foregroundColor: Colors.white,
                                                 ),
                                                 onPressed: redeemNow > 0
-                                                    ? () {
-                                                        setState(() {
-                                                          redeemNow = 0;
-                                                          discountValue = 0.0;
-                                                          _recalculatePrice();
-                                                        });
-                                                      }
+                                                    ? () => _setRedeemNow(
+                                                        0,
+                                                        maxRedeemable,
+                                                      )
                                                     : null,
+                                                // onPressed: redeemNow > 0
+                                                //     ? () {
+                                                //         setState(() {
+                                                //           redeemNow = 0;
+                                                //           discountValue = 0.0;
+                                                //           _recalculatePrice();
+                                                //         });
+                                                //       }
+                                                //     : null,
                                               ),
                                             ],
                                           ),
@@ -2815,6 +3487,20 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                             ),
                                           ),
                                           SizedBox(width: 12),
+                                          // ElevatedButton.icon(
+                                          //   icon: Icon(Icons.add),
+                                          //   label: Text('Add'),
+                                          //   style: ElevatedButton.styleFrom(
+                                          //     backgroundColor: Colors.indigo,
+                                          //     foregroundColor: Colors.white,
+                                          //     minimumSize: Size(60, 48),
+                                          //     shape: RoundedRectangleBorder(
+                                          //       borderRadius:
+                                          //           BorderRadius.circular(8),
+                                          //     ),
+                                          //   ),
+                                          //   onPressed: _addPayment,
+                                          // ),
                                           ElevatedButton.icon(
                                             icon: Icon(Icons.add),
                                             label: Text('Add'),
@@ -2827,7 +3513,9 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                     BorderRadius.circular(8),
                                               ),
                                             ),
-                                            onPressed: _addPayment,
+                                            onPressed: balanceDue <= 0
+                                                ? null
+                                                : _addPayment,
                                           ),
                                         ],
                                       )
@@ -2893,30 +3581,84 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                     BorderRadius.circular(8),
                                               ),
                                             ),
-                                            onPressed: _addPayment,
+                                            onPressed: balanceDue <= 0
+                                                ? null
+                                                : _addPayment,
                                           ),
                                         ],
                                       ),
                                 SizedBox(height: 12),
-                                ...payments.map(
-                                  (p) => ListTile(
+
+                                if (balanceDue <= 0)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: Text(
+                                      'Total paid cannot exceed balance due.',
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+
+                                // ...payments.map(
+                                //   (p) => ListTile(
+                                //     leading: Icon(
+                                //       Icons.check_circle,
+                                //       color: Colors.green,
+                                //     ),
+                                //     title: Text('${p['method']}'),
+                                //     trailing: Text(
+                                //       '₹${p['amount']}',
+                                //       style: TextStyle(
+                                //         fontWeight: FontWeight.bold,
+                                //       ),
+                                //     ),
+                                //     dense: true,
+                                //     shape: RoundedRectangleBorder(
+                                //       borderRadius: BorderRadius.circular(8),
+                                //     ),
+                                //   ),
+                                // ),
+                                ...payments.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  final p = entry.value;
+                                  return ListTile(
                                     leading: Icon(
                                       Icons.check_circle,
                                       color: Colors.green,
                                     ),
                                     title: Text('${p['method']}'),
-                                    trailing: Text(
-                                      '₹${p['amount']}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '₹${p['amount']}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete,
+                                            color: Colors.red,
+                                          ),
+                                          tooltip: 'Remove Payment',
+                                          onPressed: () {
+                                            setState(() {
+                                              payments.removeAt(idx);
+                                              _recalculatePrice();
+                                            });
+                                          },
+                                        ),
+                                      ],
                                     ),
                                     dense: true,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                  ),
-                                ),
+                                  );
+                                }),
                               ],
                             );
                           },
@@ -2995,8 +3737,14 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Total Paid:'),
-                        Text('₹${totalPaid.toStringAsFixed(2)}'),
+                        Text(
+                          'Total Paid:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '₹${totalPaid.toStringAsFixed(2)}',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ],
                     ),
                     Row(

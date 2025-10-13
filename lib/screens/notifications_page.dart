@@ -9,6 +9,8 @@ class NotificationsPage extends StatelessWidget {
     {'type': 'Signup', 'msg': 'Signup request approved'},
   ];
 
+  NotificationsPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,26 +35,49 @@ class NotificationsPage extends StatelessWidget {
                 children: [
                   Icon(Icons.notifications, color: Colors.indigo),
                   SizedBox(width: 8),
-                  Text('Notifications', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                  Text(
+                    'Notifications',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.indigo,
+                    ),
+                  ),
                 ],
               ),
             ),
             SizedBox(height: 12),
             Expanded(
               child: notifications.isEmpty
-                  ? Center(child: Text('No notifications yet', style: TextStyle(color: Colors.grey)))
+                  ? Center(
+                      child: Text(
+                        'No notifications yet',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: notifications.length,
                       itemBuilder: (context, i) {
                         final n = notifications[i];
                         return Card(
                           elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           color: Colors.white,
                           child: ListTile(
-                            leading: Icon(Icons.notifications_active, color: Colors.indigo),
-                            title: Text(n['type'] ?? '', style: TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text(n['msg'] ?? '', style: TextStyle(color: Colors.indigo)),
+                            leading: Icon(
+                              Icons.notifications_active,
+                              color: Colors.indigo,
+                            ),
+                            title: Text(
+                              n['type'] ?? '',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text(
+                              n['msg'] ?? '',
+                              style: TextStyle(color: Colors.indigo),
+                            ),
                           ),
                         );
                       },

@@ -16,11 +16,8 @@ import 'screens/stock_adjustment_page.dart';
 import 'screens/notifications_page.dart';
 import 'screens/stock_management_page.dart';
 import 'screens/customer_ledger_page.dart';
-import 'screens/whatsapp_notifications_page.dart';
 import 'screens/user_data_page.dart';
-import 'screens/push_notifications_page.dart';
 import 'screens/catalogue_upload_page.dart';
-import 'screens/sales_order_page.dart';
 
 void main() {
   runApp(ProviderScope(child: MyApp()));

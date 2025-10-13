@@ -6,6 +6,8 @@ class CustomerLedgerPage extends StatelessWidget {
     {'customer': 'Customer B', 'credit': 10000, 'debit': 4000, 'balance': 6000},
   ];
 
+  CustomerLedgerPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -30,31 +32,54 @@ class CustomerLedgerPage extends StatelessWidget {
                 children: [
                   Icon(Icons.account_balance_wallet, color: Colors.indigo),
                   SizedBox(width: 8),
-                  Text('Ledger List', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                  Text(
+                    'Ledger List',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.indigo,
+                    ),
+                  ),
                 ],
               ),
             ),
             SizedBox(height: 12),
             Expanded(
               child: ledger.isEmpty
-                  ? Center(child: Text('No ledger entries yet', style: TextStyle(color: Colors.grey)))
+                  ? Center(
+                      child: Text(
+                        'No ledger entries yet',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: ledger.length,
                       itemBuilder: (context, i) {
                         final l = ledger[i];
                         return Card(
                           elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           color: Colors.white,
                           child: ListTile(
-                            leading: Icon(Icons.account_balance_wallet, color: Colors.indigo),
-                            title: Text(l['customer'], style: TextStyle(fontWeight: FontWeight.bold)),
+                            leading: Icon(
+                              Icons.account_balance_wallet,
+                              color: Colors.indigo,
+                            ),
+                            title: Text(
+                              l['customer'],
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text('Credit: ₹${l['credit']}'),
                                 Text('Debit: ₹${l['debit']}'),
-                                Text('Balance: ₹${l['balance']}', style: TextStyle(color: Colors.indigo)),
+                                Text(
+                                  'Balance: ₹${l['balance']}',
+                                  style: TextStyle(color: Colors.indigo),
+                                ),
                               ],
                             ),
                           ),

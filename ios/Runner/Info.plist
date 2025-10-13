@@ -13,6 +13,8 @@
 		<key>NSCameraUsageDescription</key>
 		<string>We need access to your camera to upload your photo.</string>
 		<key>CFBundleExecutable</key>
+		<key>NSCameraUsageDescription</key>
+		<string>Camera access is needed for barcode scanning.</string>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>

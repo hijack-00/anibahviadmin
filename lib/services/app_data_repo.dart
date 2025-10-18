@@ -5,6 +5,20 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppDataRepo {
+  Future<Map<String, dynamic>> fetchChallansWithPagination({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    return await _api.fetchChallansWithPagination(page: page, limit: limit);
+  }
+
+  Future<Map<String, dynamic>> fetchReturnsWithPagination({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    return await _api.fetchReturnsWithPagination(page: page, limit: limit);
+  }
+
   static final AppDataRepo _instance = AppDataRepo._internal();
   factory AppDataRepo() => _instance;
   AppDataRepo._internal();
@@ -19,6 +33,70 @@ class AppDataRepo {
     final response = await _api.getAllProducts();
     if (response['success'] == true && response['data'] is List) {
       return List<Map<String, dynamic>>.from(response['data']);
+    } else {
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchAllOrdersByAdminWithPagination() async {
+    return await _api.fetchAllOrdersByAdminWithPagination();
+  }
+
+  Future<Map<String, dynamic>> updateOrderNoteByAdmin(
+    String orderId,
+    String orderNote,
+  ) async {
+    return await _api.updateOrderNoteByAdmin(orderId, orderNote);
+  }
+
+  Future<Map<String, dynamic>> changeOrderStatusByAdmin({
+    required String orderId,
+    required String newStatus,
+    String trackingId = '',
+    String deliveryVendor = '',
+  }) async {
+    return await _api.changeOrderStatusByAdmin(
+      orderId: orderId,
+      newStatus: newStatus,
+      trackingId: trackingId,
+      deliveryVendor: deliveryVendor,
+    );
+  }
+
+  Future<Map<String, dynamic>> updateOrderPaymentByAdmin({
+    required String orderId,
+    required double additionalPayment,
+    required String paymentMethod,
+    String notes = '',
+  }) async {
+    return await _api.updateOrderPaymentByAdmin(
+      orderId: orderId,
+      additionalPayment: additionalPayment,
+      paymentMethod: paymentMethod,
+      notes: notes,
+    );
+  }
+
+  Future<Map<String, dynamic>> createOrderByAdmin(
+    Map<String, dynamic> orderData,
+  ) async {
+    final response = await _api.createOrderByAdmin(orderData);
+    return {
+      "success":
+          response['success'] == true ||
+          response['status'] == 201 ||
+          response['status'] == 200,
+      "data": response,
+      "status": response['status'] ?? 200,
+      "message": response['message'] ?? '',
+    };
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAllOrders() async {
+    // Fetch all orders using the new endpoint, but ignore pagination for now
+    final response = await fetchAllOrdersByAdminWithPagination();
+    if (response['success'] == true && response['orders'] is List) {
+      return List<Map<String, dynamic>>.from(response['orders']);
     } else {
       return [];
     }
@@ -79,6 +157,38 @@ class AppDataRepo {
     }
   }
 
+  Future<Map<String, dynamic>> getReturnsByCustomerAndOrder({
+    required String customerId,
+    required String orderId,
+  }) => _api.getReturnsByCustomerAndOrder(
+    customerId: customerId,
+    orderId: orderId,
+  );
+
+  Future<Map<String, dynamic>> createReturn({
+    required Map<String, dynamic> data,
+  }) => _api.createReturn(data: data);
+
+  Future<Map<String, dynamic>> fetchOrdersByUser(String userId) async {
+    return await _api.getOrdersByUserId(userId);
+  }
+
+  Future<Map<String, dynamic>> getChallansByCustomerAndOrder({
+    required String customerId,
+    required String orderId,
+  }) async {
+    return await _api.getChallansByCustomerAndOrder(
+      customerId: customerId,
+      orderId: orderId,
+    );
+  }
+
+  Future<Map<String, dynamic>> createChallan(
+    Map<String, dynamic> challanBody,
+  ) async {
+    return await _api.createChallan(challanBody);
+  }
+
   Future<Map<String, dynamic>> deleteOrderById(String orderId) async {
     return await _api.deleteOrderById(orderId);
   }
@@ -103,24 +213,6 @@ class AppDataRepo {
     return await _api.fetchSalesData();
   }
 
-  // In app_data_repo.dart
-  Future<Map<String, dynamic>> createOrderByAdmin(
-    Map<String, dynamic> orderData,
-  ) async {
-    final response = await http.post(
-      Uri.parse('${ApiService.baseUrl}/order/create-order-by-admin'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(orderData),
-    );
-    final body = jsonDecode(response.body);
-    return {
-      "success": response.statusCode == 200 || response.statusCode == 201,
-      "data": body,
-      "status": response.statusCode,
-      "message": body['message'] ?? '',
-    };
-  }
-
   Future<int> fetchUserRewardPoints(String userId) async {
     final data = await ApiService.getUserRewardPoints(userId);
     if (data != null &&
@@ -137,9 +229,9 @@ class AppDataRepo {
     return await _api.fetchTopProducts();
   }
 
-  Future<Map<String, dynamic>> fetchAllOrders() async {
-    return await _api.getAllOrders();
-  }
+  // Future<Map<String, dynamic>> fetchAllOrders() async {
+  //   return await _api.getAllOrders();
+  // }
 
   Future<Map<String, dynamic>> changeOrderStatus(
     String orderId, {

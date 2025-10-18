@@ -218,7 +218,7 @@ class _UsersPageState extends State<UsersPage>
                               user['name'] ?? '',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: 14,
                               ),
                             ),
                             SizedBox(height: 4),
@@ -236,7 +236,7 @@ class _UsersPageState extends State<UsersPage>
                                   user['email'],
                                   style: TextStyle(
                                     color: Colors.grey[800],
-                                    fontSize: 13,
+                                    fontSize: 11,
                                   ),
                                 ),
                               ),
@@ -248,7 +248,7 @@ class _UsersPageState extends State<UsersPage>
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Colors.grey[800],
-                                    fontSize: 13,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),
@@ -259,7 +259,7 @@ class _UsersPageState extends State<UsersPage>
                                   address,
                                   style: TextStyle(
                                     color: Colors.grey[600],
-                                    fontSize: 12,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ),
@@ -312,7 +312,7 @@ class _UsersPageState extends State<UsersPage>
                                                     style: TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                      fontSize: 13,
+                                                      fontSize: 11,
                                                     ),
                                                   ),
                                                   Text(
@@ -320,7 +320,7 @@ class _UsersPageState extends State<UsersPage>
                                                     style: TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                      fontSize: 13,
+                                                      fontSize: 11,
                                                     ),
                                                   ),
                                                 ],
@@ -344,7 +344,7 @@ class _UsersPageState extends State<UsersPage>
                                                     style: TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                      fontSize: 13,
+                                                      fontSize: 11,
                                                     ),
                                                   ),
                                                   Text(
@@ -352,7 +352,7 @@ class _UsersPageState extends State<UsersPage>
                                                     style: TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                      fontSize: 13,
+                                                      fontSize: 11,
                                                     ),
                                                   ),
                                                 ],
@@ -420,52 +420,144 @@ class _UsersPageState extends State<UsersPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Users'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(text: 'Active Users'),
-            Tab(text: 'Inactive Users'),
-          ],
+      // Replace your appBar property in Scaffold with this:
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(80),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.indigo.shade500, Colors.teal.shade400],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.people, color: Colors.white, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Users',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
+
+      // appBar: AppBar(
+      //   title: Text('Users'),
+      //   bottom: TabBar(
+      //     controller: _tabController,
+      //     tabs: [
+      //       Tab(text: 'Active Users'),
+      //       Tab(text: 'Inactive Users'),
+      //     ],
+      //   ),
+      // ),
+      // body: _loading
+      //     ? _UsersSkeleton()
+      //     : TabBarView(
+      //         controller: _tabController,
+      //         children: [
+      //           Column(
+      //             children: [
+      //               Padding(
+      //                 padding: const EdgeInsets.all(16.0),
+      //                 child: TextField(
+      //                   decoration: InputDecoration(
+      //                     labelText: 'Search by name',
+      //                     border: OutlineInputBorder(),
+      //                     prefixIcon: Icon(Icons.search),
+      //                   ),
+      //                   onChanged: (v) => _searchUsers(true, v),
+      //                 ),
+      //               ),
+      //               Expanded(child: _buildUserList(_filteredActive)),
+      //             ],
+      //           ),
+      //           Column(
+      //             children: [
+      //               Padding(
+      //                 padding: const EdgeInsets.all(16.0),
+      //                 child: TextField(
+      //                   decoration: InputDecoration(
+      //                     labelText: 'Search by name',
+      //                     border: OutlineInputBorder(),
+      //                     prefixIcon: Icon(Icons.search),
+      //                   ),
+      //                   onChanged: (v) => _searchUsers(false, v),
+      //                 ),
+      //               ),
+      //               Expanded(child: _buildUserList(_filteredInactive)),
+      //             ],
+      //           ),
+      //         ],
+      //       ),
       body: _loading
           ? _UsersSkeleton()
-          : TabBarView(
-              controller: _tabController,
+          : Column(
               children: [
-                Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Search by name',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.search),
-                        ),
-                        onChanged: (v) => _searchUsers(true, v),
-                      ),
-                    ),
-                    Expanded(child: _buildUserList(_filteredActive)),
-                  ],
+                // TabBar at the top of the body
+                Container(
+                  color: Colors.white,
+                  child: TabBar(
+                    controller: _tabController,
+                    indicatorColor: Colors.indigo,
+                    labelColor: Colors.indigo,
+                    unselectedLabelColor: Colors.grey,
+                    tabs: [
+                      Tab(text: 'Active Users'),
+                      Tab(text: 'Inactive Users'),
+                    ],
+                  ),
                 ),
-                Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Search by name',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.search),
-                        ),
-                        onChanged: (v) => _searchUsers(false, v),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: TextField(
+                              decoration: InputDecoration(
+                                labelText: 'Search by name',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.search),
+                              ),
+                              onChanged: (v) => _searchUsers(true, v),
+                            ),
+                          ),
+                          Expanded(child: _buildUserList(_filteredActive)),
+                        ],
                       ),
-                    ),
-                    Expanded(child: _buildUserList(_filteredInactive)),
-                  ],
+                      Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: TextField(
+                              decoration: InputDecoration(
+                                labelText: 'Search by name',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.search),
+                              ),
+                              onChanged: (v) => _searchUsers(false, v),
+                            ),
+                          ),
+                          Expanded(child: _buildUserList(_filteredInactive)),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

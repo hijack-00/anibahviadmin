@@ -2,316 +2,617 @@ import 'package:anibhaviadmin/services/api_service.dart';
 import 'package:flutter/material.dart';
 import '../services/app_data_repo.dart';
 
-class OrderDetailsPage extends StatefulWidget {
+class OrderDetailsPage extends StatelessWidget {
   final String orderId;
   const OrderDetailsPage({required this.orderId, Key? key}) : super(key: key);
 
   @override
-  State<OrderDetailsPage> createState() => _OrderDetailsPageState();
-}
-
-class _OrderDetailsPageState extends State<OrderDetailsPage> {
-  final Map<String, String> orderStatusOptionsMap = {
-    'Order Pending': 'pending',
-    'Order Confirmed': 'order Confirmed',
-    'Processing': 'processing',
-    'Shipped': 'shipped',
-    'Delivered': 'delivered',
-    'Cancelled': 'cancelled',
-  };
-  List<String> get orderStatusOptions => orderStatusOptionsMap.keys.toList();
-  final List<String> paymentStatusOptions = [
-    'Pending',
-    'Complete Payment',
-    'Failed',
-    'Partial Payment',
-  ];
-  String? _selectedOrderStatus;
-  String? _selectedPaymentStatus;
-
-  Future<void> _changeOrderStatus() async {
-    if (_selectedOrderStatus == null && _selectedPaymentStatus == null) return;
-    try {
-      final repo = AppDataRepo();
-      final resp = await repo.changeOrderStatus(
-        widget.orderId,
-        orderStatus: _selectedOrderStatus != null ? orderStatusOptionsMap[_selectedOrderStatus!] : null,
-        paymentStatus: _selectedPaymentStatus,
-      );
-      if (resp['success'] == true) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(content: Text(resp['message'] ?? 'Status updated successfully'), backgroundColor: Colors.green),
-        );
-        await _fetchOrderDetails();
-      } else {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(content: Text(resp['message'] ?? 'Failed to update status'), backgroundColor: Colors.red),
-        );
-      }
-    } catch (e) {
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
-  Future<void> _deleteOrder() async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (dialogCtx) => AlertDialog(
-      title: Text('Delete Order'),
-      content: Text('Are you sure you want to delete this order?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogCtx).pop(false),
-          child: Text('Cancel'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          onPressed: () => Navigator.of(dialogCtx).pop(true),
-          child: Text('Confirm', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
-  );
-
-  if (confirmed == true) {
-    try {
-      final repo = AppDataRepo();
-      final resp = await repo.deleteOrderById(widget.orderId);
-
-      print("API response: $resp");
-
-      // 🔑 Check `status` instead of `success`
-      if (resp['status'] == true) {
-        if (!mounted) return;
-
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              resp['message'] ?? 'Order deleted successfully',
-              style: TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-
-        // ✅ Pop OrderDetailsPage
-        Navigator.of(context, rootNavigator: true).pop(true);
-      } else {
-        if (!mounted) return;
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              resp['message'] ?? 'Failed to delete order',
-              style: TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Error: $e', style: TextStyle(color: Colors.white)),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-}
-
-  bool _loading = true;
-  String? _error;
-  Map<String, dynamic>? _order;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchOrderDetails();
-  }
-
-  Future<void> _fetchOrderDetails() async {
-    setState(() { _loading = true; _error = null; });
-    try {
-      final repo = AppDataRepo();
-      final response = await repo.fetchOrderById(widget.orderId);
-      if (response['success'] == true && response['order'] != null) {
-        setState(() {
-          _order = response['order'];
-          _loading = false;
-          _selectedOrderStatus = _order!['orderStatus'] != null ? _mapOrderStatus(_order!['orderStatus']) : null;
-          _selectedPaymentStatus = _order!['paymentStatus'] != null ? _mapPaymentStatus(_order!['paymentStatus']) : null;
-        });
-      } else {
-        setState(() { _error = response['message'] ?? 'Failed to load order'; _loading = false; });
-      }
-    } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
-    }
-  }
-
-  String? _mapOrderStatus(dynamic status) {
-    final s = status.toString().toLowerCase();
-    if (s == 'pending') return 'Order Pending';
-    if (s == 'order confirmed') return 'Order Confirmed';
-    if (s == 'processing') return 'Processing';
-    if (s == 'shipped') return 'Shipped';
-    if (s == 'delivered') return 'Delivered';
-    if (s == 'cancelled') return 'Cancelled';
-    return null;
-  }
-  String? _mapPaymentStatus(dynamic status) {
-    final s = status.toString().toLowerCase();
-    if (s.contains('pending')) return 'Pending';
-    if (s.contains('complete')) return 'Complete Payment';
-    if (s.contains('fail')) return 'Failed';
-    if (s.contains('partial')) return 'Partial Payment';
-    return null;
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final allOrders =
+        ModalRoute.of(context)?.settings.arguments
+            as List<Map<String, dynamic>>?;
+    final order = allOrders?.firstWhere(
+      (o) => o['_id'] == orderId || o['id'] == orderId,
+      orElse: () => {},
+    );
+
+    if (order == null || order.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Order Details')),
+        body: Center(child: Text('Order not found')),
+      );
+    }
+
+    final customer = order['customer'] ?? {};
+    final user = customer['userId'] ?? {};
+    final address = user['address'] ?? {};
+    final items = order['items'] ?? [];
+    final payments = order['payments'] ?? [];
+    final statusHistory = order['statusHistory'] ?? [];
+    final paidAmount = order['paidAmount'] ?? 0;
+    final balanceAmount = order['balanceAmount'] ?? 0;
+    final paymentType = order['paymentType'] ?? '';
+    final paymentMethod = order['paymentMethod'] ?? '';
+    final subtotal = order['subtotal'] ?? 0;
+    final total = order['total'] ?? 0;
+    final pointsRedeemed = order['pointsRedeemed'] ?? 0;
+    final pointsRedemptionValue = order['pointsRedemptionValue'] ?? 0;
+    final pointsEarned = order['pointsEarned'] ?? 0;
+    final pointsEarnedValue = order['pointsEarnedValue'] ?? 0;
+    final orderNote = order['orderNote'] ?? '';
+    final transportName = order['transportName'] ?? '';
+    final orderType = order['orderType'] ?? '';
+    final orderDate = order['orderDate'] ?? '';
+    final status = order['status'] ?? '';
+    final deliveryAddress = customer['deliveryAddress'] ?? '';
+
+    Color statusColor(String status) {
+      switch (status.toLowerCase()) {
+        case 'pending':
+          return Colors.orange;
+        case 'packed':
+          return Colors.blue;
+        case 'cancelled':
+          return Colors.red;
+        default:
+          return Colors.grey;
+      }
+    }
+
     return Scaffold(
-      appBar: AppBar(title: Text('Order Details')),
-      body: _loading
-          ? Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ListView(
-                children: List.generate(5, (i) => Card(
-                  margin: EdgeInsets.symmetric(vertical: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(width: 120, height: 16, color: Colors.grey.shade200, margin: EdgeInsets.only(bottom: 8)),
-                        Container(width: 80, height: 12, color: Colors.grey.shade200, margin: EdgeInsets.only(bottom: 8)),
-                        Container(width: 180, height: 12, color: Colors.grey.shade200, margin: EdgeInsets.only(bottom: 8)),
-                        Container(width: 60, height: 12, color: Colors.grey.shade200),
-                      ],
-                    ),
-                  ),
-                )),
-              ),
-            )
-          : _error != null
-              ? Center(child: Text(_error!))
-              : _order == null
-                  ? Center(child: Text('No order found'))
-                  : Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: ListView(
+      appBar: AppBar(
+        title: Text(
+          '${order['orderNumber'] ?? ''}',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+        // actions: [
+        //   Padding(
+        //     padding: const EdgeInsets.symmetric(horizontal: 12.0),
+        //     child: ElevatedButton.icon(
+        //       style: ElevatedButton.styleFrom(
+        //         backgroundColor: Colors.green,
+        //         foregroundColor: Colors.white,
+        //         elevation: 0,
+        //         shape: RoundedRectangleBorder(
+        //           borderRadius: BorderRadius.circular(6),
+        //         ),
+        //       ),
+        //       icon: Icon(Icons.print, size: 18),
+        //       label: Text('Print Invoice'),
+        //       onPressed: () {},
+        //     ),
+        //   ),
+        // ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(18.0),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // Top Row: Customer Info, Order Info, Status History
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Customer Info
+                      Row(
                         children: [
-                          Text('Order ID: ${_order!['orderUniqueId'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                          SizedBox(height: 8),
-                          // Payment details UI with highlights
-                          Text('Amount: ₹${_order!['totalAmount'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          SizedBox(height: 4),
-                          Text('Payment Method: ${_order!['paymentMethod'] ?? ''}', style: TextStyle(fontSize: 16)),
-                          SizedBox(height: 4),
-                          Text('Payment Status: ${_order!['paymentStatus'] ?? ''}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color:
-                                (_order!['paymentStatus']?.toString().toLowerCase().contains('fail') ?? false)
-                                  ? Colors.red
-                                  : (_order!['paymentStatus']?.toString().toLowerCase().contains('complete') ?? false)
-                                    ? Colors.indigo
-                                    : (_order!['paymentStatus']?.toString().toLowerCase().contains('partial') ?? false)
-                                      ? Colors.green
-                                      : Colors.black,
+                          Expanded(
+                            child: Card(
+                              elevation: 0,
+                              // margin: EdgeInsets.only(right: 12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(14.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Customer Information',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'User ID: ${user['uniqueUserId'] ?? ''}',
+                                          style: TextStyle(fontSize: 11),
+                                        ),
+                                        Text(
+                                          'Shop Name: ${user['shopname'] ?? ''}',
+                                          style: TextStyle(fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Name: ${customer['name'] ?? ''}',
+                                          style: TextStyle(fontSize: 11),
+                                        ),
+                                        Text(
+                                          'Phone: ${customer['phone'] ?? ''}',
+                                          style: TextStyle(fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+
+                                    Text(
+                                      'Email: ${customer['email'] ?? ''}',
+                                      style: TextStyle(fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                          SizedBox(height: 4),
-                          Text('Received Amount: ₹${_order!['recivedAmount'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 16)),
-                          SizedBox(height: 4),
-                          Text('Pending Amount: ₹${_order!['pendingAmount'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 16)),
-                          Divider(),
-                          Text('Customer: ${_order!['shippingAddress']?['name'] ?? ''}', style: TextStyle(fontSize: 16)),
-                          Text('Phone: ${_order!['shippingAddress']?['phone'] ?? ''}', style: TextStyle(fontSize: 16)),
-                          Text('Address: ${_order!['shippingAddress']?['address'] ?? ''}, ${_order!['shippingAddress']?['city'] ?? ''}, ${_order!['shippingAddress']?['state'] ?? ''}, ${_order!['shippingAddress']?['country'] ?? ''}', style: TextStyle(fontSize: 16)),
-                          Divider(),
-                          Text('Products:', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ...?_order!['products']?.map<Widget>((prod) {
-                            final subProducts = prod['subProduct'] ?? [];
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: List<Widget>.from(subProducts.map<Widget>((subProd) {
-                                final images = List<String>.from(subProd['subProductImages'] ?? []);
-                                return Card(
-                                  margin: EdgeInsets.symmetric(vertical: 4),
-                                  child: ListTile(
-                                    leading: images.isNotEmpty
-                                        ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Image.network(images[0], width: 48, height: 48, fit: BoxFit.cover),
-                                          )
-                                        : Container(width: 48, height: 48, color: Colors.grey[300], child: Icon(Icons.image)),
-                                    title: Text(subProd['productId']?['productName'] ?? 'Product'),
-                                    subtitle: Text('Qty: ${prod['quantity']?[0] ?? ''} | Price: ₹${prod['price']?[0] ?? ''}'),
-                                  ),
-                                );
-                              })),
-                            );
-                          })?.toList(),
-                          SizedBox(height: 16),
-                          // Dropdowns above delete button (in Column)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      // Order Info
+                      Card(
+                        elevation: 0,
+                        // margin: EdgeInsets.only(right: 12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              DropdownButtonFormField<String>(
-                                decoration: InputDecoration(labelText: 'Order Status'),
-                                value: _selectedOrderStatus,
-                                items: orderStatusOptions.map((status) => DropdownMenuItem(
-                                  value: status,
-                                  child: Text(status),
-                                )).toList(),
-                                onChanged: (val) {
-                                  setState(() { _selectedOrderStatus = val; });
-                                  _changeOrderStatus();
-                                },
+                              Text(
+                                'Order Information',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
                               ),
-                              SizedBox(height: 16),
-                              DropdownButtonFormField<String>(
-                                decoration: InputDecoration(labelText: 'Payment Status'),
-                                value: _selectedPaymentStatus,
-                                items: paymentStatusOptions.map((status) => DropdownMenuItem(
-                                  value: status,
-                                  child: Text(status),
-                                )).toList(),
-                                onChanged: (val) {
-                                  setState(() { _selectedPaymentStatus = val; });
-                                  _changeOrderStatus();
-                                },
+                              SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Date: $orderDate',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                  Text(
+                                    'Type: $orderType',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                ],
+                              ),
+
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Payment Type: $paymentType',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                  Text(
+                                    'Payment Method: $paymentMethod',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (transportName.toString().isNotEmpty)
+                                        Text(
+                                          'Transport: $transportName',
+                                          style: TextStyle(fontSize: 11),
+                                        ),
+
+                                      if (orderNote.toString().isNotEmpty)
+                                        Text(
+                                          'Note: $orderNote',
+                                          style: TextStyle(fontSize: 11),
+                                        ),
+                                    ],
+                                  ),
+
+                                  Column(
+                                    children: [
+                                      Text(
+                                        'Subtotal: ₹$subtotal',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                      Text(
+                                        'Total: ₹$total',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          SizedBox(height: 16),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                            onPressed: () async {
-                              await _deleteOrder();
-                              if (mounted) Navigator.of(context).pop(true); // Return true to previous page for refresh
-                            },
-                            child: Text('Delete Order', style: TextStyle(color: Colors.white)),
+                        ),
+                      ),
+
+                      // Status History
+                    ],
+                  ),
+
+                  // Delivery Address
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Card(
+                          elevation: 0,
+                          child: Padding(
+                            padding: const EdgeInsets.all(14.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Delivery Address',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  '${address['street'] ?? ''}, ${address['city'] ?? ''}, ${address['state'] ?? ''}, ${address['country'] ?? ''} - ${address['zipCode'] ?? ''}',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  Card(
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Status History',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          ...statusHistory.map<Widget>(
+                            (s) => Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 4.0,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: statusColor(s['status'] ?? ''),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    '${s['status'] ?? ''}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    '${s['date'] ?? ''}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'by ${s['updatedBy'] ?? ''}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 18),
+              // Payment Information
+              Card(
+                elevation: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(14.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Payment Information',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+
+                                children: [
+                                  Text(
+                                    'Paid Amount: ',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹$paidAmount',
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  SizedBox(height: 10),
+
+                                  Text(
+                                    'Redeemed:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  Text(
+                                    "$pointsRedeemed Points",
+                                    style: TextStyle(
+                                      color: Colors.orange,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+
+                                children: [
+                                  Text(
+                                    'Balance Amount: ',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹$balanceAmount',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+
+                                  SizedBox(height: 10),
+
+                                  Text(
+                                    'Earned:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  Text(
+                                    "$pointsEarned Points",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              // SizedBox(height: 16),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+
+                                children: [
+                                  Text(
+                                    'Discount:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹$pointsRedemptionValue',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+
+                                  SizedBox(height: 10),
+
+                                  Text(
+                                    'Earned Value:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹$pointsEarnedValue',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+
+                      // SizedBox(height: 12),
+                      Text(
+                        'Payments:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      ...payments.map<Widget>(
+                        (pm) => Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${pm['method'] ?? 'Cash'}:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              '₹${pm['amount'] ?? ''}',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 18),
+              // Items
+              Card(
+                elevation: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(14.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Products',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      ...items.map<Widget>((item) {
+                        // Calculate total pieces and total price
+                        final sets = item['quantity'] ?? 1;
+                        final pcsInSet = item['pcsInSet'] ?? 1;
+                        final pricePerPiece = item['singlePicPrice'] ?? 0;
+                        final totalPcs = sets * pcsInSet;
+                        final totalPrice = pricePerPiece * totalPcs;
+
+                        return Container(
+                          margin: EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ListTile(
+                            title: Text(
+                              item['name'] ?? '',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Quantity: $sets sets × $pcsInSet pcs = $totalPcs pieces',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                                Text(
+                                  'Price: ₹$pricePerPiece per piece',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                            trailing: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '₹${totalPrice.toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  '$totalPcs pieces',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 18),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(
+                  'Delete Order',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

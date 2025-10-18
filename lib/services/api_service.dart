@@ -4,6 +4,26 @@ import 'package:http/http.dart' as http;
 import '../models/product.dart';
 
 class ApiService {
+  Future<Map<String, dynamic>> fetchChallansWithPagination({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    final url =
+        "$baseUrl/challan/get-all-challans-with-pagination?page=$page&limit=$limit";
+    final response = await http.get(Uri.parse(url), headers: defaultHeaders);
+    return jsonDecode(response.body);
+  }
+
+  Future<Map<String, dynamic>> fetchReturnsWithPagination({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    final url =
+        "$baseUrl/return/get-all-return-with-pagination?page=$page&limit=$limit";
+    final response = await http.get(Uri.parse(url), headers: defaultHeaders);
+    return jsonDecode(response.body);
+  }
+
   static const String baseUrl = "https://api.sddipl.com/api";
   static Map<String, String> defaultHeaders = {
     "Content-Type": "application/json",
@@ -207,6 +227,44 @@ class ApiService {
     }
   }
 
+  // Add: fetch challans by customer+order, create challan
+  Future<Map<String, dynamic>> getChallansByCustomerAndOrder({
+    required String customerId,
+    required String orderId,
+  }) async {
+    final endpoint = '/challan/get-all-challans-by-customer-and-order';
+    final url = '$baseUrl$endpoint';
+    final body = jsonEncode({'customerId': customerId, 'orderId': orderId});
+    print('API: POST $url');
+    print('Request body: $body');
+    final response = await post(
+      endpoint,
+      headers: {'Content-Type': 'application/json'},
+      body: body,
+    );
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+    return jsonDecode(response.body);
+  }
+
+  Future<Map<String, dynamic>> createChallan(
+    Map<String, dynamic> challanBody,
+  ) async {
+    final endpoint = '/challan/create-challan';
+    final url = '$baseUrl$endpoint';
+    final body = jsonEncode(challanBody);
+    print('API: POST $url');
+    print('Request body: $body');
+    final response = await post(
+      endpoint,
+      headers: {'Content-Type': 'application/json'},
+      body: body,
+    );
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+    return jsonDecode(response.body);
+  }
+
   Future<Map<String, dynamic>> fetchJeansShirtRevenueAndOrder() async {
     final url = "$baseUrl/salesAndReports/get-jeans-shirt-revenue-and-order";
     final response = await get(
@@ -219,21 +277,91 @@ class ApiService {
     }
   }
 
+  // Add: fetch returns by customer + order, create return
+
+  Future<Map<String, dynamic>> getReturnsByCustomerAndOrder({
+    required String customerId,
+    required String orderId,
+  }) async {
+    final url = Uri.parse(
+      '$baseUrl/return/get-all-returns-by-customer-and-order',
+    );
+    final resp = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'customerId': customerId, 'orderId': orderId}),
+    );
+    return jsonDecode(resp.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createReturn({
+    required Map<String, dynamic> data,
+  }) async {
+    final url = Uri.parse('$baseUrl/return/create-return');
+    final resp = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'data': data}),
+    );
+    return jsonDecode(resp.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> createOrderByAdmin(
     Map<String, dynamic> orderData,
   ) async {
-    final url = "$baseUrl/order/create-order-by-admin";
+    final endpoint = '/order/create-order-by-admin';
+    final url = "$baseUrl$endpoint";
+    final body = jsonEncode(orderData);
+
+    // Request logging
+    print('--- CREATE ORDER REQUEST ---');
+    print('URL: $url');
+    print('Endpoint: $endpoint');
+    print('Headers: {"Content-Type": "application/json"}');
+    print('Request body: $body');
+
     final response = await post(
-      '/order/create-order-by-admin',
+      endpoint,
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode(orderData),
+      body: body,
     );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to create order: ${response.statusCode}');
+
+    // Response logging
+    print('--- CREATE ORDER RESPONSE ---');
+    print('Status code: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
+    // Try to decode JSON, return a safe map on failure
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {'success': true, 'data': decoded, 'status': response.statusCode};
+    } catch (e) {
+      print('Failed to decode response JSON: $e');
+      return {
+        'success': false,
+        'status': response.statusCode,
+        'rawBody': response.body,
+      };
     }
   }
+
+  // Future<Map<String, dynamic>> createOrderByAdmin(
+  //   Map<String, dynamic> orderData,
+  // ) async {
+  //   final url = "$baseUrl/order/create-order-by-admin";
+  //   final response = await post(
+  //     '/order/create-order-by-admin',
+  //     headers: {"Content-Type": "application/json"},
+  //     body: jsonEncode(orderData),
+  //   );
+
+  //   if (response.statusCode == 200 || response.statusCode == 201) {
+  //     return jsonDecode(response.body);
+  //   } else {
+  //     throw Exception('Failed to create order: ${response.statusCode}');
+  //   }
+  // }
 
   Future<Map<String, dynamic>> fetchSalesData() async {
     final url = "$baseUrl/salesAndReports/get-SalesData";
@@ -305,6 +433,15 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchAllOrdersByAdminWithPagination({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    final url = "$baseUrl/order/get-all-Admin-orders";
+    final response = await http.get(Uri.parse(url), headers: defaultHeaders);
+    return jsonDecode(response.body);
+  }
+
   Future<Map<String, dynamic>> changeOrderStatus(
     String orderId, {
     String? orderStatus,
@@ -327,6 +464,61 @@ class ApiService {
     } else {
       throw Exception('Failed to change order status: ${response.statusCode}');
     }
+  }
+
+  Future<Map<String, dynamic>> updateOrderNoteByAdmin(
+    String orderId,
+    String orderNote,
+  ) async {
+    final url = "$baseUrl/order/update-order-notes-by-admin/$orderId";
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"orderNote": orderNote}),
+    );
+    return jsonDecode(response.body);
+  }
+
+  Future<Map<String, dynamic>> changeOrderStatusByAdmin({
+    required String orderId,
+    required String newStatus,
+    String trackingId = '',
+    String deliveryVendor = '',
+  }) async {
+    final url = "$baseUrl/order/change-status-by-admin/$orderId";
+    final body = {
+      "orderId": orderId,
+      "newStatus": newStatus,
+      "trackingId": trackingId,
+      "deliveryVendor": deliveryVendor,
+    };
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(body),
+    );
+    return jsonDecode(response.body);
+  }
+
+  Future<Map<String, dynamic>> updateOrderPaymentByAdmin({
+    required String orderId,
+    required double additionalPayment,
+    required String paymentMethod,
+    String notes = '',
+  }) async {
+    final url = "$baseUrl/order/update-order-payment-by-admin/$orderId";
+    final body = {
+      "orderId": orderId,
+      "additionalPayment": additionalPayment,
+      "paymentMethod": paymentMethod,
+      "notes": notes,
+    };
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(body),
+    );
+    return jsonDecode(response.body);
   }
 
   Future<Map<String, dynamic>> getOrderById(String orderId) async {

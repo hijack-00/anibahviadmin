@@ -135,34 +135,61 @@ class _UniversalScaffoldState extends State<UniversalScaffold> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        // elevation: 2,
-        title: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Dashboard',
-                style: Theme.of(context).textTheme.headlineSmall,
+
+      // Replace your appBar property in Scaffold (inside UniversalScaffold) with this:
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(80),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.indigo.shade500, Colors.teal.shade400],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.dashboard_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Dashboard',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (widget.selectedIndex == 0)
+                    IconButton(
+                      icon: Icon(Icons.logout, color: Colors.white),
+                      tooltip: 'Logout',
+                      onPressed: () async {
+                        final repo = AppDataRepo();
+                        await repo.clearUserData();
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LoginScreen(),
+                          ),
+                          (route) => false,
+                        );
+                      },
+                    ),
+                ],
               ),
-              if (widget.selectedIndex == 0)
-                IconButton(
-                  icon: Icon(Icons.logout, color: Colors.red),
-                  tooltip: 'Logout',
-                  onPressed: () async {
-                    final repo = AppDataRepo();
-                    await repo.clearUserData();
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => LoginScreen()),
-                      (route) => false,
-                    );
-                  },
-                ),
-            ],
+            ),
           ),
         ),
       ),
@@ -384,31 +411,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
-                // SALES SUMMARY BLOCK (dummy data)
-                // Row(
-                //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                //   children: [
-                //     _SalesSummaryCard(
-                //       title: "Yearly Sales",
-                //       value: "₹12,00,000",
-                //       subtitle: "Revenue",
-                //       color: Colors.indigo.shade700,
-                //     ),
-                //     _SalesSummaryCard(
-                //       title: "Monthly Sales",
-                //       value: "₹1,00,000",
-                //       subtitle: "Revenue",
-                //       color: Colors.indigo.shade400,
-                //     ),
-                //     _SalesSummaryCard(
-                //       title: "Weekly Sales",
-                //       value: "₹25,000",
-                //       subtitle: "Revenue",
-                //       color: Colors.indigo.shade200,
-                //     ),
-                //   ],
-                // ),
-                // SizedBox(height: 20),
                 SizedBox(height: 16),
               ],
             ),
@@ -422,30 +424,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final Map<String, int> userOverview = {'active': 12, 'inactive': 3};
 
-  // final List<Map<String, dynamic>> quickActions = [
-  //   {
-  //     'label': 'Add Customer',
-  //     'icon': Icons.person_add,
-  //     'action': 'add_customer',
-  //   },
-  //   {
-  //     'label': 'View Orders',
-  //     'icon': Icons.shopping_cart,
-  //     'route': '/orders',
-  //
-  //   },
-  //   // {'label': 'View Catalogue', 'icon': Icons.collections, 'route': '/catalogue'},
-  //   {
-  //     'label': 'View Challan',
-  //     'icon': Icons.local_shipping,
-  //     'route': '/challan',
-  //   },
-  //   {
-  //     'label': 'Sales Report',
-  //     'icon': Icons.currency_rupee,
-  //     'route': '/reports',
-  //   },
-  // ];
   final List<Map<String, dynamic>> quickActions = [
     {
       'label': 'Add Customer',
@@ -494,7 +472,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _refreshData() {
     setState(() {
-      _ordersFuture = AppDataRepo().fetchAllOrders();
+      _ordersFuture = AppDataRepo().fetchAllOrders().then(
+        (ordersList) => {'orders': ordersList, 'success': true},
+      );
     });
   }
 
@@ -504,82 +484,128 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _refreshData();
   }
 
+  // Add these helper functions and widgets to fix errors for _buildUserStatCard and _getStatusIcon
+
+  // Helper for status icons
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'pending':
+        return Icons.hourglass_top;
+      case 'shipped':
+        return Icons.local_shipping;
+      case 'delivered':
+        return Icons.check_circle_outline;
+      case 'cancelled':
+        return Icons.cancel_outlined;
+      case 'confirmed':
+        return Icons.assignment_turned_in;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  // Helper for capitalizing status
+  String _capitalize(String s) =>
+      s.isNotEmpty ? s[0].toUpperCase() + s.substring(1) : s;
+
+  // Elegant user stat card
+  Widget _buildUserStatCard(
+    String label,
+    int count,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      height: 90,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: color,
+                ),
+              ),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // Graphs Section
-        FutureBuilder<Map<String, dynamic>>(
-          future: salesDataFuture,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return Container(
-                height: 120,
-                alignment: Alignment.center,
-                child: CircularProgressIndicator(),
-              );
-            }
-            final salesData = snapshot.data;
-
-            String todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-            final List<dynamic> jeansToday =
-                (salesData?['jeans']?['dailyData'] ?? [])
-                    .where((d) => d['date'] == todayStr)
-                    .toList();
-            final List<dynamic> shirtsToday =
-                (salesData?['shirts']?['dailyData'] ?? [])
-                    .where((d) => d['date'] == todayStr)
-                    .toList();
-
-            if (_selectedReportType == 'Overview') {
-              return SalesBarChart(
-                jeansDaily: jeansToday,
-                shirtsDaily: shirtsToday,
-                section: 'overview',
-              );
-            } else if (_selectedReportType == 'Jeans') {
-              return SalesBarChart(
-                jeansDaily: jeansToday,
-                shirtsDaily: [],
-                section: 'jeans',
-              );
-            } else if (_selectedReportType == 'Shirts') {
-              return SalesBarChart(
-                jeansDaily: [],
-                shirtsDaily: shirtsToday,
-                section: 'shirts',
-              );
-            }
-            return SizedBox();
-          },
-        );
-
         final result = await showDialog<bool>(
           context: context,
           barrierDismissible: false,
           builder: (context) {
             return AlertDialog(
               backgroundColor: Colors.white,
-              title: Text('Exit App'),
-              content: Text('Are you sure you want to exit?'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.exit_to_app_rounded,
+                    color: Colors.indigo.shade400,
+                    size: 22,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Exit App',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.indigo.shade700,
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                'Are you sure you want to exit?',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+              ),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(false);
-                  },
+                  onPressed: () => Navigator.of(context).pop(false),
                   child: Text('Cancel'),
-                  style: TextButton.styleFrom(foregroundColor: Colors.indigo),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.indigo.shade500,
+                    textStyle: TextStyle(fontWeight: FontWeight.w500),
+                  ),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(true);
-                  },
-                  child: Text('OK'),
+                  onPressed: () => Navigator.of(context).pop(true),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
+                    backgroundColor: Colors.indigo.shade500,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
+                  child: Text('OK'),
                 ),
               ],
             );
@@ -596,50 +622,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _refreshData();
                 await _ordersFuture;
               },
+              color: Colors.indigo,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // SALES SUMMARY BLOCK (API-driven)
+                    // --- SALES SUMMARY ---
                     FutureBuilder<Map<String, dynamic>>(
                       future: salesDataFuture,
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
-                          return Container(
+                          return SizedBox(
                             height: 120,
-                            alignment: Alignment.center,
-                            child: CircularProgressIndicator(),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.indigo.shade400,
+                                strokeWidth: 2.5,
+                              ),
+                            ),
                           );
                         }
+
                         final data = snapshot.data!['data'];
                         final jeans = data['jeans'];
                         final shirts = data['shirts'];
-                        final List<dynamic> jeansDaily =
-                            jeans['dailyData'] ?? [];
-                        final List<dynamic> shirtsDaily =
-                            shirts['dailyData'] ?? [];
-                        // Combine all daily sales
-                        final allDaily = [...jeansDaily, ...shirtsDaily];
+                        final allDaily = [
+                          ...(jeans['dailyData'] ?? []),
+                          ...(shirts['dailyData'] ?? []),
+                        ];
                         int totalSales = 0;
                         Set<String> uniqueDays = {};
                         for (var d in allDaily) {
                           totalSales += (d['sales'] ?? 0) as int;
                           uniqueDays.add(d['date'] ?? '');
                         }
-                        int numDays = uniqueDays.length > 0
+                        int numDays = uniqueDays.isNotEmpty
                             ? uniqueDays.length
                             : 1;
                         double avgDay = totalSales / numDays;
                         double avgYear = avgDay * 365;
                         double avgMonth = avgDay * 30;
                         double avgWeek = avgDay * 7;
-                        String fmt(num n) {
-                          double k = n / 1000;
-                          if (k < 0.1 && n > 0) k = 0.1;
-                          return '₹${k.toStringAsFixed(1)}K';
-                        }
 
                         return Padding(
                           padding: const EdgeInsets.all(8.0),
@@ -650,7 +675,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 title: "Yearly Sales",
                                 value: formatCurrency(avgYear.round()),
                                 subtitle: "Avg Revenue",
-                                color: Colors.indigo,
+                                color: Colors.indigo.shade500,
                                 onTap: () {
                                   Navigator.push(
                                     context,
@@ -663,9 +688,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               _SalesSummaryCard(
                                 title: "Monthly Sales",
                                 value: formatCurrency(avgMonth.round()),
-
                                 subtitle: "Avg Revenue",
-                                color: Colors.indigo,
+                                color: Colors.teal.shade400,
                                 onTap: () {
                                   Navigator.push(
                                     context,
@@ -679,7 +703,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 title: "Weekly Sales",
                                 value: formatCurrency(avgWeek.round()),
                                 subtitle: "Avg Revenue",
-                                color: Colors.indigo,
+                                color: Colors.purple.shade400,
                                 onTap: () {
                                   Navigator.push(
                                     context,
@@ -694,45 +718,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         );
                       },
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                    // Dropdown for report type
+                    // --- Report Type Dropdown ---
                     Container(
-                      padding: EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 12,
-                        vertical: 4,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                         boxShadow: [
-                          BoxShadow(color: Colors.black12, blurRadius: 4),
+                          BoxShadow(
+                            color: Colors.indigo.shade100.withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
                         ],
                       ),
                       child: DropdownButton<String>(
                         value: _selectedReportType,
                         isExpanded: true,
-                        underline: SizedBox(),
+                        underline: const SizedBox(),
+                        icon: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Colors.indigo.shade400,
+                        ),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade800,
+                        ),
                         items: _reportTypes.map((type) {
                           return DropdownMenuItem(
                             value: type,
                             child: Text(
                               type,
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: Colors.indigo.shade600,
+                              ),
                             ),
                           );
                         }).toList(),
-                        onChanged: (val) {
-                          setState(() {
-                            _selectedReportType = val!;
-                          });
-                        },
+                        onChanged: (val) =>
+                            setState(() => _selectedReportType = val!),
                       ),
                     ),
+                    const SizedBox(height: 28),
 
-                    SizedBox(height: 30),
-
-                    // Graphs Section
+                    // --- Graphs ---
                     if (_selectedReportType == 'Overview')
                       FutureBuilder<Map<String, dynamic>>(
                         future: salesDataFuture,
@@ -742,7 +777,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           final data = snapshot.data!['data'];
                           final jeans = data['jeans'];
                           final shirts = data['shirts'];
-                          // Use API fields for total orders and revenue
                           final totalOrders =
                               (jeans['orders'] ?? 0) + (shirts['orders'] ?? 0);
                           final totalRevenue =
@@ -810,7 +844,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   String todayStr = DateFormat(
                                     'yyyy-MM-dd',
                                   ).format(DateTime.now());
-                                  // Filter for today's data
                                   final List<dynamic> jeansToday =
                                       (jeans['dailyData'] ?? [])
                                           .where((d) => d['date'] == todayStr)
@@ -820,7 +853,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           .where((d) => d['date'] == todayStr)
                                           .toList();
 
-                                  // Calculate today's total orders and revenue
                                   int todayOrders = 0;
                                   int todayRevenue = 0;
                                   for (var d in jeansToday) {
@@ -954,14 +986,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     barTouchData: BarTouchData(
                                       enabled: true,
                                       touchTooltipData: BarTouchTooltipData(
-                                        // tooltipBgColor: Colors.indigo,
                                         getTooltipItem:
                                             (group, groupIndex, rod, rodIndex) {
                                               return BarTooltipItem(
                                                 rod.toY.toString(),
                                                 TextStyle(
-                                                  color: Colors
-                                                      .white, // <-- This sets the label color to white
+                                                  color: Colors.white,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 14,
                                                 ),
@@ -988,8 +1018,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                 return Text(
                                                   formatted,
                                                   style: TextStyle(
-                                                    fontSize:
-                                                        11, // Your desired text size
+                                                    fontSize: 11,
                                                     color: Colors.black,
                                                   ),
                                                 );
@@ -1003,7 +1032,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                               (double value, TitleMeta meta) {
                                                 final idx = value.toInt();
                                                 if (idx < jeansToday.length) {
-                                                  // If time is available, show time, else show index+1
                                                   String label = '';
                                                   if (jeansToday[idx]['time'] !=
                                                       null) {
@@ -1105,14 +1133,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     barTouchData: BarTouchData(
                                       enabled: true,
                                       touchTooltipData: BarTouchTooltipData(
-                                        // tooltipBgColor: Colors.black87,
                                         getTooltipItem:
                                             (group, groupIndex, rod, rodIndex) {
                                               return BarTooltipItem(
                                                 rod.toY.toString(),
                                                 TextStyle(
-                                                  color: Colors
-                                                      .white, // <-- This sets the label color to white
+                                                  color: Colors.white,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 14,
                                                 ),
@@ -1139,8 +1165,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                 return Text(
                                                   formatted,
                                                   style: TextStyle(
-                                                    fontSize:
-                                                        11, // Your desired text size
+                                                    fontSize: 11,
                                                     color: Colors.black,
                                                   ),
                                                 );
@@ -1154,7 +1179,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                               (double value, TitleMeta meta) {
                                                 final idx = value.toInt();
                                                 if (idx < shirtsToday.length) {
-                                                  // If time is available, show time, else show index+1
                                                   String label = '';
                                                   if (shirtsToday[idx]['time'] !=
                                                       null) {
@@ -1196,21 +1220,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         },
                       ),
 
-                    SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
-                    // Order stats
+                    // --- Order Stats Section ---
                     Container(
                       decoration: BoxDecoration(
-                        color: Color(0xFFF6F8FA), // Elegant light background
-                        borderRadius: BorderRadius.circular(22),
+                        gradient: LinearGradient(
+                          colors: [Colors.indigo.shade50, Colors.white],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.indigo.shade100.withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
                       ),
-                      padding: EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
                       child: FutureBuilder<Map<String, dynamic>>(
                         future: _ordersFuture,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
-                            // Skeleton loader for big buttons
                             return Column(
                               children: List.generate(
                                 4,
@@ -1219,107 +1253,132 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     vertical: 8.0,
                                   ),
                                   child: Container(
-                                    height: 70,
+                                    height: 60,
                                     decoration: BoxDecoration(
                                       color: Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
                                 ),
                               ),
                             );
                           }
+
                           if (snapshot.hasError ||
                               snapshot.data == null ||
                               snapshot.data!['orders'] == null) {
+                            print('Order stats error: ${snapshot.error}');
                             return Center(
-                              child: Text('Error loading order stats'),
+                              child: Text(
+                                'Error loading order stats',
+                                style: TextStyle(
+                                  color: Colors.red.shade300,
+                                  fontSize: 13,
+                                ),
+                              ),
                             );
                           }
+
                           final orders = List<Map<String, dynamic>>.from(
                             snapshot.data!['orders'],
                           );
+                          // Print all statuses for debugging
+                          print('Order statuses:');
+                          for (var order in orders) {
+                            print(order['status'] ?? order['orderStatus']);
+                          }
+
+                          // Map all statuses to your stats buckets
                           final statusCounts = {
                             'pending': 0,
+                            'packed': 0,
+                            'confirmed': 0,
                             'shipped': 0,
                             'delivered': 0,
                             'cancelled': 0,
                           };
                           for (var order in orders) {
-                            final statusRaw = order['orderStatus'] ?? '';
-                            final status = statusRaw
-                                .toString()
-                                .trim()
-                                .toLowerCase();
+                            final status =
+                                ((order['status'] ?? order['orderStatus']) ??
+                                        '')
+                                    .toString()
+                                    .trim()
+                                    .toLowerCase();
                             if (statusCounts.containsKey(status)) {
                               statusCounts[status] = statusCounts[status]! + 1;
                             }
                           }
-                          final statusIcons = {
-                            'pending': Icons.pending_actions,
-                            'shipped': Icons.local_shipping,
-                            'delivered': Icons.check_circle,
-                            'cancelled': Icons.cancel,
+                          print('Order statusCounts: $statusCounts');
+
+                          final statusColors = {
+                            'pending': Colors.orange.shade400,
+                            'packed': Colors.blue.shade300,
+                            'confirmed': Colors.indigo,
+                            'shipped': Colors.blue.shade400,
+                            'delivered': Colors.green.shade400,
+                            'cancelled': Colors.red.shade400,
                           };
-                          final statusLabels = {
-                            'pending': 'Pending',
-                            'shipped': 'Shipped',
-                            'delivered': 'Delivered',
-                            'cancelled': 'Cancelled',
-                          };
+
+                          // Only show statuses that have at least 1 order
+                          final visibleStatuses = statusCounts.entries.where(
+                            (e) => e.value > 0,
+                          );
+
+                          if (visibleStatuses.isEmpty) {
+                            return Center(child: Text('No orders found'));
+                          }
+
                           return Column(
-                            children: statusCounts.entries.map((entry) {
+                            children: visibleStatuses.map((entry) {
                               return Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 8.0,
+                                  vertical: 6.0,
                                 ),
                                 child: Material(
                                   color: statusColors[entry.key]!.withOpacity(
-                                    0.15,
+                                    0.1,
                                   ),
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(14),
                                   child: InkWell(
-                                    borderRadius: BorderRadius.circular(16),
-                                    onTap: () {
-                                      // TODO: Add navigation or action if needed
-                                    },
+                                    borderRadius: BorderRadius.circular(14),
+                                    onTap: () {},
                                     child: Container(
-                                      height: 50,
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 20,
+                                      height: 56,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 18,
                                       ),
                                       child: Row(
                                         children: [
                                           Icon(
-                                            statusIcons[entry.key],
+                                            _getStatusIcon(entry.key),
                                             color: statusColors[entry.key],
-                                            size: 28,
+                                            size: 24,
                                           ),
-                                          SizedBox(width: 18),
+                                          const SizedBox(width: 16),
                                           Expanded(
                                             child: Text(
-                                              statusLabels[entry.key]!,
+                                              _capitalize(entry.key),
                                               style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 18,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
                                                 color: statusColors[entry.key],
                                               ),
                                             ),
                                           ),
                                           Text(
-                                            '${entry.value} ',
+                                            '${entry.value}',
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 22,
+                                              fontSize: 18,
                                               color: Colors.black87,
                                             ),
                                           ),
+                                          const SizedBox(width: 4),
                                           Text(
                                             'Orders',
                                             style: TextStyle(
-                                              // fontWeight: FontWeight.w500,
-                                              fontSize: 16,
-                                              color: Colors.black87,
+                                              fontSize: 13,
+                                              color: Colors.grey.shade700,
                                             ),
                                           ),
                                         ],
@@ -1333,500 +1392,693 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         },
                       ),
                     ),
-                    SizedBox(height: 20),
-                    // Text(
-                    //   'Users',
-                    //   style: Theme.of(context).textTheme.titleMedium,
-                    // ),
-                    SizedBox(height: 8),
 
-                    // User & Cart Overview
-                    // Row(
-                    //   mainAxisAlignment: MainAxisAlignment.center,
-                    //   children: [
-                    //     Padding(
-                    //       padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                    //       child: GestureDetector(
-                    //         onTap: () {
-                    //           Navigator.push(
-                    //             context,
-                    //             MaterialPageRoute(
-                    //               builder: (context) =>
-                    //                   UsersPage(showActive: true),
+                    // Container(
+                    //   decoration: BoxDecoration(
+                    //     gradient: LinearGradient(
+                    //       colors: [Colors.indigo.shade50, Colors.white],
+                    //       begin: Alignment.topLeft,
+                    //       end: Alignment.bottomRight,
+                    //     ),
+                    //     borderRadius: BorderRadius.circular(20),
+                    //     boxShadow: [
+                    //       BoxShadow(
+                    //         color: Colors.indigo.shade100.withOpacity(0.3),
+                    //         blurRadius: 6,
+                    //         offset: Offset(0, 3),
+                    //       ),
+                    //     ],
+                    //   ),
+                    //   padding: const EdgeInsets.all(16),
+                    //   child: FutureBuilder<Map<String, dynamic>>(
+                    //     future: _ordersFuture,
+                    //     builder: (context, snapshot) {
+                    //       if (snapshot.connectionState ==
+                    //           ConnectionState.waiting) {
+                    //         return Column(
+                    //           children: List.generate(
+                    //             4,
+                    //             (i) => Padding(
+                    //               padding: const EdgeInsets.symmetric(
+                    //                 vertical: 8.0,
+                    //               ),
+                    //               child: Container(
+                    //                 height: 60,
+                    //                 decoration: BoxDecoration(
+                    //                   color: Colors.grey.shade200,
+                    //                   borderRadius: BorderRadius.circular(12),
+                    //                 ),
+                    //               ),
+                    //             ),
+                    //           ),
+                    //         );
+                    //       }
+
+                    //       if (snapshot.hasError ||
+                    //           snapshot.data == null ||
+                    //           snapshot.data!['orders'] == null) {
+                    //         return Center(
+                    //           child: Text(
+                    //             'Error loading order stats',
+                    //             style: TextStyle(
+                    //               color: Colors.red.shade300,
+                    //               fontSize: 13,
+                    //             ),
+                    //           ),
+                    //         );
+                    //       }
+
+                    //       final orders = List<Map<String, dynamic>>.from(
+                    //         snapshot.data!['orders'],
+                    //       );
+                    //       final statusCounts = {
+                    //         'pending': 0,
+                    //         'shipped': 0,
+                    //         'delivered': 0,
+                    //         'cancelled': 0,
+                    //       };
+                    //       for (var order in orders) {
+                    //         final status = (order['orderStatus'] ?? '')
+                    //             .toString()
+                    //             .trim()
+                    //             .toLowerCase();
+                    //         if (statusCounts.containsKey(status)) {
+                    //           statusCounts[status] = statusCounts[status]! + 1;
+                    //         }
+                    //       }
+
+                    //       final statusColors = {
+                    //         'pending': Colors.orange.shade400,
+                    //         'shipped': Colors.blue.shade400,
+                    //         'delivered': Colors.green.shade400,
+                    //         'cancelled': Colors.red.shade400,
+                    //       };
+
+                    //       return Column(
+                    //         children: statusCounts.entries.map((entry) {
+                    //           return Padding(
+                    //             padding: const EdgeInsets.symmetric(
+                    //               vertical: 6.0,
+                    //             ),
+                    //             child: Material(
+                    //               color: statusColors[entry.key]!.withOpacity(
+                    //                 0.1,
+                    //               ),
+                    //               borderRadius: BorderRadius.circular(14),
+                    //               child: InkWell(
+                    //                 borderRadius: BorderRadius.circular(14),
+                    //                 onTap: () {},
+                    //                 child: Container(
+                    //                   height: 56,
+                    //                   padding: const EdgeInsets.symmetric(
+                    //                     horizontal: 18,
+                    //                   ),
+                    //                   child: Row(
+                    //                     children: [
+                    //                       Icon(
+                    //                         _getStatusIcon(entry.key),
+                    //                         color: statusColors[entry.key],
+                    //                         size: 24,
+                    //                       ),
+                    //                       const SizedBox(width: 16),
+                    //                       Expanded(
+                    //                         child: Text(
+                    //                           _capitalize(
+                    //                             entry.key,
+                    //                           ), // Show status as text, not icon
+                    //                           style: TextStyle(
+                    //                             fontWeight: FontWeight.w600,
+                    //                             fontSize: 14,
+                    //                             color: statusColors[entry.key],
+                    //                           ),
+                    //                         ),
+                    //                       ),
+                    //                       Text(
+                    //                         '${entry.value}',
+                    //                         style: TextStyle(
+                    //                           fontWeight: FontWeight.bold,
+                    //                           fontSize: 18,
+                    //                           color: Colors.black87,
+                    //                         ),
+                    //                       ),
+                    //                       const SizedBox(width: 4),
+                    //                       Text(
+                    //                         'Orders',
+                    //                         style: TextStyle(
+                    //                           fontSize: 13,
+                    //                           color: Colors.grey.shade700,
+                    //                         ),
+                    //                       ),
+                    //                     ],
+                    //                   ),
+                    //                 ),
+                    //               ),
                     //             ),
                     //           );
-                    //         },
-                    //         child: UserStatCard(
-                    //           label: 'Active Users',
-                    //           count: userOverview['active'] as int,
-                    //           icon: Icons.person,
-                    //           color: Colors.indigo,
-                    //         ),
-                    //       ),
-                    //     ),
-                    //     Padding(
-                    //       padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                    //       child: GestureDetector(
-                    //         onTap: () {
-                    //           Navigator.push(
-                    //             context,
-                    //             MaterialPageRoute(
-                    //               builder: (context) =>
-                    //                   UsersPage(showActive: false),
-                    //             ),
-                    //           );
-                    //         },
-                    //         child: UserStatCard(
-                    //           label: 'Inactive Users',
-                    //           count: userOverview['inactive'] as int,
-                    //           icon: Icons.person_off,
-                    //           color: Colors.grey,
-                    //         ),
-                    //       ),
-                    //     ),
-                    //   ],
+                    //         }).toList(),
+                    //       );
+                    //     },
+                    //   ),
                     // ),
+                    const SizedBox(height: 24),
+
+                    // --- User Stats ---
                     Row(
                       children: [
                         Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6.0,
-                            ),
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        UsersPage(showActive: true),
-                                  ),
-                                );
-                              },
-                              child: UserStatCard(
-                                label: 'Active Users',
-                                count: userOverview['active'] as int,
-                                icon: Icons.person,
-                                color: Colors.indigo,
-                              ),
-                            ),
+                          child: _buildUserStatCard(
+                            'Active Users',
+                            userOverview['active'] as int,
+                            Icons.person_rounded,
+                            Colors.indigo.shade400,
                           ),
                         ),
+                        SizedBox(width: 10),
                         Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6.0,
-                            ),
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        UsersPage(showActive: false),
-                                  ),
-                                );
-                              },
-                              child: UserStatCard(
-                                label: 'Inactive Users',
-                                count: userOverview['inactive'] as int,
-                                icon: Icons.person_off,
-                                color: Colors.grey,
-                              ),
-                            ),
+                          child: _buildUserStatCard(
+                            'Inactive Users',
+                            userOverview['inactive'] as int,
+                            Icons.person_off_rounded,
+                            Colors.grey.shade500,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 20),
-                    // Quick Actions
-                    // Text(
-                    //   'Quick Actions',
-                    //   style: Theme.of(context).textTheme.titleMedium,
-                    // ),
-                    SizedBox(height: 8),
-                    // SingleChildScrollView(
-                    //   scrollDirection: Axis.horizontal,
-                    //   child: Row(
-                    //     children: quickActions
-                    //         .map(
-                    //           (action) => Padding(
-                    //             padding: const EdgeInsets.symmetric(
-                    //               horizontal: 6.0,
-                    //             ),
-                    //             child: action['action'] == 'add_customer'
-                    //                 ? ElevatedButton.icon(
-                    //                     icon: Icon(action['icon'] as IconData),
-                    //                     label: Text(action['label'] as String),
-                    //                     style: ElevatedButton.styleFrom(
-                    //                       backgroundColor: Colors.indigo,
-                    //                       foregroundColor: Colors.white,
-                    //                       padding: EdgeInsets.symmetric(
-                    //                         horizontal: 16,
-                    //                         vertical: 10,
-                    //                       ),
-                    //                       shape: RoundedRectangleBorder(
-                    //                         borderRadius: BorderRadius.circular(
-                    //                           12,
-                    //                         ),
-                    //                       ),
-                    //                     ),
-                    //                     onPressed: () {
-                    //                       Future.microtask(
-                    //                         () =>
-                    //                             showUserCreationDialog(context),
-                    //                       );
-                    //                       // Optionally refresh users or show a message
-                    //                     },
-                    //                   )
-                    //                 : QuickActionButton(
-                    //                     label: action['label'] as String,
-                    //                     icon: action['icon'] as IconData,
 
-                    //                     route: action['route'] as String,
-                    //                   ),
-                    //           ),
-                    //         )
-                    //         .toList(),
-                    //   ),
-                    // ),
+                    const SizedBox(height: 24),
+
+                    // --- Quick Actions ---
                     GridView.count(
                       crossAxisCount: 2,
                       shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
+                      physics: const NeverScrollableScrollPhysics(),
                       mainAxisSpacing: 12,
                       crossAxisSpacing: 12,
-                      childAspectRatio: 2.6, // Adjust for button shape
+                      childAspectRatio: 2.6,
                       children: quickActions.map((action) {
                         final Color btnColor =
-                            action['color'] ?? Colors.grey.shade200;
-                        return action['action'] == 'add_customer'
-                            ? ElevatedButton.icon(
-                                icon: Icon(action['icon'] as IconData),
-                                label: Text(action['label'] as String),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: btnColor,
-                                  // foregroundColor: Colors.indigo,
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 18,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 1,
-                                ),
-                                onPressed: () {
-                                  Future.microtask(
-                                    () => showUserCreationDialog(context),
-                                  );
-                                },
-                              )
-                            : QuickActionButton(
-                                label: action['label'] as String,
-                                icon: action['icon'] as IconData,
-                                route: action['route'] as String,
-                                bgcolor: btnColor, // Pass color to your widget
-                                fgcolor: Colors
-                                    .indigo, // Pass foreground color to your widget
+                            action['color'] ?? Colors.indigo.shade50;
+                        return ElevatedButton.icon(
+                          icon: Icon(action['icon'] as IconData, size: 18),
+                          label: Text(
+                            action['label'] as String,
+                            style: TextStyle(fontSize: 13),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: btnColor,
+                            foregroundColor: Colors.indigo.shade600,
+                            elevation: 1,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 12,
+                            ),
+                          ),
+                          onPressed: () {
+                            if (action['action'] == 'add_customer') {
+                              Future.microtask(
+                                () => showUserCreationDialog(context),
                               );
+                            } else {
+                              Navigator.pushNamed(context, action['route']);
+                            }
+                          },
+                        );
                       }).toList(),
                     ),
-                    SizedBox(height: 20),
-                    // Recent Orders from API
+                    const SizedBox(height: 24),
+
+                    // --- Recent Orders ---
+
+                    // ...existing code...
                     Text(
                       'Recent Orders',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.indigo.shade700,
+                      ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     FutureBuilder<Map<String, dynamic>>(
                       future: _ordersFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          // Skeleton loader for recent orders
                           return Column(
                             children: List.generate(
                               3,
                               (i) => Card(
                                 color: Colors.white,
-                                margin: EdgeInsets.symmetric(vertical: 8),
+                                margin: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 16,
+                                ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(16.0),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        width: 120,
-                                        height: 16,
-                                        color: Colors.grey.shade200,
-                                        margin: EdgeInsets.only(bottom: 8),
+                                    children: List.generate(
+                                      4,
+                                      (i) => Container(
+                                        height: 14,
+                                        width: double.infinity,
+                                        margin: const EdgeInsets.symmetric(
+                                          vertical: 6.0,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade200,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
                                       ),
-                                      Container(
-                                        width: 80,
-                                        height: 12,
-                                        color: Colors.grey.shade200,
-                                        margin: EdgeInsets.only(bottom: 8),
-                                      ),
-                                      Container(
-                                        width: 180,
-                                        height: 12,
-                                        color: Colors.grey.shade200,
-                                        margin: EdgeInsets.only(bottom: 8),
-                                      ),
-                                      Container(
-                                        width: 60,
-                                        height: 12,
-                                        color: Colors.grey.shade200,
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           );
                         }
-                        if (snapshot.hasError) {
-                          return Center(child: Text('Error loading orders'));
+                        if (snapshot.hasError ||
+                            snapshot.data == null ||
+                            snapshot.data!['orders'] == null) {
+                          print(
+                            'Dashboard Recent Orders Error: ${snapshot.error}',
+                          );
+                          return Center(
+                            child: Text('Error loading recent orders'),
+                          );
                         }
-                        final data = snapshot.data;
-                        final orders =
-                            (data != null &&
-                                data['success'] == true &&
-                                data['orders'] != null)
-                            // SALES SUMMARY CARD WIDGET
-                            ? List<Map<String, dynamic>>.from(data['orders'])
-                            : [];
+                        final orders = List<Map<String, dynamic>>.from(
+                          snapshot.data!['orders'],
+                        );
+                        print(
+                          'Dashboard Recent Orders count: ${orders.length}',
+                        );
+                        if (orders.isNotEmpty)
+                          print('First order: ${orders.first}');
                         if (orders.isEmpty) {
+                          print('No recent orders found');
                           return Center(child: Text('No recent orders found'));
                         }
                         return Column(
-                          children: [
-                            ...orders.take(3).map((order) {
-                              final shipping = order['shippingAddress'] ?? {};
-                              String statusRaw = (order['orderStatus'] ?? '')
-                                  .toString()
-                                  .trim();
-                              String status =
-                                  statusRaw.toLowerCase() == 'order confirmed'
-                                  ? 'Confirmed'
-                                  : statusRaw;
-                              String paymentStatus =
-                                  (order['paymentStatus'] ?? '')
-                                      .toString()
-                                      .trim();
-                              return Card(
-                                color: Colors.white,
-                                margin: EdgeInsets.symmetric(vertical: 8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
-                                  onTap: () async {
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => OrderDetailsPage(
-                                          orderId: order['_id'],
-                                        ),
+                          children: List.generate(orders.length > 4 ? 4 : orders.length, (
+                            idx,
+                          ) {
+                            final order = orders[idx];
+                            print('Recent Order[$idx]: $order');
+                            final customer = order['customer'] ?? {};
+                            final user = customer['userId'] ?? {};
+                            final address = user['address'] ?? {};
+                            final items = order['items'] ?? [];
+                            final payments = order['payments'] ?? [];
+                            final paidAmount = order['paidAmount'] ?? 0;
+                            final balanceAmount = order['balanceAmount'] ?? 0;
+                            final paymentType = order['paymentType'] ?? '';
+                            final paymentMethod = order['paymentMethod'] ?? '';
+                            final orderNote = order['orderNote'] ?? '';
+                            final transportName = order['transportName'] ?? '';
+                            final orderType = order['orderType'] ?? '';
+                            final orderDate = order['orderDate'] ?? '';
+                            final status = order['status'] ?? '';
+                            final total = order['total'] ?? 0;
+                            final trackingId = order['trackingId'] ?? '';
+                            final deliveryVendor =
+                                order['deliveryVendor'] ?? '';
+
+                            final deliveredPcs = items.fold<int>(
+                              0,
+                              (int sum, dynamic item) =>
+                                  sum + ((item['deliveredPcs'] ?? 0) as int),
+                            );
+                            final totalPcs = items.fold<int>(
+                              0,
+                              (int sum, dynamic item) =>
+                                  sum +
+                                  (((item['quantity'] ?? 1) as int) *
+                                      ((item['pcsInSet'] ?? 1) as int)),
+                            );
+                            final setsCount = items.fold<int>(
+                              0,
+                              (int sum, dynamic item) =>
+                                  sum + ((item['quantity'] ?? 1) as int),
+                            );
+
+                            Color statusColor(String status) {
+                              switch (status.toLowerCase()) {
+                                case 'pending':
+                                  return Colors.yellow.shade700;
+                                case 'packed':
+                                  return Colors.blue;
+                                case 'cancelled':
+                                  return Colors.red;
+                                case 'confirmed':
+                                  return Colors.indigo;
+                                case 'delivered':
+                                  return Colors.green;
+                                default:
+                                  return Colors.grey;
+                              }
+                            }
+
+                            return Card(
+                              color: Colors.white,
+                              elevation: 2,
+                              margin: const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: () async {
+                                  final orderId =
+                                      order['_id'] ?? order['id'] ?? '';
+                                  if (orderId.toString().isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Order ID not found!'),
                                       ),
                                     );
-                                    if (result == true) {
-                                      _refreshData();
-                                    }
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Container(
-                                                child: Text(
-                                                  order['orderUniqueId'] ?? '',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
+                                    return;
+                                  }
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          OrderDetailsPage(orderId: orderId),
+                                      settings: RouteSettings(
+                                        arguments: orders,
+                                      ),
+                                    ),
+                                  );
+                                  if (result == true) _refreshData();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Top Row: Order Number, Date, Type, Status
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              order['orderNumber'] ?? '',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                                color: Colors.indigo.shade700,
                                               ),
                                             ),
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 4,
+                                          ),
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: statusColor(status),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              status,
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
                                               ),
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    statusColors[status
-                                                        .toLowerCase()] ??
-                                                    Colors.grey.shade200,
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            orderDate,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                          SizedBox(width: 10),
+                                          Text(
+                                            orderType,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 4),
+                                      // Customer Info
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.person,
+                                                    size: 14,
+                                                    color: Colors.indigo,
+                                                  ),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    customer['name'] ?? '',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 12,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ],
                                               ),
-                                              child: Text(
-                                                status,
+                                              if ((customer['phone'] ?? '')
+                                                  .toString()
+                                                  .isNotEmpty)
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 2.0,
+                                                      ),
+                                                  child: Text(
+                                                    customer['phone'],
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.grey[700],
+                                                    ),
+                                                  ),
+                                                ),
+                                              if ((customer['email'] ?? '')
+                                                  .toString()
+                                                  .isNotEmpty)
+                                                Text(
+                                                  customer['email'],
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey[700],
+                                                  ),
+                                                ),
+                                              if ((customer['deliveryAddress'] ??
+                                                      '')
+                                                  .toString()
+                                                  .isNotEmpty)
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 2.0,
+                                                      ),
+                                                  child: Text(
+                                                    customer['deliveryAddress']
+                                                                .toString()
+                                                                .length >
+                                                            30
+                                                        ? customer['deliveryAddress']
+                                                                  .toString()
+                                                                  .substring(
+                                                                    0,
+                                                                    30,
+                                                                  ) +
+                                                              '...'
+                                                        : customer['deliveryAddress']
+                                                              .toString(),
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.grey[700],
+                                                    ),
+                                                  ),
+                                                ),
+                                              if (transportName
+                                                  .toString()
+                                                  .isNotEmpty)
+                                                Text(
+                                                  'Transport: $transportName',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.blue,
+                                                  ),
+                                                ),
+                                              Row(
+                                                children: [
+                                                  Text(
+                                                    deliveryVendor.isNotEmpty
+                                                        ? deliveryVendor
+                                                        : '',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.indigo,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    deliveryVendor.isNotEmpty
+                                                        ? ' • '
+                                                        : ' ',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.indigo,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    trackingId.isNotEmpty
+                                                        ? trackingId
+                                                        : 'No tracking',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.indigo,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                'Paid: ₹${paidAmount is num ? paidAmount.toStringAsFixed(2) : paidAmount}',
                                                 style: TextStyle(
-                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  color: Colors.green,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              SizedBox(width: 10),
+                                              if (balanceAmount is num &&
+                                                      balanceAmount > 0 ||
+                                                  balanceAmount < 0)
+                                                Text(
+                                                  'Balance: ₹${balanceAmount.toString()}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.red,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              SizedBox(width: 10),
+                                              Text(
+                                                paymentMethod,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                              Text(
+                                                '$setsCount set${setsCount > 1 ? 's' : ''}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                              Text(
+                                                '$totalPcs pieces',
+                                                style: TextStyle(
+                                                  color: Colors.indigo,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 12,
                                                 ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                        if ((shipping['name'] ?? '')
-                                            .toString()
-                                            .isNotEmpty)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 2.0,
-                                            ),
-                                            child: Text(
-                                              shipping['name'] ?? '',
-                                              style: TextStyle(fontSize: 14),
-                                            ),
+                                              SizedBox(width: 10),
+                                              Text(
+                                                '$deliveredPcs delivered',
+                                                style: TextStyle(
+                                                  color: Colors.blue,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              SizedBox(width: 10),
+                                            ],
                                           ),
-                                        Row(
-                                          children: [
-                                            if ((shipping['phone'] ?? '')
-                                                .toString()
-                                                .isNotEmpty)
-                                              Text(
-                                                shipping['phone'] ?? '',
-                                                style: TextStyle(fontSize: 13),
-                                              ),
-                                            if ((shipping['phone'] ?? '')
-                                                .toString()
-                                                .isNotEmpty)
-                                              Text(
-                                                ' • ',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
-                                            if ((shipping['email'] ?? '')
-                                                .toString()
-                                                .isNotEmpty)
-                                              Text(
-                                                shipping['email'] ?? '',
-                                                style: TextStyle(fontSize: 13),
-                                              ),
-                                          ],
-                                        ),
-                                        if ((shipping['address'] ?? '')
-                                            .toString()
-                                            .isNotEmpty)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 2.0,
-                                            ),
-                                            child: Text(
-                                              '${shipping['address'] ?? ''}${shipping['city'] != null ? ', ' + shipping['city'] : ''}${shipping['state'] != null ? ', ' + shipping['state'] : ''}${shipping['country'] != null ? ', ' + shipping['country'] : ''}${shipping['postalCode'] != null ? ' - ' + shipping['postalCode'] : ''}',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.grey[700],
-                                              ),
-                                            ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 4),
+
+                                      if (orderNote.toString().isNotEmpty)
+                                        Text(
+                                          'Note: ${orderNote.length > 25 ? orderNote.substring(0, 25) + '...' : orderNote}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[600],
                                           ),
-                                        SizedBox(height: 6),
-                                        Row(
-                                          children: [
-                                            if (paymentStatus.isNotEmpty)
-                                              Text(
-                                                paymentStatus,
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w500,
-                                                  color:
-                                                      paymentStatus
-                                                          .toLowerCase()
-                                                          .contains('fail')
-                                                      ? Colors.red
-                                                      : paymentStatus
-                                                            .toLowerCase()
-                                                            .contains(
-                                                              'complete',
-                                                            )
-                                                      ? Colors.indigo
-                                                      : paymentStatus
-                                                            .toLowerCase()
-                                                            .contains('partial')
-                                                      ? Colors.green
-                                                      : Colors.black,
-                                                ),
-                                              ),
-                                            if (paymentStatus.isNotEmpty)
-                                              Text(
-                                                ' • ',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
-                                            Text(
-                                              '₹${order['totalAmount'] ?? ''}',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 15,
-                                              ),
-                                            ),
-                                          ],
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ],
-                                    ),
+                                    ],
                                   ),
                                 ),
-                              );
-                            }),
-                            if (orders.length > 6)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12.0,
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AllOrdersPage(),
-                                      ),
-                                    );
-                                  },
-                                  child: Text('View All'),
-                                ),
                               ),
-                          ],
+                            );
+                          }),
                         );
                       },
                     ),
-                    SizedBox(height: 20),
+
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           ),
-          // Floating button above bottom nav bar, using MediaQuery for correct spacing
+
+          // --- Floating Action Button ---
           Positioned(
             right: 24,
-            bottom:
-                MediaQuery.of(context).padding.bottom +
-                72, // 56 for nav bar + 16 extra
+            bottom: MediaQuery.of(context).padding.bottom + 72,
             child: FloatingActionButton(
-              backgroundColor: Colors.indigo,
+              backgroundColor: Colors.indigo.shade500,
               foregroundColor: Colors.white,
-              child: Icon(Icons.add, size: 32),
-              onPressed: _showDashboardActionsSheet,
+              elevation: 4,
               tooltip: 'Quick Actions',
+              onPressed: _showDashboardActionsSheet,
+              child: const Icon(Icons.add_rounded, size: 28),
             ),
           ),
         ],
@@ -1834,64 +2086,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
-
-// Helper widgets
-// Widget _StatColumn(String label, String value) {
-//   return Column(
-//     crossAxisAlignment: CrossAxisAlignment.start,
-//     children: [
-//       Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-//       SizedBox(height: 4),
-//       Text(label, style: TextStyle(color: Colors.grey[700], fontSize: 13)),
-//     ],
-//   );
-// }
-
-// class _QuickCard extends StatelessWidget {
-//   final Color color;
-//   final IconData icon;
-//   final String title;
-//   final String subtitle;
-
-//   const _QuickCard({
-//     required this.color,
-//     required this.icon,
-//     required this.title,
-//     required this.subtitle,
-//   });
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//       decoration: BoxDecoration(
-//         color: color,
-//         borderRadius: BorderRadius.circular(20),
-//       ),
-//       padding: EdgeInsets.all(16),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Icon(icon, color: Colors.black54, size: 28),
-//           SizedBox(height: 12),
-//           Text(
-//             title,
-//             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-//           ),
-//           SizedBox(height: 6),
-//           Text(
-//             subtitle,
-//             style: TextStyle(color: Colors.grey[700], fontSize: 12),
-//           ),
-//           Spacer(),
-//           Align(
-//             alignment: Alignment.bottomRight,
-//             child: Icon(Icons.arrow_forward, color: Colors.black38, size: 18),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
 
 @override
 Widget build(BuildContext context) {

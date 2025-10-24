@@ -1743,20 +1743,6 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     return id?.toString() ?? '';
   }
 
-  // Update _addProduct:
-  // void _addProduct(Map<String, dynamic> product) {
-  //   setState(() {
-  //     final pid = getProductId(product);
-  //     final idx = _selectedProducts.indexWhere((p) => getProductId(p) == pid);
-  //     if (idx >= 0) {
-  //       _selectedProducts[idx]['quantity'] += 1;
-  //     } else {
-  //       _selectedProducts.add({...product, 'quantity': 1});
-  //     }
-
-  //     _recalculatePrice();
-  //   });
-  // }
   void _addProduct(Map<String, dynamic> product) {
     setState(() {
       final pid = getProductKey(product);
@@ -1785,17 +1771,6 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
       );
     });
   }
-
-  // Update _updateProductQuantity:
-  // void _updateProductQuantity(String pid, int delta) {
-  //   final idx = _selectedProducts.indexWhere((p) => getProductKey(p) == pid);
-  //   if (idx >= 0) {
-  //     final newQty = (_selectedProducts[idx]['quantity'] ?? 1) + delta;
-  //     print('Trying to set qty for $pid: $newQty');
-  //     _selectedProducts[idx]['quantity'] = newQty.clamp(1, 999);
-  //   }
-  //   _recalculatePrice();
-  // }
 
   void _updateProductQuantity(String pid, int delta) {
     final idx = _selectedProducts.indexWhere((p) => getProductKey(p) == pid);
@@ -2057,25 +2032,6 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     } finally {
       setState(() => loading = false);
     }
-
-    // try {
-
-    //   final resp = await AppDataRepo().createOrderByAdmin(orderData);
-    //   if (resp['success'] == true || resp['status'] == 201) {
-    //     Navigator.of(context).pop(true);
-    //   } else {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(content: Text(resp['message'] ?? 'Order creation failed')),
-    //     );
-    //   }
-
-    // } catch (e) {
-    //   ScaffoldMessenger.of(
-    //     context,
-    //   ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    // } finally {
-    //   setState(() => loading = false);
-    // }
   }
 
   Future<void> _showProductSelectionSheet() async {
@@ -3208,10 +3164,12 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                         ),
                                         onPressed: () async {
                                           final barcode =
-                                              await showDialog<String>(
-                                                context: context,
-                                                builder: (ctx) =>
-                                                    const BarcodeScannerPage(),
+                                              await Navigator.push<String>(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      const BarcodeScannerPage(),
+                                                ),
                                               );
                                           if (!mounted) return;
                                           if (barcode != null &&
@@ -3616,50 +3574,65 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                   onTap: () {
                                                     setState(() {
                                                       if (pcsInSet > 1) {
+                                                        // keep pcsInSet as int
                                                         p['pcsInSet'] =
-                                                            (pcsInSet - 1)
-                                                                .toString();
+                                                            pcsInSet - 1;
                                                         _recalculatePrice();
                                                       }
                                                     });
                                                   },
                                                 ),
-                                                Text(
-                                                  '$pcsInSet',
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
+
+                                                SizedBox(
+                                                  width: 44,
+                                                  child: TextField(
+                                                    keyboardType:
+                                                        TextInputType.number,
+                                                    inputFormatters: [
+                                                      FilteringTextInputFormatter
+                                                          .digitsOnly,
+                                                    ],
+                                                    textAlign: TextAlign.center,
+                                                    controller:
+                                                        TextEditingController(
+                                                          text: pcsInSet
+                                                              .toString(),
+                                                        ),
+
+                                                    decoration: const InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                          EdgeInsets.symmetric(
+                                                            vertical: 6,
+                                                            horizontal: 6,
+                                                          ),
+                                                      border:
+                                                          OutlineInputBorder(),
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                    ),
+                                                    onChanged: (v) {
+                                                      final newVal =
+                                                          int.tryParse(v) ?? 1;
+                                                      setState(() {
+                                                        // store as int (other code parses if needed)
+                                                        p['pcsInSet'] = newVal;
+                                                        _recalculatePrice();
+                                                      });
+                                                    },
                                                   ),
                                                 ),
                                                 _qtyButton(
                                                   icon: Icons.add,
+
                                                   onTap: () {
-                                                    print(
-                                                      'Current qty: $quantity, lotStock: $lotStock',
-                                                    );
-                                                    if (quantity < lotStock) {
-                                                      setState(
-                                                        () =>
-                                                            _updateProductQuantity(
-                                                              pid,
-                                                              1,
-                                                            ),
-                                                      );
-                                                    } else {
-                                                      print(
-                                                        'Blocked increment: qty=$quantity, lotStock=$lotStock',
-                                                      );
-                                                      ScaffoldMessenger.of(
-                                                        context,
-                                                      ).showSnackBar(
-                                                        SnackBar(
-                                                          content: Text(
-                                                            'Cannot select more than available stock ($lotStock sets).',
-                                                          ),
-                                                          backgroundColor:
-                                                              Colors.red,
-                                                        ),
-                                                      );
-                                                    }
+                                                    // increment pcs per set (not the sets quantity)
+                                                    setState(() {
+                                                      p['pcsInSet'] =
+                                                          pcsInSet + 1;
+                                                      _recalculatePrice();
+                                                    });
                                                   },
                                                 ),
                                               ],
@@ -3688,10 +3661,56 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                         )
                                                       : null,
                                                 ),
-                                                Text(
-                                                  '$quantity',
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
+                                                // Text(
+                                                //   '$quantity',
+                                                //   style: const TextStyle(
+                                                //     fontSize: 11,
+                                                //   ),
+                                                // ),
+                                                SizedBox(
+                                                  width: 44,
+                                                  child: TextField(
+                                                    keyboardType:
+                                                        TextInputType.number,
+                                                    inputFormatters: [
+                                                      FilteringTextInputFormatter
+                                                          .digitsOnly,
+                                                    ],
+                                                    textAlign: TextAlign.center,
+                                                    controller:
+                                                        TextEditingController(
+                                                          text: quantity
+                                                              .toString(),
+                                                        ),
+                                                    decoration: const InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                          EdgeInsets.symmetric(
+                                                            vertical: 6,
+                                                            horizontal: 6,
+                                                          ),
+                                                      border:
+                                                          OutlineInputBorder(),
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                    ),
+                                                    onChanged: (v) {
+                                                      final parsed =
+                                                          int.tryParse(v) ??
+                                                          quantity;
+                                                      final clamped = parsed
+                                                          .clamp(
+                                                            1,
+                                                            lotStock > 0
+                                                                ? lotStock
+                                                                : 999,
+                                                          );
+                                                      setState(() {
+                                                        p['quantity'] = clamped;
+                                                        _recalculatePrice();
+                                                      });
+                                                    },
                                                   ),
                                                 ),
                                                 _qtyButton(

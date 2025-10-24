@@ -297,13 +297,37 @@ class ApiService {
   Future<Map<String, dynamic>> createReturn({
     required Map<String, dynamic> data,
   }) async {
-    final url = Uri.parse('$baseUrl/return/create-return');
+    // final url = Uri.parse('$baseUrl/return/create-return');
+    // final resp = await http.post(
+    //   url,
+    //   headers: {'Content-Type': 'application/json'},
+    //   body: jsonEncode({'data': data}),
+    // );
+    // return jsonDecode(resp.body) as Map<String, dynamic>;
+    final endpoint = '/return/create-return';
+    final url = Uri.parse('$baseUrl$endpoint');
+    // Wrap payload under "data" because API expects {"data": {...}}
+    final wrapped = {'data': data};
+    final body = jsonEncode(wrapped);
+    print('API: POST $url');
+    print('API: Request body: $body');
     final resp = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'data': data}),
+      body: body,
     );
-    return jsonDecode(resp.body) as Map<String, dynamic>;
+    print('API: Response status: ${resp.statusCode}');
+    print('API: Response body: ${resp.body}');
+    try {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    } catch (e) {
+      print('API: Failed to decode createReturn response JSON: $e');
+      return {
+        'success': false,
+        'status': resp.statusCode,
+        'rawBody': resp.body,
+      };
+    }
   }
 
   Future<Map<String, dynamic>> createOrderByAdmin(

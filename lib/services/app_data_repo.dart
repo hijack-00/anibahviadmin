@@ -206,11 +206,23 @@ class AppDataRepo {
   }
 
   Future<Map<String, dynamic>> getJeansShirtRevenueAndOrder() async {
-    return await _api.fetchJeansShirtRevenueAndOrder();
+    // return await _api.fetchJeansShirtRevenueAndOrder();
+    try {
+      return await _api.fetchJeansShirtRevenueAndOrder();
+    } catch (e) {
+      print('AppDataRepo.getJeansShirtRevenueAndOrder ERROR: $e');
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> getSalesData() async {
-    return await _api.fetchSalesData();
+    // return await _api.fetchSalesData();
+    try {
+      return await _api.fetchSalesData();
+    } catch (e) {
+      print('AppDataRepo.getSalesData ERROR: $e');
+      rethrow;
+    }
   }
 
   Future<int> fetchUserRewardPoints(String userId) async {

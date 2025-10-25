@@ -266,14 +266,31 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> fetchJeansShirtRevenueAndOrder() async {
-    final url = "$baseUrl/salesAndReports/get-jeans-shirt-revenue-and-order";
-    final response = await get(
-      '/salesAndReports/get-jeans-shirt-revenue-and-order',
-    );
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to fetch jeans/shirt revenue and order');
+    // final url = "$baseUrl/salesAndReports/get-jeans-shirt-revenue-and-order";
+    // final response = await get(
+    //   '/salesAndReports/get-jeans-shirt-revenue-and-order',
+    // );
+    // if (response.statusCode == 200) {
+    //   return json.decode(response.body);
+    // } else {
+    //   throw Exception('Failed to fetch jeans/shirt revenue and order');
+    // }
+    final endpoint = '/salesAndReports/get-jeans-shirt-revenue-and-order';
+    try {
+      final response = await get(endpoint);
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body) as Map<String, dynamic>;
+        print('fetchJeansShirtRevenueAndOrder decoded: $decoded');
+        return decoded;
+      } else {
+        final msg =
+            'Failed to fetch jeans/shirt revenue: ${response.statusCode} ${response.body}';
+        print(msg);
+        throw Exception(msg);
+      }
+    } catch (e, st) {
+      print('fetchJeansShirtRevenueAndOrder ERROR: $e\n$st');
+      rethrow;
     }
   }
 
@@ -388,12 +405,29 @@ class ApiService {
   // }
 
   Future<Map<String, dynamic>> fetchSalesData() async {
-    final url = "$baseUrl/salesAndReports/get-SalesData";
-    final response = await get('/salesAndReports/get-SalesData');
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to fetch sales data');
+    // final url = "$baseUrl/salesAndReports/get-SalesData";
+    // final response = await get('/salesAndReports/get-SalesData');
+    // if (response.statusCode == 200) {
+    //   return json.decode(response.body);
+    // } else {
+    //   throw Exception('Failed to fetch sales data');
+    // }
+    final endpoint = '/salesAndReports/get-SalesData';
+    try {
+      final response = await get(endpoint);
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body) as Map<String, dynamic>;
+        print('fetchSalesData decoded: $decoded');
+        return decoded;
+      } else {
+        final msg =
+            'Failed to fetch sales data: ${response.statusCode} ${response.body}';
+        print(msg);
+        throw Exception(msg);
+      }
+    } catch (e, st) {
+      print('fetchSalesData ERROR: $e\n$st');
+      rethrow;
     }
   }
 
@@ -655,8 +689,23 @@ class ApiService {
     String endpoint, {
     Map<String, String>? headers,
   }) async {
-    final url = Uri.parse('$baseUrl$endpoint');
-    return await http.get(url, headers: headers);
+    // final url = Uri.parse('$baseUrl$endpoint');
+    // return await http.get(url, headers: headers);
+    final String urlStr = endpoint.startsWith('http')
+        ? endpoint
+        : '$baseUrl$endpoint';
+    print('API GET -> $urlStr');
+    try {
+      final uri = Uri.parse(urlStr);
+      final resp = await http.get(uri, headers: headers);
+      print(
+        'API GET Response (${resp.statusCode}) from $urlStr : ${resp.body}',
+      );
+      return resp;
+    } catch (e, st) {
+      print('API GET ERROR -> $urlStr : $e\n$st');
+      rethrow;
+    }
   }
 
   Future<http.Response> post(
@@ -664,8 +713,23 @@ class ApiService {
     Map<String, String>? headers,
     Object? body,
   }) async {
-    final url = Uri.parse('$baseUrl$endpoint');
-    return await http.post(url, headers: headers, body: body);
+    // final url = Uri.parse('$baseUrl$endpoint');
+    // return await http.post(url, headers: headers, body: body);
+    final String urlStr = endpoint.startsWith('http')
+        ? endpoint
+        : '$baseUrl$endpoint';
+    print('API POST -> $urlStr');
+    try {
+      final uri = Uri.parse(urlStr);
+      final resp = await http.post(uri, headers: headers, body: body);
+      print(
+        'API POST Response (${resp.statusCode}) from $urlStr : ${resp.body}',
+      );
+      return resp;
+    } catch (e, st) {
+      print('API POST ERROR -> $urlStr : $e\n$st');
+      rethrow;
+    }
   }
 
   Future<http.Response> multipart(

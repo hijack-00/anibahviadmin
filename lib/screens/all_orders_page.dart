@@ -1670,6 +1670,8 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
   Map<String, dynamic>? _selectedCustomer;
   String customerSearch = '';
   late TextEditingController redeemNowController;
+  final Map<String, TextEditingController> _pcsControllers = {};
+  final Map<String, TextEditingController> _qtyControllers = {};
 
   final Map<String, _ProductRateController> _rateControllers = {};
 
@@ -1755,6 +1757,21 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
         final prodCopy = deepCopyProduct(product);
         prodCopy['quantity'] = 1;
         _selectedProducts.add(prodCopy);
+
+        // create controllers for this product (persist across rebuilds)
+        final newPid = getProductKey(prodCopy);
+        _pcsControllers.putIfAbsent(
+          newPid,
+          () => TextEditingController(
+            text: (prodCopy['pcsInSet'] ?? 1).toString(),
+          ),
+        );
+        _qtyControllers.putIfAbsent(
+          newPid,
+          () => TextEditingController(
+            text: (prodCopy['quantity'] ?? 1).toString(),
+          ),
+        );
       }
 
       _recalculatePrice();
@@ -1769,6 +1786,11 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
       print(
         'After removal: ${_selectedProducts.map((p) => getProductKey(p)).toList()}',
       );
+      // dispose and remove controllers for removed product
+      _pcsControllers[pid]?.dispose();
+      _pcsControllers.remove(pid);
+      _qtyControllers[pid]?.dispose();
+      _qtyControllers.remove(pid);
     });
   }
 
@@ -1800,6 +1822,17 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
       // Enforce minimum quantity of 1
       product['quantity'] = newQty.clamp(1, lotStock > 0 ? lotStock : 999);
       print('Trying to set qty for $pid: ${product['quantity']}');
+      // update persistent controller value while preserving cursor position at end
+      final ctrl = _qtyControllers[pid];
+
+      if (ctrl != null) {
+        final txt = product['quantity'].toString();
+        ctrl.value = TextEditingValue(
+          text: txt,
+          selection: TextSelection.collapsed(offset: txt.length),
+        );
+      }
+      // _qtyControllers[pid]?.text = product['quantity'].toString();
     }
     _recalculatePrice();
   }
@@ -1836,6 +1869,14 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     redeemNowController.dispose();
     for (final c in _rateControllers.values) {
       c.controller.dispose();
+    }
+
+    // dispose persistent controllers
+    for (final c in _pcsControllers.values) {
+      c.dispose();
+    }
+    for (final c in _qtyControllers.values) {
+      c.dispose();
     }
     super.dispose();
   }
@@ -3406,7 +3447,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                       style: const TextStyle(
                                                         fontWeight:
                                                             FontWeight.bold,
-                                                        fontSize: 12,
+                                                        fontSize: 14,
                                                       ),
                                                       overflow:
                                                           TextOverflow.ellipsis,
@@ -3569,14 +3610,31 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                             ),
                                             Row(
                                               children: [
+                                                // _qtyButton(
+                                                //   icon: Icons.remove,
+                                                //   onTap: () {
+                                                //     setState(() {
+                                                //       if (pcsInSet > 1) {
+                                                //         // keep pcsInSet as int
+                                                //         p['pcsInSet'] =
+                                                //             pcsInSet - 1;
+                                                //         _recalculatePrice();
+                                                //       }
+                                                //     });
+                                                //   },
+                                                // ),
                                                 _qtyButton(
                                                   icon: Icons.remove,
                                                   onTap: () {
                                                     setState(() {
                                                       if (pcsInSet > 1) {
-                                                        // keep pcsInSet as int
                                                         p['pcsInSet'] =
                                                             pcsInSet - 1;
+                                                        // sync controller if exists
+                                                        _pcsControllers[pid]
+                                                                ?.text =
+                                                            p['pcsInSet']
+                                                                .toString();
                                                         _recalculatePrice();
                                                       }
                                                     });
@@ -3585,52 +3643,119 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
 
                                                 SizedBox(
                                                   width: 44,
-                                                  child: TextField(
-                                                    keyboardType:
-                                                        TextInputType.number,
-                                                    inputFormatters: [
-                                                      FilteringTextInputFormatter
-                                                          .digitsOnly,
-                                                    ],
-                                                    textAlign: TextAlign.center,
-                                                    controller:
-                                                        TextEditingController(
-                                                          text: pcsInSet
-                                                              .toString(),
-                                                        ),
+                                                  child: Builder(
+                                                    builder: (ctx) {
+                                                      // ensure a persistent controller exists for this product
+                                                      final pcsController =
+                                                          _pcsControllers.putIfAbsent(
+                                                            pid,
+                                                            () => TextEditingController(
+                                                              text: pcsInSet
+                                                                  .toString(),
+                                                            ),
+                                                          );
 
-                                                    decoration: const InputDecoration(
-                                                      isDense: true,
-                                                      contentPadding:
-                                                          EdgeInsets.symmetric(
-                                                            vertical: 6,
-                                                            horizontal: 6,
-                                                          ),
-                                                      border:
-                                                          OutlineInputBorder(),
-                                                    ),
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                    ),
-                                                    onChanged: (v) {
-                                                      final newVal =
-                                                          int.tryParse(v) ?? 1;
-                                                      setState(() {
-                                                        // store as int (other code parses if needed)
-                                                        p['pcsInSet'] = newVal;
-                                                        _recalculatePrice();
-                                                      });
+                                                      return TextField(
+                                                        keyboardType:
+                                                            TextInputType
+                                                                .number,
+                                                        inputFormatters: [
+                                                          FilteringTextInputFormatter
+                                                              .digitsOnly,
+                                                        ],
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        controller:
+                                                            pcsController,
+                                                        decoration: const InputDecoration(
+                                                          isDense: true,
+                                                          contentPadding:
+                                                              EdgeInsets.symmetric(
+                                                                vertical: 6,
+                                                                horizontal: 6,
+                                                              ),
+                                                          border:
+                                                              OutlineInputBorder(),
+                                                        ),
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                        ),
+                                                        onChanged: (v) {
+                                                          final newVal =
+                                                              int.tryParse(v) ??
+                                                              1;
+                                                          // update model from controller; do not recreate controller
+                                                          setState(() {
+                                                            p['pcsInSet'] =
+                                                                newVal;
+                                                            _recalculatePrice();
+                                                          });
+                                                        },
+                                                      );
                                                     },
                                                   ),
                                                 ),
+
+                                                // SizedBox(
+                                                //   width: 44,
+                                                //   child: TextField(
+                                                //     keyboardType:
+                                                //         TextInputType.number,
+                                                //     inputFormatters: [
+                                                //       FilteringTextInputFormatter
+                                                //           .digitsOnly,
+                                                //     ],
+                                                //     textAlign: TextAlign.center,
+                                                //     controller:
+                                                //         TextEditingController(
+                                                //           text: pcsInSet
+                                                //               .toString(),
+                                                //         ),
+
+                                                //     decoration: const InputDecoration(
+                                                //       isDense: true,
+                                                //       contentPadding:
+                                                //           EdgeInsets.symmetric(
+                                                //             vertical: 6,
+                                                //             horizontal: 6,
+                                                //           ),
+                                                //       border:
+                                                //           OutlineInputBorder(),
+                                                //     ),
+                                                //     style: const TextStyle(
+                                                //       fontSize: 11,
+                                                //     ),
+                                                //     onChanged: (v) {
+                                                //       final newVal =
+                                                //           int.tryParse(v) ?? 1;
+                                                //       setState(() {
+                                                //         // store as int (other code parses if needed)
+                                                //         p['pcsInSet'] = newVal;
+                                                //         _recalculatePrice();
+                                                //       });
+                                                //     },
+                                                //   ),
+                                                // ),
+                                                // _qtyButton(
+                                                //   icon: Icons.add,
+
+                                                //   onTap: () {
+                                                //     // increment pcs per set (not the sets quantity)
+                                                //     setState(() {
+                                                //       p['pcsInSet'] =
+                                                //           pcsInSet + 1;
+                                                //       _recalculatePrice();
+                                                //     });
+                                                //   },
                                                 _qtyButton(
                                                   icon: Icons.add,
-
                                                   onTap: () {
-                                                    // increment pcs per set (not the sets quantity)
                                                     setState(() {
                                                       p['pcsInSet'] =
                                                           pcsInSet + 1;
+                                                      _pcsControllers[pid]
+                                                          ?.text = p['pcsInSet']
+                                                          .toString();
                                                       _recalculatePrice();
                                                     });
                                                   },
@@ -3661,58 +3786,179 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                         )
                                                       : null,
                                                 ),
-                                                // Text(
-                                                //   '$quantity',
-                                                //   style: const TextStyle(
-                                                //     fontSize: 11,
-                                                //   ),
-                                                // ),
                                                 SizedBox(
                                                   width: 44,
-                                                  child: TextField(
-                                                    keyboardType:
-                                                        TextInputType.number,
-                                                    inputFormatters: [
-                                                      FilteringTextInputFormatter
-                                                          .digitsOnly,
-                                                    ],
-                                                    textAlign: TextAlign.center,
-                                                    controller:
-                                                        TextEditingController(
-                                                          text: quantity
-                                                              .toString(),
-                                                        ),
-                                                    decoration: const InputDecoration(
-                                                      isDense: true,
-                                                      contentPadding:
-                                                          EdgeInsets.symmetric(
-                                                            vertical: 6,
-                                                            horizontal: 6,
-                                                          ),
-                                                      border:
-                                                          OutlineInputBorder(),
-                                                    ),
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                    ),
-                                                    onChanged: (v) {
-                                                      final parsed =
-                                                          int.tryParse(v) ??
-                                                          quantity;
-                                                      final clamped = parsed
-                                                          .clamp(
-                                                            1,
-                                                            lotStock > 0
-                                                                ? lotStock
-                                                                : 999,
+
+                                                  // child: TextField(
+                                                  //   keyboardType:
+                                                  //       TextInputType.number,
+                                                  //   inputFormatters: [
+                                                  //     FilteringTextInputFormatter
+                                                  //         .digitsOnly,
+                                                  //   ],
+                                                  //   textAlign: TextAlign.center,
+                                                  //   controller:
+                                                  //       TextEditingController(
+                                                  //         text: quantity
+                                                  //             .toString(),
+                                                  //       ),
+                                                  //   decoration: const InputDecoration(
+                                                  //     isDense: true,
+                                                  //     contentPadding:
+                                                  //         EdgeInsets.symmetric(
+                                                  //           vertical: 6,
+                                                  //           horizontal: 6,
+                                                  //         ),
+                                                  //     border:
+                                                  //         OutlineInputBorder(),
+                                                  //   ),
+                                                  //   style: const TextStyle(
+                                                  //     fontSize: 11,
+                                                  //   ),
+                                                  //   onChanged: (v) {
+                                                  //     final parsed =
+                                                  //         int.tryParse(v) ??
+                                                  //         quantity;
+                                                  //     final clamped = parsed
+                                                  //         .clamp(
+                                                  //           1,
+                                                  //           lotStock > 0
+                                                  //               ? lotStock
+                                                  //               : 999,
+                                                  //         );
+                                                  //     setState(() {
+                                                  //       p['quantity'] = clamped;
+                                                  //       _recalculatePrice();
+                                                  //     });
+                                                  //   },
+                                                  // ),
+                                                  child: Builder(
+                                                    builder: (ctx) {
+                                                      // persistent controller for quantity field
+                                                      final qtyController =
+                                                          _qtyControllers.putIfAbsent(
+                                                            pid,
+                                                            () => TextEditingController(
+                                                              text: quantity
+                                                                  .toString(),
+                                                            ),
                                                           );
-                                                      setState(() {
-                                                        p['quantity'] = clamped;
-                                                        _recalculatePrice();
-                                                      });
+
+                                                      return TextField(
+                                                        keyboardType:
+                                                            TextInputType
+                                                                .number,
+                                                        inputFormatters: [
+                                                          FilteringTextInputFormatter
+                                                              .digitsOnly,
+                                                        ],
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        controller:
+                                                            qtyController,
+                                                        decoration: const InputDecoration(
+                                                          isDense: true,
+                                                          contentPadding:
+                                                              EdgeInsets.symmetric(
+                                                                vertical: 6,
+                                                                horizontal: 6,
+                                                              ),
+                                                          border:
+                                                              OutlineInputBorder(),
+                                                        ),
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                        ),
+                                                        onChanged: (v) {
+                                                          // allow users to erase digits (keep cursor)
+                                                          // parse to int if possible, otherwise fallback to 1
+                                                          final parsed =
+                                                              int.tryParse(v) ??
+                                                              1;
+                                                          final clamped = parsed
+                                                              .clamp(
+                                                                1,
+                                                                lotStock > 0
+                                                                    ? lotStock
+                                                                    : 999,
+                                                              );
+                                                          setState(() {
+                                                            p['quantity'] =
+                                                                clamped;
+                                                            // do NOT assign qtyController.text here
+                                                            // assigning text causes cursor/focus loss
+                                                            _recalculatePrice();
+                                                          });
+                                                        },
+
+                                                        // onChanged: (v) {
+                                                        //   final parsed =
+                                                        //       int.tryParse(v) ??
+                                                        //       quantity;
+                                                        //   final clamped = parsed
+                                                        //       .clamp(
+                                                        //         1,
+                                                        //         lotStock > 0
+                                                        //             ? lotStock
+                                                        //             : 999,
+                                                        //       );
+                                                        //   setState(() {
+                                                        //     p['quantity'] =
+                                                        //         clamped;
+                                                        //     // sync controller (already same instance)
+                                                        //     qtyController.text =
+                                                        //         clamped
+                                                        //             .toString();
+                                                        //     _recalculatePrice();
+                                                        //   });
+                                                        // },
+                                                        // when editing completes (user leaves field), ensure at least 1
+                                                        onEditingComplete: () {
+                                                          final txt =
+                                                              qtyController
+                                                                  .text;
+                                                          final parsed =
+                                                              int.tryParse(
+                                                                txt,
+                                                              ) ??
+                                                              0;
+                                                          final finalVal =
+                                                              (parsed < 1)
+                                                              ? 1
+                                                              : (lotStock > 0
+                                                                    ? parsed.clamp(
+                                                                        1,
+                                                                        lotStock,
+                                                                      )
+                                                                    : parsed);
+                                                          final finalText =
+                                                              finalVal
+                                                                  .toString();
+                                                          qtyController
+                                                              .value = TextEditingValue(
+                                                            text: finalText,
+                                                            selection:
+                                                                TextSelection.collapsed(
+                                                                  offset:
+                                                                      finalText
+                                                                          .length,
+                                                                ),
+                                                          );
+                                                          setState(() {
+                                                            p['quantity'] =
+                                                                finalVal;
+                                                            _recalculatePrice();
+                                                          });
+                                                          // optionally remove focus
+                                                          FocusScope.of(
+                                                            context,
+                                                          ).unfocus();
+                                                        },
+                                                      );
                                                     },
                                                   ),
                                                 ),
+
                                                 _qtyButton(
                                                   icon: Icons.add,
                                                   onTap: (quantity < lotStock)
@@ -3734,7 +3980,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                   top: 2.0,
                                                 ),
                                                 child: Text(
-                                                  'No more stock available',
+                                                  'No more than $lotStock stock available',
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     color: Colors.red,

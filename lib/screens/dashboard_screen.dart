@@ -467,7 +467,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _refreshData();
     jeansShirtFuture = AppDataRepo().getJeansShirtRevenueAndOrder();
-    salesDataFuture = AppDataRepo().getSalesData();
+    // salesDataFuture = AppDataRepo().getSalesData();
+    salesDataFuture = AppDataRepo()
+        .getSalesData()
+        .then((resp) {
+          print('DEBUG salesData API response: $resp');
+          return resp;
+        })
+        .catchError((e, st) {
+          print('ERROR fetching salesData: $e\n$st');
+          throw e;
+        });
   }
 
   void _refreshData() {
@@ -633,6 +643,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     FutureBuilder<Map<String, dynamic>>(
                       future: salesDataFuture,
                       builder: (context, snapshot) {
+                        // if (!snapshot.hasData) {
+                        if (snapshot.hasError) {
+                          print(
+                            'Dashboard salesDataFuture error: ${snapshot.error}',
+                          );
+                          return Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Center(
+                              child: Text(
+                                'Error loading sales data: ${snapshot.error}',
+                              ),
+                            ),
+                          );
+                        }
                         if (!snapshot.hasData) {
                           return SizedBox(
                             height: 120,

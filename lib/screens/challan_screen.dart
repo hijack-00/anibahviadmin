@@ -2396,10 +2396,29 @@ class _ChallanScreenState extends State<ChallanScreen> {
                                                     FilteringTextInputFormatter
                                                         .digitsOnly,
                                                   ],
-                                                  onChanged: (v) =>
-                                                      fi['refundAmount'] =
-                                                          double.tryParse(v) ??
-                                                          0.0,
+                                                  onChanged: (v) {
+                                                    // update model and refresh modal so totals update immediately
+                                                    fi['refundAmount'] =
+                                                        double.tryParse(v) ??
+                                                        0.0;
+                                                    setModal(() {});
+                                                  },
+                                                  // controller: ctrlRefund,
+                                                  // keyboardType:
+                                                  //     TextInputType.number,
+                                                  // decoration:
+                                                  //     const InputDecoration(
+                                                  //       labelText: 'Refund (₹)',
+                                                  //       isDense: true,
+                                                  //     ),
+                                                  // inputFormatters: [
+                                                  //   FilteringTextInputFormatter
+                                                  //       .digitsOnly,
+                                                  // ],
+                                                  // onChanged: (v) =>
+                                                  //     fi['refundAmount'] =
+                                                  //         double.tryParse(v) ??
+                                                  //         0.0,
                                                 ),
                                               ),
                                               const SizedBox(width: 8),
@@ -2461,11 +2480,19 @@ class _ChallanScreenState extends State<ChallanScreen> {
                                       '₹${(() {
                                         double t = 0;
                                         for (var it in freeFormItems) {
-                                          final idx = it['idx'] as int;
-                                          t += double.tryParse(refundControllers[idx]?.text ?? '0') ?? 0;
+                                          t += double.tryParse((it['refundAmount'] ?? 0).toString()) ?? 0;
                                         }
                                         return t.round();
                                       }())}',
+
+                                      // '₹${(() {
+                                      //   double t = 0;
+                                      //   for (var it in freeFormItems) {
+                                      //     final idx = it['idx'] as int;
+                                      //     t += double.tryParse(refundControllers[idx]?.text ?? '0') ?? 0;
+                                      //   }
+                                      //   return t.round();
+                                      // }())}',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.orange,

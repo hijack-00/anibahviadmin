@@ -1419,7 +1419,7 @@ class _SalesReportsPageState extends State<SalesReportsPage> {
                 ),
                 // SizedBox(width: 8),
                 _KpiCard(
-                  label: 'Units',
+                  label: 'Pcs',
                   value: '$pieces',
                   icon: Icons.check_circle,
                   color: isJeans ? Colors.indigo : Colors.green,
@@ -1541,7 +1541,7 @@ Widget _buildProductCard(Map<String, dynamic> prod) {
                   ),
                 ),
                 Text(
-                  'Units Sold: ${prod['pieces']}',
+                  'Pcs Sold: ${prod['pieces']}',
                   style: const TextStyle(color: Colors.indigo),
                 ),
               ],

@@ -38,6 +38,52 @@ class AppDataRepo {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchAllMainCategories() async {
+    final response = await _api.getAllMainCategories();
+    if (response['success'] == true && response['data'] is List) {
+      return List<Map<String, dynamic>>.from(response['data']);
+    } else {
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteChallan({required String id}) async {
+    return await _api.deleteChallan(id: id);
+  }
+
+  Future<Map<String, dynamic>> updateReturn({
+    required String id,
+    required Map<String, dynamic> data,
+  }) async {
+    return await _api.updateReturn(id: id, data: data);
+  }
+
+  Future<Map<String, dynamic>> deleteReturn({required String id}) async {
+    return await _api.deleteReturn(id: id);
+  }
+
+  /// Update challan by id. Pass the full challan object under `data`.
+  Future<Map<String, dynamic>> updateChallan({
+    required String id,
+    required Map<String, dynamic> data,
+  }) async {
+    return await _api.updateChallan(id: id, data: data);
+  }
+
+  /// Wrapper: remove challan bilti slip
+  Future<Map<String, dynamic>> removeChallanSlip({
+    required String challanId,
+  }) async {
+    return await _api.removeChallanSlip(challanId: challanId);
+  }
+
+  Future<Map<String, dynamic>> uploadChallanSlip({
+    required File file,
+    required String challanId,
+  }) async {
+    return await _api.uploadChallanSlip(file: file, challanId: challanId);
+  }
+
   Future<Map<String, dynamic>> fetchAllOrdersByAdminWithPagination() async {
     return await _api.fetchAllOrdersByAdminWithPagination();
   }

@@ -46,8 +46,8 @@ class _SalesSummaryCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: 120,
-        height: 100,
-        padding: EdgeInsets.all(16),
+        height: 70,
+        padding: EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(16),
@@ -56,7 +56,7 @@ class _SalesSummaryCard extends StatelessWidget {
           // ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
               title,

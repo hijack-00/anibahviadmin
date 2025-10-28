@@ -23,6 +23,19 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
   String? _error;
   List<Map<String, dynamic>> _orders = [];
 
+  // Filter state: delivery status filter (default All)
+  String _selectedFilterStatus = 'All';
+  final List<String> _filterStatuses = [
+    'All',
+    'Pending',
+    'Packed',
+    'Shipped',
+    'Confirmed',
+    'Delivered',
+    'Cancelled',
+    'Returned',
+  ];
+
   final Map<String, Color> statusColors = {
     'pending': Colors.yellow.shade700,
     'shipped': Colors.blue,
@@ -95,16 +108,92 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
   String _searchQuery = '';
 
   List<Map<String, dynamic>> get _filteredOrders {
-    if (_searchQuery.isEmpty) return _orders;
+    final q = _searchQuery.trim().toLowerCase();
+    final filterAll =
+        (_selectedFilterStatus == 'All' ||
+        _selectedFilterStatus.trim().isEmpty);
+
     return _orders.where((order) {
-      final shipping = order['shippingAddress'] ?? {};
-      final name = (shipping['name'] ?? '').toString().toLowerCase();
-      final phone = (shipping['phone'] ?? '').toString().toLowerCase();
-      final id = (order['orderUniqueId'] ?? '').toString().toLowerCase();
-      return name.contains(_searchQuery) ||
-          phone.contains(_searchQuery) ||
-          id.contains(_searchQuery);
+      // status filter (applies regardless of search)
+      final orderStatus = (order['status'] ?? '').toString().toLowerCase();
+      if (!filterAll && orderStatus != _selectedFilterStatus.toLowerCase()) {
+        return false;
+      }
+
+      // if no search query, include the order (status already checked)
+      if (q.isEmpty) return true;
+
+      // when search present, run the existing matching checks
+      final orderNumber = (order['orderNumber'] ?? '').toString().toLowerCase();
+      final orderUniqueId = (order['orderUniqueId'] ?? '')
+          .toString()
+          .toLowerCase();
+      final trackingId = (order['trackingId'] ?? '').toString().toLowerCase();
+
+      final customer = order['customer'] ?? {};
+      final custName = (customer['name'] ?? '').toString().toLowerCase();
+      final custPhone = (customer['phone'] ?? '').toString().toLowerCase();
+      final custEmail = (customer['email'] ?? '').toString().toLowerCase();
+
+      final shipping = (order['shippingAddress'] ?? {}) as Map? ?? {};
+      final shipName = (shipping['name'] ?? '').toString().toLowerCase();
+      final shipPhone = (shipping['phone'] ?? '').toString().toLowerCase();
+      final shipAddr =
+          ((shipping['address'] ?? shipping['deliveryAddress'] ?? ''))
+              .toString()
+              .toLowerCase();
+
+      return orderNumber.contains(q) ||
+          orderUniqueId.contains(q) ||
+          trackingId.contains(q) ||
+          custName.contains(q) ||
+          custPhone.contains(q) ||
+          custEmail.contains(q) ||
+          shipName.contains(q) ||
+          shipPhone.contains(q) ||
+          shipAddr.contains(q);
     }).toList();
+    // if (_searchQuery.isEmpty) return _orders;
+    // final q = _searchQuery;
+    // return _orders.where((order) {
+    //   // order-level identifiers
+    //   final orderStatus = (order['status'] ?? '').toString().toLowerCase();
+    //   if (_selectedFilterStatus != 'All' && _selectedFilterStatus.isNotEmpty) {
+    //     if (orderStatus != _selectedFilterStatus.toLowerCase()) return false;
+    //   }
+
+    //   final orderNumber = (order['orderNumber'] ?? '').toString().toLowerCase();
+    //   final orderUniqueId = (order['orderUniqueId'] ?? '')
+    //       .toString()
+    //       .toLowerCase();
+    //   final trackingId = (order['trackingId'] ?? '').toString().toLowerCase();
+
+    //   // customer and nested user info
+    //   final customer = order['customer'] ?? {};
+    //   final custName = (customer['name'] ?? '').toString().toLowerCase();
+    //   final custPhone = (customer['phone'] ?? '').toString().toLowerCase();
+    //   final custEmail = (customer['email'] ?? '').toString().toLowerCase();
+
+    //   // possible shipping / delivery address fields
+    //   final shipping = (order['shippingAddress'] ?? {}) as Map? ?? {};
+    //   final shipName = (shipping['name'] ?? '').toString().toLowerCase();
+    //   final shipPhone = (shipping['phone'] ?? '').toString().toLowerCase();
+    //   final shipAddr =
+    //       ((shipping['address'] ?? shipping['deliveryAddress'] ?? ''))
+    //           .toString()
+    //           .toLowerCase();
+
+    //   // aggregate check
+    //   return orderNumber.contains(q) ||
+    //       orderUniqueId.contains(q) ||
+    //       trackingId.contains(q) ||
+    //       custName.contains(q) ||
+    //       custPhone.contains(q) ||
+    //       custEmail.contains(q) ||
+    //       shipName.contains(q) ||
+    //       shipPhone.contains(q) ||
+    //       shipAddr.contains(q);
+    // }).toList();
   }
 
   @override
@@ -161,41 +250,127 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
+                    horizontal: 8,
+                    vertical: 6,
                   ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (query) {
-                      setState(() {
-                        _searchQuery = query.toLowerCase();
-                      });
-                    },
-                    style: TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'Search by name, order number, or phone',
-                      hintStyle: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (query) {
+                            setState(() {
+                              _searchQuery = query.trim().toLowerCase();
+                            });
+                          },
+                          textAlign: TextAlign.left,
+                          textAlignVertical: TextAlignVertical.center,
+                          style: const TextStyle(fontSize: 12, height: 1.0),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 8,
+                            ),
+                            hintText: 'Search by name, order no. or phone',
+                            hintStyle: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search_rounded,
+                              color: Colors.indigo.shade400,
+                              size: 18,
+                            ),
+                            border: InputBorder.none,
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(
+                                      Icons.clear_rounded,
+                                      color: Colors.grey.shade400,
+                                      size: 18,
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: BoxConstraints(
+                                      minWidth: 40,
+                                      minHeight: 40,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
                       ),
-                      prefixIcon: Icon(
-                        Icons.search_rounded,
-                        color: Colors.indigo.shade400,
+                      const SizedBox(width: 8),
+                      // Filter dropdown (sleek small)
+                      Container(
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.indigo.shade100),
+                        ),
+                        child: PopupMenuButton<String>(
+                          tooltip: 'Filter by status',
+                          padding: EdgeInsets.zero,
+                          onSelected: (val) =>
+                              setState(() => _selectedFilterStatus = val),
+                          itemBuilder: (ctx) => _filterStatuses
+                              .map(
+                                (s) => PopupMenuItem(
+                                  value: s,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          s,
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                      if (s == _selectedFilterStatus)
+                                        const Icon(
+                                          Icons.check,
+                                          size: 16,
+                                          color: Colors.indigo,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.filter_list,
+                                  size: 18,
+                                  color: Colors.indigo,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _selectedFilterStatus,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.indigo,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  size: 18,
+                                  color: Colors.indigo,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                      border: InputBorder.none,
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(
-                                Icons.clear_rounded,
-                                color: Colors.grey.shade400,
-                              ),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _searchQuery = '');
-                              },
-                            )
-                          : null,
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -1592,7 +1767,7 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         ),
         onPressed: () async {
-          await showModalBottomSheet(
+          final result = await showModalBottomSheet<bool>(
             context: context,
             isScrollControlled: true,
             backgroundColor: Colors.white,
@@ -1609,7 +1784,30 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
               child: _CreateOrderSheet(),
             ),
           );
+          // if the sheet returned true (order created), refresh the orders list
+          if (result == true) {
+            await _fetchOrders();
+          }
         },
+        // onPressed: () async {
+        //   await showModalBottomSheet(
+        //     context: context,
+        //     isScrollControlled: true,
+        //     backgroundColor: Colors.white,
+        //     shape: const RoundedRectangleBorder(
+        //       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        //     ),
+        //     builder: (context) => Padding(
+        //       padding: EdgeInsets.only(
+        //         bottom: MediaQuery.of(context).viewInsets.bottom,
+        //         left: 16,
+        //         right: 16,
+        //         top: 24,
+        //       ),
+        //       child: _CreateOrderSheet(),
+        //     ),
+        //   );
+        // },
       ),
 
       bottomNavigationBar: UniversalNavBar(selectedIndex: 1, onTap: _onNavTap),
@@ -2756,21 +2954,20 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                         if (selected != null) _onSelectCustomer(selected);
                       },
                       child: Card(
-                        elevation: 3,
+                        elevation: 2,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         color: Colors.indigo.shade50,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 12,
+                            vertical: 4, // 👈 Reduced from 8 → 4
+                            horizontal: 10, // slightly reduced from 12
                           ),
                           child: Row(
                             children: [
-                              // ...inside the Row in the main customer card...
                               CircleAvatar(
-                                radius: 28,
+                                radius: 22, // 👈 Reduced from 28 → 22
                                 backgroundImage:
                                     _selectedCustomer != null &&
                                         _selectedCustomer!['photo'] != null &&
@@ -2787,13 +2984,13 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                             .isEmpty)
                                     ? Icon(
                                         Icons.person,
-                                        size: 28,
+                                        size: 22, // 👈 Smaller icon
                                         color: Colors.grey,
                                       )
                                     : null,
                                 backgroundColor: Colors.grey.shade200,
                               ),
-                              SizedBox(width: 12),
+                              SizedBox(width: 10),
                               Expanded(
                                 child: _selectedCustomer == null
                                     ? Text(
@@ -2801,19 +2998,21 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                         style: TextStyle(
                                           color: Colors.indigo,
                                           fontWeight: FontWeight.w500,
-                                          fontSize: 13,
+                                          fontSize: 12, // Slightly smaller
                                         ),
                                       )
                                     : Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize
+                                            .min, // 👈 Prevents unnecessary height
                                         children: [
                                           Text(
                                             _selectedCustomer!['name'] ?? '',
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               color: Colors.indigo,
-                                              fontSize: 12,
+                                              fontSize: 11.5,
                                             ),
                                           ),
                                           if ((_selectedCustomer!['email'] ??
@@ -2822,7 +3021,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                               .isNotEmpty)
                                             Text(
                                               _selectedCustomer!['email'],
-                                              style: TextStyle(fontSize: 11),
+                                              style: TextStyle(fontSize: 10.5),
                                             ),
                                           if ((_selectedCustomer!['phone'] ??
                                                   '')
@@ -2830,12 +3029,16 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                               .isNotEmpty)
                                             Text(
                                               _selectedCustomer!['phone'],
-                                              style: TextStyle(fontSize: 11),
+                                              style: TextStyle(fontSize: 10.5),
                                             ),
                                         ],
                                       ),
                               ),
-                              Icon(Icons.arrow_drop_down, color: Colors.indigo),
+                              Icon(
+                                Icons.arrow_drop_down,
+                                color: Colors.indigo,
+                                size: 22,
+                              ),
                             ],
                           ),
                         ),
@@ -4306,7 +4509,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                   )
                                                 : null,
                                             child: const Text(
-                                              'Redeem',
+                                              'Full Redeem',
                                               style: TextStyle(fontSize: 11),
                                             ),
                                           ),
@@ -4418,10 +4621,11 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                   if (availableMethods.isNotEmpty)
                                     Row(
                                       children: [
+                                        // 🔹 Method Dropdown
                                         Expanded(
                                           flex: 2,
                                           child: DropdownButtonFormField<String>(
-                                            isExpanded: true, // <-- Important!
+                                            isExpanded: true,
                                             value:
                                                 paymentMethod.isNotEmpty &&
                                                     availableMethods.contains(
@@ -4431,15 +4635,36 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                 : availableMethods.first,
                                             decoration: InputDecoration(
                                               labelText: 'Method',
+                                              labelStyle: const TextStyle(
+                                                fontSize: 10.5,
+                                              ),
+                                              isDense:
+                                                  true, // 👈 compact form field height
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical:
+                                                        4, // 👈 tighter height
+                                                    horizontal: 8,
+                                                  ),
                                               border: OutlineInputBorder(
                                                 borderRadius:
-                                                    BorderRadius.circular(8),
+                                                    BorderRadius.circular(6),
                                               ),
                                               prefixIcon: const Icon(
                                                 Icons
                                                     .account_balance_wallet_outlined,
+                                                size: 16,
+                                                color: Colors.indigo,
                                               ),
                                             ),
+                                            iconSize: 16,
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              color: Colors.black,
+                                              height: 1.1,
+                                            ),
+                                            dropdownColor: Colors.white,
+                                            menuMaxHeight: 180,
                                             items: availableMethods
                                                 .map(
                                                   (m) => DropdownMenuItem(
@@ -4447,7 +4672,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                     child: Text(
                                                       m,
                                                       style: const TextStyle(
-                                                        fontSize: 11,
+                                                        fontSize: 10.5,
                                                         color: Colors.black,
                                                       ),
                                                     ),
@@ -4459,7 +4684,10 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(width: 10),
+
+                                        const SizedBox(width: 8),
+
+                                        // 🔹 Amount Field
                                         Expanded(
                                           flex: 2,
                                           child: TextField(
@@ -4467,36 +4695,48 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                             keyboardType: TextInputType.number,
                                             decoration: InputDecoration(
                                               labelText: 'Amount',
+                                              labelStyle: const TextStyle(
+                                                fontSize: 10.5,
+                                              ),
+                                              isDense:
+                                                  true, // 👈 makes field smaller
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 4,
+                                                    horizontal: 8,
+                                                  ),
                                               border: OutlineInputBorder(
                                                 borderRadius:
-                                                    BorderRadius.circular(8),
+                                                    BorderRadius.circular(6),
                                               ),
                                               prefixIcon: const Icon(
                                                 Icons.currency_rupee,
+                                                size: 16,
+                                                color: Colors.indigo,
                                               ),
                                             ),
                                             style: const TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 10.5,
                                               color: Colors.black,
+                                              height: 1.1,
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(width: 4),
-                                        ElevatedButton.icon(
-                                          icon: const Icon(Icons.add, size: 13),
-                                          label: const Text(
-                                            'Add',
-                                            style: TextStyle(fontSize: 10),
-                                          ),
+
+                                        const SizedBox(width: 6),
+
+                                        // 🔹 Compact "+" Button
+                                        ElevatedButton(
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.indigo,
                                             foregroundColor: Colors.white,
-                                            minimumSize: const Size(60, 30),
-
+                                            minimumSize: const Size(32, 32),
+                                            padding: EdgeInsets.zero,
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                             ),
+                                            elevation: 2,
                                           ),
                                           onPressed:
                                               (balanceDue <= 0 ||
@@ -4536,9 +4776,154 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                     _recalculatePrice();
                                                   });
                                                 },
+                                          child: const Icon(
+                                            Icons.add,
+                                            size: 16,
+                                          ),
                                         ),
                                       ],
                                     )
+                                  // Row(
+                                  //   children: [
+                                  //     Expanded(
+                                  //       flex: 2,
+                                  //       child: DropdownButtonFormField<String>(
+                                  //         isExpanded: true,
+                                  //         value:
+                                  //             paymentMethod.isNotEmpty &&
+                                  //                 availableMethods.contains(
+                                  //                   paymentMethod,
+                                  //                 )
+                                  //             ? paymentMethod
+                                  //             : availableMethods.first,
+                                  //         decoration: InputDecoration(
+                                  //           labelText: 'Method',
+                                  //           labelStyle: const TextStyle(
+                                  //             fontSize: 11,
+                                  //           ), // 👈 smaller label
+                                  //           contentPadding:
+                                  //               const EdgeInsets.symmetric(
+                                  //                 vertical:
+                                  //                     6, // 👈 Reduced vertical padding
+                                  //                 horizontal:
+                                  //                     10, // 👈 Slightly tighter spacing
+                                  //               ),
+                                  //           border: OutlineInputBorder(
+                                  //             borderRadius:
+                                  //                 BorderRadius.circular(6),
+                                  //           ),
+                                  //           prefixIcon: const Icon(
+                                  //             Icons
+                                  //                 .account_balance_wallet_outlined,
+                                  //             size: 18, // 👈 Smaller icon
+                                  //             color: Colors.indigo,
+                                  //           ),
+                                  //         ),
+                                  //         iconSize:
+                                  //             18, // 👈 smaller dropdown arrow
+                                  //         style: const TextStyle(
+                                  //           fontSize: 11, // 👈 compact font
+                                  //           color: Colors.black,
+                                  //         ),
+                                  //         items: availableMethods
+                                  //             .map(
+                                  //               (m) => DropdownMenuItem(
+                                  //                 value: m,
+                                  //                 child: Text(
+                                  //                   m,
+                                  //                   style: const TextStyle(
+                                  //                     fontSize:
+                                  //                         11, // 👈 smaller dropdown item text
+                                  //                     color: Colors.black,
+                                  //                   ),
+                                  //                 ),
+                                  //               ),
+                                  //             )
+                                  //             .toList(),
+                                  //         onChanged: (val) => setState(
+                                  //           () => paymentMethod = val ?? '',
+                                  //         ),
+                                  //       ),
+                                  //     ),
+                                  //     const SizedBox(width: 10),
+                                  //     Expanded(
+                                  //       flex: 2,
+                                  //       child: TextField(
+                                  //         controller: paymentAmountController,
+                                  //         keyboardType: TextInputType.number,
+                                  //         decoration: InputDecoration(
+                                  //           labelText: 'Amount',
+                                  //           border: OutlineInputBorder(
+                                  //             borderRadius:
+                                  //                 BorderRadius.circular(8),
+                                  //           ),
+                                  //           prefixIcon: const Icon(
+                                  //             Icons.currency_rupee,
+                                  //           ),
+                                  //         ),
+                                  //         style: const TextStyle(
+                                  //           fontSize: 12,
+                                  //           color: Colors.black,
+                                  //         ),
+                                  //       ),
+                                  //     ),
+                                  //     const SizedBox(width: 4),
+                                  //     ElevatedButton.icon(
+                                  //       icon: const Icon(Icons.add, size: 13),
+                                  //       label: const Text(
+                                  //         'Add',
+                                  //         style: TextStyle(fontSize: 10),
+                                  //       ),
+                                  //       style: ElevatedButton.styleFrom(
+                                  //         backgroundColor: Colors.indigo,
+                                  //         foregroundColor: Colors.white,
+                                  //         minimumSize: const Size(60, 30),
+                                  //         shape: RoundedRectangleBorder(
+                                  //           borderRadius:
+                                  //               BorderRadius.circular(8),
+                                  //         ),
+                                  //       ),
+                                  //       onPressed:
+                                  //           (balanceDue <= 0 ||
+                                  //               availableMethods.isEmpty)
+                                  //           ? null
+                                  //           : () {
+                                  //               final amt =
+                                  //                   double.tryParse(
+                                  //                     paymentAmountController
+                                  //                         .text,
+                                  //                   ) ??
+                                  //                   0.0;
+                                  //               if (amt <= 0) return;
+                                  //               setState(() {
+                                  //                 payments.add({
+                                  //                   'method': paymentMethod,
+                                  //                   'amount': amt,
+                                  //                   'editing': false,
+                                  //                 });
+                                  //                 paymentAmountController
+                                  //                     .clear();
+                                  //                 if (availableMethods
+                                  //                         .length >
+                                  //                     1) {
+                                  //                   paymentMethod =
+                                  //                       availableMethods
+                                  //                           .firstWhere(
+                                  //                             (m) =>
+                                  //                                 m !=
+                                  //                                 paymentMethod,
+                                  //                             orElse: () =>
+                                  //                                 '',
+                                  //                           );
+                                  //                 } else {
+                                  //                   paymentMethod = '';
+                                  //                 }
+                                  //                 _recalculatePrice();
+                                  //               });
+                                  //             },
+                                  //     ),
+                                  //   ],
+                                  // )
                                   else
                                     Padding(
                                       padding: const EdgeInsets.symmetric(

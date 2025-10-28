@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
 import 'universal_navbar.dart';
 import 'package:flutter/material.dart';
 import '../widgets/searchable_dropdown.dart';
@@ -7,6 +8,19 @@ import 'package:fl_chart/fl_chart.dart'; // For graph view
 import '../services/app_data_repo.dart';
 import 'package:anibhaviadmin/widgets/searchable_dropdown.dart';
 import 'package:shimmer/shimmer.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
+import '../services/app_data_repo.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:printing/printing.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class ChallanScreen extends StatefulWidget {
   const ChallanScreen({super.key});
@@ -37,8 +51,50 @@ class _ChallanScreenState extends State<ChallanScreen> {
   List<Map<String, dynamic>> returns = [];
   bool returnLoading = false;
 
+  final Set<String> expandedChallanIds = {};
+  final Set<String> expandedReturnIds = {};
+
+  final Map<String, String> challanLrUrls = {};
+
+  final ImagePicker _picker = ImagePicker();
+
+  final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+  bool _localNotifInitialized = false;
+
+  Future<void> _ensureNotifInit() async {
+    if (_localNotifInitialized) return;
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    final initSettings = InitializationSettings(android: androidInit);
+    try {
+      await _localNotificationsPlugin.initialize(initSettings);
+      _localNotifInitialized = true;
+    } catch (e) {
+      debugPrint('Notification init failed: $e');
+    }
+  }
+
+  Future<void> _showSavedNotification(String path) async {
+    await _ensureNotifInit();
+    if (!_localNotifInitialized) return;
+    const androidDetails = AndroidNotificationDetails(
+      'pdf_saved_channel',
+      'Saved PDFs',
+      channelDescription: 'Notifies when a PDF is saved',
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+    );
+    final details = NotificationDetails(android: androidDetails);
+    await _localNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'Challan saved',
+      'Saved to $path',
+      details,
+    );
+  }
+
   List<String> statuses = [
-    'All',
+    // 'All',
     'Pending',
     'Approved',
     'Completed',
@@ -55,15 +111,709 @@ class _ChallanScreenState extends State<ChallanScreen> {
     fetchReturns();
   }
 
+  // Future<Uint8List> _buildChallanPdfData(Map<String, dynamic> challan) async {
+  //   final pdf = pw.Document();
+  //   double _toDouble(dynamic v) {
+  //     if (v == null) return 0.0;
+  //     if (v is num) return v.toDouble();
+  //     return double.tryParse(v.toString()) ?? 0.0;
+  //   }
+
+  //   double _unitPriceForItem(Map<String, dynamic> it) {
+  //     final filnal = it['filnalLotPrice'] ?? it['filnalPrice'];
+  //     if (filnal != null && filnal.toString().trim().isNotEmpty) {
+  //       return _toDouble(filnal);
+  //     }
+  //     final single = it['singlePicPrice'] ?? it['singlePrice'] ?? it['price'];
+  //     return _toDouble(single);
+  //   }
+
+  //   final items = List<Map<String, dynamic>>.from(challan['items'] ?? []);
+  //   final customerName = challan['customer']?.toString() ?? '';
+  //   final orderNumber = challan['orderNumber']?.toString() ?? '';
+  //   final challanNumber = challan['challanNumber']?.toString() ?? '';
+  //   final dateStr = (challan['date'] ?? '').toString();
+  //   final displayDate = dateStr.isNotEmpty ? dateStr.substring(0, 10) : '';
+  //   final vendor = challan['vendor']?.toString() ?? '';
+  //   final totalValue = _toDouble(challan['totalValue'] ?? 0).round();
+
+  //   // Build PDF
+  //   pdf.addPage(
+  //     pw.Page(
+  //       pageFormat: PdfPageFormat.a4,
+  //       build: (context) {
+  //         return pw.Column(
+  //           crossAxisAlignment: pw.CrossAxisAlignment.start,
+  //           children: [
+  //             pw.Row(
+  //               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+  //               children: [
+  //                 pw.Column(
+  //                   crossAxisAlignment: pw.CrossAxisAlignment.start,
+  //                   children: [
+  //                     pw.Text(
+  //                       'DELIVERY CHALLAN',
+  //                       style: pw.TextStyle(
+  //                         fontSize: 18,
+  //                         fontWeight: pw.FontWeight.bold,
+  //                       ),
+  //                     ),
+  //                     pw.SizedBox(height: 6),
+  //                     pw.Text(
+  //                       'Garments B2B & Offline Management Platform',
+  //                       style: pw.TextStyle(fontSize: 9),
+  //                     ),
+  //                   ],
+  //                 ),
+  //                 pw.Column(
+  //                   crossAxisAlignment: pw.CrossAxisAlignment.end,
+  //                   children: [
+  //                     pw.Text(
+  //                       'Challan Details',
+  //                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+  //                     ),
+  //                     pw.SizedBox(height: 4),
+  //                     pw.Text('Number: $challanNumber'),
+  //                     pw.Text('Date: $displayDate'),
+  //                     pw.Text('Vendor: $vendor'),
+  //                   ],
+  //                 ),
+  //               ],
+  //             ),
+  //             pw.SizedBox(height: 14),
+  //             pw.Row(
+  //               crossAxisAlignment: pw.CrossAxisAlignment.start,
+  //               children: [
+  //                 pw.Expanded(
+  //                   child: pw.Column(
+  //                     crossAxisAlignment: pw.CrossAxisAlignment.start,
+  //                     children: [
+  //                       pw.Text(
+  //                         'Customer Details',
+  //                         style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+  //                       ),
+  //                       pw.SizedBox(height: 6),
+  //                       pw.Text('Name: $customerName'),
+  //                       pw.Text('Order Number: $orderNumber'),
+  //                     ],
+  //                   ),
+  //                 ),
+  //                 pw.SizedBox(width: 10),
+  //               ],
+  //             ),
+  //             pw.SizedBox(height: 14),
+  //             pw.Text(
+  //               'Items:',
+  //               style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+  //             ),
+  //             pw.SizedBox(height: 6),
+  //             pw.Table.fromTextArray(
+  //               headers: ['Product Name', 'Size', 'Quantity', 'Price', 'Total'],
+  //               data: items.map((it) {
+  //                 final name = it['name']?.toString() ?? '';
+  //                 final size =
+  //                     (it['availableSizes'] is List &&
+  //                         (it['availableSizes'] as List).isNotEmpty)
+  //                     ? (it['availableSizes'] as List).join(', ')
+  //                     : '';
+  //                 final pcsInSet =
+  //                     int.tryParse(it['pcsInSet']?.toString() ?? '1') ?? 1;
+  //                 final qty =
+  //                     int.tryParse(
+  //                       (it['dispatchedQty'] ?? it['quantity'] ?? 0).toString(),
+  //                     ) ??
+  //                     0;
+  //                 final unitPrice = _unitPriceForItem(it);
+  //                 final bool isPerSet =
+  //                     (it['filnalLotPrice'] ?? it['filnalPrice']) != null &&
+  //                     (it['filnalLotPrice']?.toString().trim().isNotEmpty ??
+  //                         false);
+  //                 final total = isPerSet
+  //                     ? unitPrice * qty
+  //                     : unitPrice * pcsInSet * qty;
+  //                 // Show price as unit price (like screenshot)
+  //                 final priceDisplay = unitPrice.round();
+  //                 return [
+  //                   name,
+  //                   size,
+  //                   qty.toString(),
+  //                   '₹$priceDisplay',
+  //                   '₹${total.round()}',
+  //                 ];
+  //               }).toList(),
+  //               headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+  //               cellAlignment: pw.Alignment.centerLeft,
+  //               headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+  //               cellHeight: 22,
+  //               columnWidths: {
+  //                 0: pw.FlexColumnWidth(3),
+  //                 1: pw.FlexColumnWidth(1.5),
+  //                 2: pw.FlexColumnWidth(1),
+  //                 3: pw.FlexColumnWidth(1.5),
+  //                 4: pw.FlexColumnWidth(1.5),
+  //               },
+  //             ),
+  //             pw.SizedBox(height: 8),
+  //             pw.Row(
+  //               mainAxisAlignment: pw.MainAxisAlignment.end,
+  //               children: [
+  //                 pw.Column(
+  //                   crossAxisAlignment: pw.CrossAxisAlignment.end,
+  //                   children: [
+  //                     pw.Row(
+  //                       children: [
+  //                         pw.Text(
+  //                           'Total Value: ',
+  //                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+  //                         ),
+  //                         pw.SizedBox(width: 6),
+  //                         pw.Text(
+  //                           '₹$totalValue',
+  //                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+  //                         ),
+  //                       ],
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ],
+  //             ),
+  //             pw.Spacer(),
+  //             pw.Align(
+  //               alignment: pw.Alignment.bottomRight,
+  //               child: pw.Text(
+  //                 'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
+  //                 style: pw.TextStyle(fontSize: 9, color: PdfColors.grey),
+  //               ),
+  //             ),
+  //           ],
+  //         );
+  //       },
+  //     ),
+  //   );
+
+  //   return pdf.save();
+  // }
+
+  // Future<void> _downloadChallanPdf(Map<String, dynamic> challan) async {
+  //   try {
+  //     ScaffoldMessenger.of(
+  //       context,
+  //     ).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
+
+  //     final bytes = await _buildChallanPdfData(challan);
+
+  //     // ask directory (works on Android with file_picker)
+  //     final dir = await FilePicker.platform.getDirectoryPath(
+  //       dialogTitle: 'Select folder to save PDF',
+  //     );
+  //     if (dir == null) {
+  //       ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  //       ScaffoldMessenger.of(
+  //         context,
+  //       ).showSnackBar(const SnackBar(content: Text('Save cancelled')));
+  //       return;
+  //     }
+
+  //     // final nameBase = (challan['challanNumber'] ?? 'challan')
+  //     //     .toString()
+  //     //     .replaceAll(RegExp(r'[^A-Za-z0-9\-_]'), '_');
+  //     // final filename = '$nameBase_${DateTime.now().millisecondsSinceEpoch}.pdf';
+  //     final nameBase = (challan['challanNumber'] ?? 'challan')
+  //         .toString()
+  //         .replaceAll(RegExp(r'[^A-Za-z0-9\-_]'), '_');
+  //     final filename =
+  //         '${nameBase}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+
+  //     final pathFile = p.join(dir, filename);
+  //     final file = File(pathFile);
+  //     await file.writeAsBytes(bytes);
+
+  //     ScaffoldMessenger.of(context)
+  //       ..hideCurrentSnackBar()
+  //       ..showSnackBar(SnackBar(content: Text('Saved PDF: $pathFile')));
+  //   } catch (e, st) {
+  //     debugPrint('Error saving challan pdf: $e\n$st');
+  //     ScaffoldMessenger.of(context)
+  //       ..hideCurrentSnackBar()
+  //       ..showSnackBar(SnackBar(content: Text('Failed to save PDF: $e')));
+  //   }
+  // }
+  //
+  // Generate PDF, save to temp, then open share sheet
+  // Future<void> _shareChallanPdf(Map<String, dynamic> challan) async {
+  //   try {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Preparing PDF for sharing...')),
+  //     );
+
+  //     final bytes = await _buildChallanPdfData(challan);
+
+  //     final tmpDir = await getTemporaryDirectory();
+  //     final nameBase = (challan['challanNumber'] ?? 'challan')
+  //         .toString()
+  //         .replaceAll(RegExp(r'[^A-Za-z0-9\-_]'), '_');
+  //     final tmpPath = p.join(
+  //       tmpDir.path,
+  //       '${nameBase}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+  //     );
+
+  //     final tmpFile = File(tmpPath);
+  //     await tmpFile.writeAsBytes(bytes);
+
+  //     ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+  //     await Share.shareXFiles([
+  //       XFile(tmpFile.path),
+  //     ], text: 'Challan ${challan['challanNumber'] ?? ''}');
+  //   } catch (e, st) {
+  //     debugPrint('Error sharing challan pdf: $e\n$st');
+  //     ScaffoldMessenger.of(context)
+  //       ..hideCurrentSnackBar()
+  //       ..showSnackBar(SnackBar(content: Text('Failed to prepare share: $e')));
+  //   }
+  // }
+
+  Future<Uint8List> _buildChallanPdfData(Map<String, dynamic> challan) async {
+    final pdf = pw.Document();
+
+    // load a Unicode-capable font (Noto Sans) via printing package helper
+    final pw.Font noto = await PdfGoogleFonts.notoSansRegular();
+
+    double _toDouble(dynamic v) {
+      if (v == null) return 0.0;
+      if (v is num) return v.toDouble();
+      return double.tryParse(v.toString()) ?? 0.0;
+    }
+
+    double _unitPriceForItem(Map<String, dynamic> it) {
+      final filnal = it['filnalLotPrice'] ?? it['filnalPrice'];
+      if (filnal != null && filnal.toString().trim().isNotEmpty) {
+        return _toDouble(filnal);
+      }
+      final single = it['singlePicPrice'] ?? it['singlePrice'] ?? it['price'];
+      return _toDouble(single);
+    }
+
+    final items = List<Map<String, dynamic>>.from(challan['items'] ?? []);
+    final customerName = challan['customer']?.toString() ?? '';
+    final orderNumber = challan['orderNumber']?.toString() ?? '';
+    final challanNumber = challan['challanNumber']?.toString() ?? '';
+    final dateStr = (challan['date'] ?? '').toString();
+    final displayDate = dateStr.isNotEmpty ? dateStr.substring(0, 10) : '';
+    final vendor = challan['vendor']?.toString() ?? '';
+    final totalValue = _toDouble(challan['totalValue'] ?? 0).round();
+
+    final baseTextStyle = pw.TextStyle(font: noto, fontSize: 11);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) {
+          return pw.DefaultTextStyle(
+            style: baseTextStyle,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'DELIVERY CHALLAN',
+                          style: baseTextStyle.copyWith(
+                            fontSize: 18,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 6),
+                        pw.Text(
+                          'Garments B2B & Offline Management Platform',
+                          style: baseTextStyle.copyWith(fontSize: 9),
+                        ),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          'Challan Details',
+                          style: baseTextStyle.copyWith(
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 4),
+                        pw.Text('Number: $challanNumber'),
+                        pw.Text('Date: $displayDate'),
+                        pw.Text('Vendor: $vendor'),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 14),
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'Customer Details',
+                            style: baseTextStyle.copyWith(
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.SizedBox(height: 6),
+                          pw.Text('Name: $customerName'),
+                          pw.Text('Order Number: $orderNumber'),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(width: 10),
+                  ],
+                ),
+                pw.SizedBox(height: 14),
+                pw.Text(
+                  'Items:',
+                  style: baseTextStyle.copyWith(fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 6),
+                pw.Table.fromTextArray(
+                  headers: [
+                    'Product Name',
+                    'Size',
+                    'Quantity',
+                    'Price',
+                    'Total',
+                  ],
+                  data: items.map((it) {
+                    final name = it['name']?.toString() ?? '';
+                    final size =
+                        (it['availableSizes'] is List &&
+                            (it['availableSizes'] as List).isNotEmpty)
+                        ? (it['availableSizes'] as List).join(', ')
+                        : '';
+                    final pcsInSet =
+                        int.tryParse(it['pcsInSet']?.toString() ?? '1') ?? 1;
+                    final qty =
+                        int.tryParse(
+                          (it['dispatchedQty'] ?? it['quantity'] ?? 0)
+                              .toString(),
+                        ) ??
+                        0;
+                    final unitPrice = _unitPriceForItem(it);
+                    final bool isPerSet =
+                        (it['filnalLotPrice'] ?? it['filnalPrice']) != null &&
+                        (it['filnalLotPrice']?.toString().trim().isNotEmpty ??
+                            false);
+                    final total = isPerSet
+                        ? unitPrice * qty
+                        : unitPrice * pcsInSet * qty;
+                    final priceDisplay = unitPrice.round();
+                    return [
+                      name,
+                      size,
+                      qty.toString(),
+                      '₹$priceDisplay',
+                      '₹${total.round()}',
+                    ];
+                  }).toList(),
+                  headerStyle: baseTextStyle.copyWith(
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                  cellStyle: baseTextStyle,
+                  cellAlignment: pw.Alignment.centerLeft,
+                  headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+                  cellHeight: 22,
+                  columnWidths: {
+                    0: pw.FlexColumnWidth(3),
+                    1: pw.FlexColumnWidth(1.5),
+                    2: pw.FlexColumnWidth(1),
+                    3: pw.FlexColumnWidth(1.5),
+                    4: pw.FlexColumnWidth(1.5),
+                  },
+                ),
+                pw.SizedBox(height: 8),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.end,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Row(
+                          children: [
+                            pw.Text(
+                              'Total Value: ',
+                              style: baseTextStyle.copyWith(
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.SizedBox(width: 6),
+                            pw.Text(
+                              '₹$totalValue',
+                              style: baseTextStyle.copyWith(
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.Spacer(),
+                pw.Align(
+                  alignment: pw.Alignment.bottomRight,
+                  child: pw.Text(
+                    'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
+                    style: baseTextStyle.copyWith(
+                      fontSize: 9,
+                      color: PdfColors.grey,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  Future<void> _downloadChallanPdf(Map<String, dynamic> challan) async {
+    try {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
+
+      final bytes = await _buildChallanPdfData(challan);
+
+      // Request Android storage permissions when necessary
+      if (Platform.isAndroid) {
+        try {
+          if (!await Permission.storage.isGranted) {
+            final p = await Permission.storage.request();
+            debugPrint('Permission.storage => ${p.isGranted}');
+          }
+          // Request manage external storage if available (Android 11+)
+          if (!await Permission.manageExternalStorage.isGranted) {
+            final p2 = await Permission.manageExternalStorage.request();
+            debugPrint('Permission.manageExternalStorage => ${p2.isGranted}');
+          }
+        } catch (e) {
+          debugPrint('Permission request failed: $e');
+        }
+      }
+
+      // Prefer public Download folder on Android: /storage/emulated/0/Download
+      String? downloadsPath;
+      if (Platform.isAndroid) {
+        final candidates = [
+          '/storage/emulated/0/Download',
+          '/storage/emulated/0/Downloads',
+        ];
+        for (var pth in candidates) {
+          final d = Directory(pth);
+          try {
+            if (!await d.exists()) {
+              // try to create; may fail due to permissions but harmless
+              await d.create(recursive: true);
+            }
+            // writable test
+            final testFile = File(p.join(d.path, '.write_test'));
+            await testFile.writeAsBytes([0]);
+            await testFile.delete();
+            downloadsPath = d.path;
+            break;
+          } catch (_) {
+            // try next candidate
+            downloadsPath ??= null;
+          }
+        }
+      } else if (Platform.isIOS) {
+        downloadsPath = (await getApplicationDocumentsDirectory()).path;
+      } else {
+        final dl = await getDownloadsDirectory();
+        downloadsPath =
+            dl?.path ?? (await getApplicationDocumentsDirectory()).path;
+      }
+
+      // If cannot use public downloads, fallback to app external dir
+      if (downloadsPath == null) {
+        final fallback = Platform.isAndroid
+            ? (await getExternalStorageDirectory())?.path
+            : (await getApplicationDocumentsDirectory()).path;
+        downloadsPath = fallback;
+      }
+
+      if (downloadsPath == null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Unable to determine save directory')),
+          );
+        return;
+      }
+
+      final nameBase = (challan['challanNumber'] ?? 'challan')
+          .toString()
+          .replaceAll(RegExp(r'[^A-Za-z0-9\-_]'), '_');
+      final filename =
+          '${nameBase}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final pathFile = p.join(downloadsPath, filename);
+
+      // try write
+      try {
+        final file = File(pathFile);
+        await file.writeAsBytes(bytes, flush: true);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text('Saved PDF: $pathFile')));
+        // show native notification
+        await _showSavedNotification(pathFile);
+        return;
+      } on FileSystemException catch (fsErr) {
+        debugPrint('Write to Download folder failed: $fsErr');
+        // fallback to app-specific directory
+        String? fallbackDir;
+        if (Platform.isAndroid) {
+          fallbackDir =
+              (await getExternalStorageDirectory())?.path ??
+              (await getApplicationDocumentsDirectory()).path;
+        } else {
+          fallbackDir = (await getApplicationDocumentsDirectory()).path;
+        }
+        if (fallbackDir == null) throw fsErr;
+        final fallbackPath = p.join(fallbackDir, filename);
+        final file2 = File(fallbackPath);
+        await file2.writeAsBytes(bytes, flush: true);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(content: Text('Saved PDF to app folder: $fallbackPath')),
+          );
+        await _showSavedNotification(fallbackPath);
+        return;
+      }
+    } catch (e, st) {
+      debugPrint('Error saving challan pdf: $e\n$st');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Failed to save PDF: $e')));
+    }
+  }
+
+  Future<void> _shareChallanPdf(Map<String, dynamic> challan) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preparing PDF for sharing...')),
+      );
+
+      final bytes = await _buildChallanPdfData(challan);
+
+      final tmpDir = await getTemporaryDirectory();
+      final nameBase = (challan['challanNumber'] ?? 'challan')
+          .toString()
+          .replaceAll(RegExp(r'[^A-Za-z0-9\-_]'), '_');
+      final tmpPath = p.join(
+        tmpDir.path,
+        '${nameBase}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+
+      final tmpFile = File(tmpPath);
+      await tmpFile.writeAsBytes(bytes);
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      try {
+        await Share.shareXFiles([
+          XFile(tmpFile.path),
+        ], text: 'Challan ${challan['challanNumber'] ?? ''}');
+      } on MissingPluginException catch (_) {
+        // plugin not registered — inform developer to do full rebuild
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Share plugin not registered. Stop app and run flutter clean && flutter pub get && flutter run',
+            ),
+            duration: Duration(seconds: 6),
+          ),
+        );
+      }
+    } catch (e, st) {
+      debugPrint('Error sharing challan pdf: $e\n$st');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Failed to prepare share: $e')));
+    }
+  }
+
   Future<void> fetchChallans() async {
     setState(() => challanLoading = true);
-    final res = await AppDataRepo().fetchChallansWithPagination(
-      page: challanPage,
-      limit: 10,
+    try {
+      final res = await AppDataRepo().fetchChallansWithPagination(
+        page: challanPage,
+        limit: 10,
+      );
+      // print fetched challans to console (safe JSON encode fallback)
+      try {
+        debugPrint('Fetched challans response: ${jsonEncode(res)}');
+      } catch (e) {
+        debugPrint('Fetched challans (toString): $res');
+      }
+      challans = List<Map<String, dynamic>>.from(res['challans'] ?? []);
+      // populate local LR map from API field biltiSlipUrl (or biltiSlip)
+      for (var c in challans) {
+        final id = (c['_id'] ?? c['challanNumber']?.toString() ?? '')
+            .toString();
+        final apiUrl =
+            (c['biltiSlipUrl'] ?? c['biltiSlip'] ?? c['biltiSlip']?.toString());
+        if (apiUrl != null && apiUrl.toString().trim().isNotEmpty) {
+          challanLrUrls[id] = apiUrl.toString();
+        }
+      }
+      challanTotalPages = res['totalPages'] ?? 1;
+    } catch (e, st) {
+      debugPrint('Error fetching challans: $e\n$st');
+    } finally {
+      setState(() => challanLoading = false);
+    }
+  }
+
+  void _showFullHeightReportSheet(Widget content) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent, // allow rounded corners to blend
+      builder: (ctx) {
+        final screenHeight = MediaQuery.of(ctx).size.height;
+        return SafeArea(
+          // SafeArea ensures we don't draw under status bar/notch
+          child: FractionallySizedBox(
+            heightFactor: 0.95, // almost full screen
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              child: Material(
+                color: Colors.white,
+                child: SingleChildScrollView(
+                  // ensure internal scrolling when content is larger than sheet
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: screenHeight * 0.95),
+                    child: content,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
-    challans = List<Map<String, dynamic>>.from(res['challans'] ?? []);
-    challanTotalPages = res['totalPages'] ?? 1;
-    setState(() => challanLoading = false);
   }
 
   Future<T?> _showFullHeightSelection<T>(
@@ -136,15 +886,29 @@ class _ChallanScreenState extends State<ChallanScreen> {
     );
   }
 
-  Future<void> fetchReturns() async {
+  // Return true on success, false on failure
+  Future<bool> fetchReturns() async {
     setState(() => returnLoading = true);
-    final res = await AppDataRepo().fetchReturnsWithPagination(
-      page: returnPage,
-      limit: 10,
-    );
-    returns = List<Map<String, dynamic>>.from(res['returns'] ?? []);
-    returnTotalPages = res['totalPages'] ?? 1;
-    setState(() => returnLoading = false);
+    try {
+      final res = await AppDataRepo().fetchReturnsWithPagination(
+        page: returnPage,
+        limit: 10,
+      );
+      try {
+        debugPrint('Fetched returns response: ${jsonEncode(res)}');
+      } catch (_) {}
+      returns = List<Map<String, dynamic>>.from(res['returns'] ?? []);
+      returnTotalPages = res['totalPages'] ?? 1;
+      return true;
+    } on SocketException catch (e, st) {
+      debugPrint('Network error fetching returns: $e\n$st');
+      return false;
+    } catch (e, st) {
+      debugPrint('Error fetching returns: $e\n$st');
+      return false;
+    } finally {
+      setState(() => returnLoading = false);
+    }
   }
 
   List<Map<String, dynamic>> get filteredChallans {
@@ -225,7 +989,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
     String notes = '';
     List<Map<String, dynamic>> userOrders = [];
     List<Map<String, dynamic>> existingChallans = [];
-    final vendors = ['BlueDart', 'Delhivery', 'DTDC', 'Other'];
+    final vendors = ['BlueDart', 'Delhivery', 'DTDC', 'Transport', 'Other'];
 
     // map of order item idx -> new dispatch int
     final Map<int, int> newDispatchMap = {};
@@ -599,101 +1363,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
                             ),
                           ),
 
-                          // InkWell(
-                          //   onTap: () async {
-                          //     final picked =
-                          //         await showModalBottomSheet<
-                          //           Map<String, dynamic>
-                          //         >(
-                          //           context: sheetCtx,
-                          //           isScrollControlled: true,
-                          //           backgroundColor: Colors.white,
-                          //           constraints: BoxConstraints(
-                          //             maxHeight:
-                          //                 MediaQuery.of(sheetCtx).size.height *
-                          //                 0.95,
-                          //           ),
-                          //           shape: const RoundedRectangleBorder(
-                          //             borderRadius: BorderRadius.vertical(
-                          //               top: Radius.circular(16),
-                          //             ),
-                          //           ),
-                          //           builder: (ctx) {
-                          //             return SafeArea(
-                          //               child: Padding(
-                          //                 padding: const EdgeInsets.all(12.0),
-                          //                 child: Column(
-                          //                   children: [
-                          //                     Row(
-                          //                       children: [
-                          //                         const Expanded(
-                          //                           child: Text(
-                          //                             'Select Customer',
-                          //                             style: TextStyle(
-                          //                               fontWeight:
-                          //                                   FontWeight.bold,
-                          //                               fontSize: 16,
-                          //                             ),
-                          //                           ),
-                          //                         ),
-                          //                         IconButton(
-                          //                           icon: const Icon(
-                          //                             Icons.close,
-                          //                           ),
-                          //                           onPressed: () =>
-                          //                               Navigator.pop(ctx),
-                          //                         ),
-                          //                       ],
-                          //                     ),
-                          //                     const SizedBox(height: 8),
-                          //                     Expanded(
-                          //                       child: ListView.builder(
-                          //                         itemCount:
-                          //                             AppDataRepo.users.length,
-                          //                         itemBuilder: (context, i) {
-                          //                           final u =
-                          //                               AppDataRepo.users[i];
-                          //                           final label =
-                          //                               '${u['name'] ?? ''} • ${u['phone'] ?? ''}';
-                          //                           return ListTile(
-                          //                             title: Text(label),
-                          //                             onTap: () =>
-                          //                                 Navigator.pop(ctx, u),
-                          //                           );
-                          //                         },
-                          //                       ),
-                          //                     ),
-                          //                   ],
-                          //                 ),
-                          //               ),
-                          //             );
-                          //           },
-                          //         );
-
-                          //     if (picked != null) {
-                          //       selectedCustomer = picked;
-                          //       setStateModal(() {});
-                          //       if (picked['_id'] != null) {
-                          //         await _loadOrdersForCustomer(
-                          //           picked['_id'].toString(),
-                          //         );
-                          //       }
-                          //     }
-                          //   },
-                          //   child: InputDecorator(
-                          //     decoration: const InputDecoration(
-                          //       labelText: 'Customer',
-                          //       border: OutlineInputBorder(),
-                          //       isDense: true,
-                          //     ),
-                          //     child: Text(
-                          //       selectedCustomer != null
-                          //           ? '${selectedCustomer!['name'] ?? ''} • ${selectedCustomer!['phone'] ?? ''}'
-                          //           : 'Select Customer',
-                          //       style: const TextStyle(fontSize: 13),
-                          //     ),
-                          //   ),
-                          // ),
                           const SizedBox(height: 12),
                           const Text('Select Order'),
                           const SizedBox(height: 6),
@@ -2791,14 +3460,919 @@ class _ChallanScreenState extends State<ChallanScreen> {
   }
 
   void _editChallan(Map<String, dynamic> challan) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Edit Challan #${challan['challanNumber']}')),
+    final id = (challan['_id'] ?? '').toString();
+    if (id.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Invalid challan id')));
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final screenHeight = MediaQuery.of(ctx).size.height;
+        final topSafe = MediaQuery.of(ctx).viewPadding.top;
+        // local mutable copy
+        final Map<String, dynamic> data = Map<String, dynamic>.from(challan);
+        final notesController = TextEditingController(
+          text: data['notes']?.toString() ?? '',
+        );
+        String statusVal = data['status']?.toString() ?? 'Pending';
+        final vendorController = TextEditingController(
+          text: data['vendor']?.toString() ?? '',
+        );
+        final items = List<Map<String, dynamic>>.from(data['items'] ?? []);
+        final Map<int, TextEditingController> qtyControllers = {};
+        for (var i = 0; i < items.length; i++) {
+          qtyControllers[i] = TextEditingController(
+            text: (items[i]['dispatchedQty'] ?? items[i]['quantity'] ?? 0)
+                .toString(),
+          );
+        }
+
+        // persist saving flag across StatefulBuilder rebuilds by declaring here
+        bool saving = false;
+
+        return Padding(
+          padding: EdgeInsets.only(top: topSafe),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: screenHeight * 0.92,
+              child: StatefulBuilder(
+                builder: (mctx, setModalState) {
+                  // helper to compute per-item unit and total
+                  String _formatCurrency(num v) => '₹${v.toStringAsFixed(0)}';
+                  double _unitPriceForItem(Map<String, dynamic> it) {
+                    final filnal = it['filnalLotPrice'] ?? it['filnalPrice'];
+                    if (filnal != null && filnal.toString().trim().isNotEmpty) {
+                      return double.tryParse(filnal.toString()) ?? 0.0;
+                    }
+                    final single =
+                        it['singlePicPrice'] ??
+                        it['singlePrice'] ??
+                        it['price'];
+                    return double.tryParse((single ?? 0).toString()) ?? 0.0;
+                  }
+
+                  Future<void> _submit() async {
+                    // disable if already saving
+                    if (saving) return;
+
+                    // apply edits to data
+                    data['notes'] = notesController.text;
+                    data['status'] = statusVal;
+                    data['vendor'] = vendorController.text;
+                    data['_id'] = id;
+
+                    double totalValue = 0.0;
+                    for (var i = 0; i < items.length; i++) {
+                      final v =
+                          int.tryParse(qtyControllers[i]?.text ?? '0') ?? 0;
+                      items[i]['dispatchedQty'] = v;
+
+                      final unitPrice = _unitPriceForItem(items[i]);
+                      // store unit price into item.price (backend expects price field)
+                      // use integer price like API sample
+                      items[i]['price'] = unitPrice.round();
+
+                      // compute per-item total consistent with UI: per set or per piece logic
+                      final pcsInSet =
+                          int.tryParse(
+                            items[i]['pcsInSet']?.toString() ?? '1',
+                          ) ??
+                          1;
+                      final bool isPerSet =
+                          (items[i]['filnalLotPrice'] ??
+                                  items[i]['filnalPrice']) !=
+                              null &&
+                          (items[i]['filnalLotPrice']
+                                  ?.toString()
+                                  .trim()
+                                  .isNotEmpty ??
+                              false);
+                      final itemTotal = isPerSet
+                          ? unitPrice * v
+                          : unitPrice * pcsInSet * v;
+                      totalValue += itemTotal;
+                    }
+                    data['items'] = items;
+                    data['totalValue'] = totalValue.round();
+
+                    // show loader in modal
+                    setModalState(() => saving = true);
+
+                    // optimistic update: reflect changed prices/qty/total immediately in main list
+                    setState(() {
+                      final idx = challans.indexWhere(
+                        (c) => (c['_id'] ?? '') == id,
+                      );
+                      if (idx != -1) {
+                        final merged = Map<String, dynamic>.from(challans[idx]);
+                        merged['items'] = items
+                            .map((it) => Map<String, dynamic>.from(it))
+                            .toList();
+                        merged['totalValue'] = data['totalValue'];
+                        merged['notes'] = data['notes'];
+                        merged['vendor'] = data['vendor'];
+                        merged['status'] = data['status'];
+                        challans[idx] = merged;
+                      }
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Updating challan...')),
+                    );
+
+                    // try {
+                    // Ensure API receives { "data": { ... } } as request body (ApiService should wrap)
+                    // final resp = await AppDataRepo().updateChallan(
+                    //   id: id,
+                    //   data: data,
+                    // );
+
+                    // try {
+                    //   debugPrint(
+                    //     'updateChallan response: ${jsonEncode(resp)}',
+                    //   );
+                    // } catch (_) {}
+
+                    try {
+                      // Send explicit HTTP request and log payload so we know exactly what goes to server
+                      final payload = {'data': data};
+                      try {
+                        debugPrint(
+                          'updateChallan request payload: ${jsonEncode(payload)}',
+                        );
+                      } catch (_) {}
+
+                      final url = Uri.parse(
+                        'https://api.sddipl.com/api/challan/update-challan/$id',
+                      );
+                      final httpResp = await http.post(
+                        url,
+                        headers: {'Content-Type': 'application/json'},
+                        body: jsonEncode(payload),
+                      );
+                      Map<String, dynamic> resp;
+                      try {
+                        resp =
+                            jsonDecode(httpResp.body) as Map<String, dynamic>;
+                      } catch (_) {
+                        resp = {
+                          'success':
+                              httpResp.statusCode >= 200 &&
+                              httpResp.statusCode < 300,
+                          'message': httpResp.body,
+                        };
+                      }
+                      debugPrint(
+                        'updateChallan http status: ${httpResp.statusCode} body: ${httpResp.body}',
+                      );
+
+                      if (resp['success'] == true && resp['challan'] != null) {
+                        final updated = Map<String, dynamic>.from(
+                          resp['challan'] as Map,
+                        );
+                        setState(() {
+                          final idx = challans.indexWhere(
+                            (c) => (c['_id'] ?? '') == id,
+                          );
+                          if (idx != -1) challans[idx] = updated;
+                        });
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            const SnackBar(content: Text('Challan updated')),
+                          );
+                      } else {
+                        final msg =
+                            resp['message']?.toString() ??
+                            'Failed to update challan';
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(SnackBar(content: Text(msg)));
+                        // refresh list from server to ensure consistency / rollback optimistic update
+                        await fetchChallans();
+                      }
+                    } catch (e, st) {
+                      debugPrint('Error updating challan: $e\n$st');
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          SnackBar(content: Text('Error updating challan: $e')),
+                        );
+                      // on error, refresh list to rollback optimistic changes
+                      await fetchChallans();
+                    } finally {
+                      setModalState(() => saving = false);
+                    }
+                  }
+
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      top: 12,
+                      bottom: MediaQuery.of(ctx).viewInsets.bottom + 12,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Edit Challan - ${challan['challanNumber'] ?? ''}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.of(ctx).pop(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: statusVal,
+                          items: statuses
+                              .map(
+                                (s) =>
+                                    DropdownMenuItem(value: s, child: Text(s)),
+                              )
+                              .toList(),
+                          onChanged: (v) =>
+                              setModalState(() => statusVal = v ?? statusVal),
+                          decoration: const InputDecoration(
+                            labelText: 'Status',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: vendorController,
+                          decoration: const InputDecoration(
+                            labelText: 'Vendor',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        const Text(
+                          'Items',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: screenHeight * 0.45,
+                          ),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: items.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (ctxItem, idx) {
+                              final it = items[idx];
+                              final controller = qtyControllers[idx]!;
+                              final unitPrice = _unitPriceForItem(it);
+                              final pcsInSet =
+                                  int.tryParse(
+                                    it['pcsInSet']?.toString() ?? '1',
+                                  ) ??
+                                  1;
+                              final qty = int.tryParse(controller.text) ?? 0;
+                              final isPerSet =
+                                  (it['filnalLotPrice'] ?? it['filnalPrice']) !=
+                                      null &&
+                                  (it['filnalLotPrice']
+                                          ?.toString()
+                                          .trim()
+                                          .isNotEmpty ??
+                                      false);
+                              final totalPrice = isPerSet
+                                  ? unitPrice * qty
+                                  : unitPrice * pcsInSet * qty;
+
+                              return Card(
+                                elevation: 0,
+                                color: Colors.grey.shade50,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(10),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  it['name'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                if ((it['availableSizes'] ?? [])
+                                                    .isNotEmpty)
+                                                  Text(
+                                                    'Size: ${(it['availableSizes'] as List).join(", ")}',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.grey[700],
+                                                    ),
+                                                  ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  'Unit: ${_formatCurrency(unitPrice)} ${isPerSet ? "(per set)" : "(per piece)"}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey[800],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            width: 90,
+                                            child: TextFormField(
+                                              controller: controller,
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Qty',
+                                                isDense: true,
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              onChanged: (_) =>
+                                                  setModalState(() {}),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      // Row(
+                                      //   mainAxisAlignment:
+                                      //       MainAxisAlignment.end,
+                                      //   children: [
+                                      //     Text(
+                                      //       'Total: ',
+                                      //       style: TextStyle(
+                                      //         fontSize: 13,
+                                      //         color: Colors.grey[800],
+                                      //       ),
+                                      //     ),
+                                      //     const SizedBox(width: 6),
+                                      //     Text(
+                                      //       _formatCurrency(totalPrice),
+                                      //       style: const TextStyle(
+                                      //         fontWeight: FontWeight.bold,
+                                      //         color: Colors.indigo,
+                                      //       ),
+                                      //     ),
+                                      //   ],
+                                      // ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Notes should appear right below items
+                        TextField(
+                          controller: notesController,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Notes',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: saving ? null : _submit,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.indigo,
+                              ),
+                              child: saving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.0,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text('Save Changes'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
   void _editReturn(Map<String, dynamic> ret) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Edit Return #${ret['returnNumber']}')),
+    final id = (ret['_id'] ?? '').toString();
+    if (id.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Invalid return id')));
+      return;
+    }
+
+    final Map<String, dynamic> data = Map<String, dynamic>.from(ret);
+    final items = List<Map<String, dynamic>>.from(data['items'] ?? []);
+    final notesController = TextEditingController(
+      text: data['notes']?.toString() ?? '',
+    );
+    String statusVal = data['status']?.toString() ?? 'Pending';
+    final refundMethodController = TextEditingController(
+      text: data['refundMethod']?.toString() ?? 'Bank Transfer',
+    );
+
+    // controllers per-item
+    final Map<int, TextEditingController> qtyControllers = {};
+    final Map<int, TextEditingController> reasonControllers = {};
+    for (var i = 0; i < items.length; i++) {
+      qtyControllers[i] = TextEditingController(
+        text: (items[i]['returnPcs'] ?? items[i]['returnQty'] ?? 0).toString(),
+      );
+      reasonControllers[i] = TextEditingController(
+        text: (items[i]['reason'] ?? '').toString(),
+      );
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final height = MediaQuery.of(ctx).size.height;
+        return Padding(
+          padding: EdgeInsets.only(top: MediaQuery.of(ctx).viewPadding.top),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: height * 0.92,
+              child: StatefulBuilder(
+                builder: (mctx, setModalState) {
+                  bool saving = false;
+
+                  double _toDouble(dynamic v) {
+                    if (v == null) return 0.0;
+                    if (v is num) return v.toDouble();
+                    return double.tryParse(v.toString()) ?? 0.0;
+                  }
+
+                  double _unitPrice(Map<String, dynamic> it) {
+                    final single =
+                        it['singlePicPrice'] ??
+                        it['singlePrice'] ??
+                        it['price'];
+                    return _toDouble(single);
+                  }
+
+                  int _computeItemRefund(int idx) {
+                    final it = items[idx];
+                    final qty =
+                        int.tryParse(qtyControllers[idx]?.text ?? '0') ?? 0;
+                    final unit = _unitPrice(it);
+                    // sample API uses singlePicPrice * returnPcs -> use unit * qty
+                    final total = (unit * qty).round();
+                    return total;
+                  }
+
+                  int _computeTotalRefund() {
+                    int sum = 0;
+                    for (var i = 0; i < items.length; i++) {
+                      sum += _computeItemRefund(i);
+                    }
+                    return sum;
+                  }
+
+                  Future<void> _submit() async {
+                    if (saving) return;
+                    // apply local changes
+                    data['status'] = statusVal;
+                    data['refundMethod'] = refundMethodController.text;
+                    data['notes'] = notesController.text;
+                    data['_id'] = id;
+
+                    int totalRefund = 0;
+                    for (var i = 0; i < items.length; i++) {
+                      final v =
+                          int.tryParse(qtyControllers[i]?.text ?? '0') ?? 0;
+                      items[i]['returnPcs'] = v;
+                      items[i]['reason'] = reasonControllers[i]?.text ?? '';
+                      final itemRefund = _computeItemRefund(i);
+                      items[i]['refundAmount'] = itemRefund;
+                      // ensure pcsInSet and singlePicPrice remain present
+                      totalRefund += itemRefund;
+                    }
+                    data['items'] = items;
+                    data['totalRefund'] = totalRefund;
+
+                    setModalState(() => saving = true);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Updating return...')),
+                    );
+
+                    try {
+                      final resp = await AppDataRepo().updateReturn(
+                        id: id,
+                        data: data,
+                      );
+                      try {
+                        debugPrint(
+                          'updateReturn response: ${jsonEncode(resp)}',
+                        );
+                      } catch (_) {}
+                      if (resp['success'] == true &&
+                          (resp['returns'] != null || resp['return'] != null)) {
+                        final updated =
+                            (resp['returns'] ?? resp['return']) is Map
+                            ? Map<String, dynamic>.from(
+                                resp['returns'] ?? resp['return'],
+                              )
+                            : data;
+                        setState(() {
+                          final idx = returns.indexWhere(
+                            (r) => (r['_id'] ?? '') == id,
+                          );
+                          if (idx != -1) returns[idx] = updated;
+                        });
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            const SnackBar(content: Text('Return updated')),
+                          );
+                      } else {
+                        final msg =
+                            resp['message']?.toString() ??
+                            'Failed to update return';
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(SnackBar(content: Text(msg)));
+                        await fetchReturns();
+                      }
+                    } catch (e, st) {
+                      debugPrint('Error updating return: $e\n$st');
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(SnackBar(content: Text('Error: $e')));
+                      await fetchReturns();
+                    } finally {
+                      setModalState(() => saving = false);
+                    }
+                  }
+
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      top: 12,
+                      bottom: MediaQuery.of(ctx).viewInsets.bottom + 12,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Edit Return - ${ret['returnNumber'] ?? ''}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.of(ctx).pop(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          // value: statusVal,
+                          // items: statuses
+                          //     .map(
+                          //       (s) =>
+                          //           DropdownMenuItem(value: s, child: Text(s)),
+                          //     )
+                          //     .toList(),
+                          // onChanged: (v) =>
+                          //     setModalState(() => statusVal = v ?? statusVal),
+                          // decoration: const InputDecoration(
+                          //   labelText: 'Status',
+                          //   border: OutlineInputBorder(),
+                          //   isDense: true,
+                          // ),
+                          // limited status options for editing a return
+                          value:
+                              ([
+                                'Pending',
+                                'Approved',
+                                'Completed',
+                                'Rejected',
+                              ].contains(statusVal)
+                              ? statusVal
+                              : 'Pending'),
+                          items:
+                              ['Pending', 'Approved', 'Completed', 'Rejected']
+                                  .map(
+                                    (s) => DropdownMenuItem(
+                                      value: s,
+                                      child: Text(s),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: (v) =>
+                              setModalState(() => statusVal = v ?? statusVal),
+                          decoration: const InputDecoration(
+                            labelText: 'Status',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // TextField(
+                        //   controller: refundMethodController,
+                        //   decoration: const InputDecoration(
+                        //     labelText: 'Refund Method',
+                        //     border: OutlineInputBorder(),
+                        //     isDense: true,
+                        //   ),
+                        // ),
+                        // refund method must be chosen from allowed options
+                        DropdownButtonFormField<String>(
+                          value:
+                              ([
+                                'Original Payment Source',
+                                'Bank Transfer',
+                                'Cash',
+                                'Store Credit',
+                              ].contains(refundMethodController.text)
+                              ? refundMethodController.text
+                              : 'Bank Transfer'),
+                          items:
+                              [
+                                    'Original Payment Source',
+                                    'Bank Transfer',
+                                    'Cash',
+                                    'Store Credit',
+                                  ]
+                                  .map(
+                                    (m) => DropdownMenuItem(
+                                      value: m,
+                                      child: Text(m),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: (v) => setModalState(
+                            () => refundMethodController.text =
+                                v ?? refundMethodController.text,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Refund Method',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Items',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxHeight: height * 0.45),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: items.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (ctxItem, idx) {
+                              final it = items[idx];
+                              final controller = qtyControllers[idx]!;
+                              final reasonC = reasonControllers[idx]!;
+                              final unit = _unitPrice(it);
+                              final pcsInSet =
+                                  int.tryParse(
+                                    it['pcsInSet']?.toString() ?? '1',
+                                  ) ??
+                                  1;
+                              final qty = int.tryParse(controller.text) ?? 0;
+                              final itemRefund = _computeItemRefund(idx);
+
+                              return Card(
+                                elevation: 0,
+                                color: Colors.grey.shade50,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(10),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  it['name'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                if ((it['availableSizes'] ?? [])
+                                                    .isNotEmpty)
+                                                  Text(
+                                                    'Size: ${(it['availableSizes'] as List).join(", ")}',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.grey[700],
+                                                    ),
+                                                  ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  'Unit: ₹${unit.round()} ${pcsInSet > 1 ? "(per set)" : ""}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey[800],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            width: 90,
+                                            child: TextFormField(
+                                              controller: controller,
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Qty',
+                                                isDense: true,
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              onChanged: (_) =>
+                                                  setModalState(() {}),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextFormField(
+                                        controller: reasonC,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Reason',
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            'Refund: ',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey[800],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            '₹${itemRefund}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.redAccent,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: notesController,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Notes',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total Refund: ₹${_computeTotalRefund()}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: saving ? null : _submit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.indigo,
+                                  ),
+                                  child: saving
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.0,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Save Changes',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -3149,17 +4723,20 @@ class _ChallanScreenState extends State<ChallanScreen> {
                             setState(() => selectedReport = type);
                             Navigator.of(context).pop();
                             Future.delayed(Duration(milliseconds: 200), () {
-                              showModalBottomSheet(
-                                context: context,
-                                backgroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(24),
-                                  ),
-                                ),
-                                isScrollControlled: true,
-                                builder: (context) =>
-                                    _buildReportSectionReturn(),
+                              // showModalBottomSheet(
+                              //   context: context,
+                              //   backgroundColor: Colors.white,
+                              //   shape: RoundedRectangleBorder(
+                              //     borderRadius: BorderRadius.vertical(
+                              //       top: Radius.circular(24),
+                              //     ),
+                              //   ),
+                              //   isScrollControlled: true,
+                              //   builder: (context) =>
+                              //       _buildReportSectionReturn(),
+                              // );
+                              _showFullHeightReportSheet(
+                                _buildReportSectionReturn(),
                               );
                             });
                           },
@@ -3192,68 +4769,60 @@ class _ChallanScreenState extends State<ChallanScreen> {
                       ),
                     )
                   : Column(
-                      // children: reportData
-                      //     .take(10)
-                      //     .map(
-                      //       (r) => ListTile(
-                      //         leading: Icon(
-                      //           Icons.undo,
-                      //           color: Colors.orangeAccent,
-                      //         ),
-                      //         title: Text('Return #${r['returnNumber']}'),
-                      //         subtitle: Text(
-                      //           'Refund: ₹${r['totalRefund']} | Reason: ${r['reason'] ?? ''}',
-                      //         ),
-                      //         trailing: Text(
-                      //           r['customer'] ?? '',
-                      //           style: TextStyle(color: Colors.indigo),
-                      //         ),
-                      //       ),
-                      //     )
-                      //     .toList(),
-                      children: reportData.take(10).map((c) {
-                        // try parse date display
-                        final dateStr = (c['date'] ?? '').toString();
+                      children: reportData.take(10).map((r) {
+                        final dateStr = (r['date'] ?? '').toString();
                         final displayDate = dateStr.isNotEmpty
                             ? dateStr.substring(0, 10)
                             : '';
-                        // compute total qty (sum dispatchedQty/quantity fields)
                         int totalQty = 0;
-                        final items = (c['items'] as List<dynamic>?) ?? [];
+                        final items = (r['items'] as List<dynamic>?) ?? [];
                         for (var it in items) {
                           totalQty +=
                               int.tryParse(
-                                (it['dispatchedQty'] ??
-                                        it['quantity'] ??
-                                        it['returnPcs'] ??
-                                        0)
+                                (it['returnPcs'] ?? it['returnQty'] ?? 0)
                                     .toString(),
                               ) ??
                               0;
                         }
 
+                        // customer can be String or Map
+                        String customerLabel = '';
+                        final cust = r['customer'];
+                        if (cust is String && cust.isNotEmpty)
+                          customerLabel = cust;
+                        else if (cust is Map && (cust['name'] != null))
+                          customerLabel = cust['name'].toString();
+                        else {
+                          // fallback to nested customerId object
+                          final cid = r['customerId'];
+                          if (cid is Map && cid['name'] != null)
+                            customerLabel = cid['name'].toString();
+                        }
+
                         return ListTile(
                           leading: const Icon(
                             Icons.receipt_long,
-                            color: Colors.indigo,
+                            color: Colors.orangeAccent,
                           ),
-                          title: Text('Challan #${c['challanNumber']}'),
+                          title: Text(
+                            'Return #${r['returnNumber'] ?? r['_id'] ?? ''}',
+                          ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('Date: $displayDate'),
                               Text(
-                                'Value: ₹${c['totalValue']} | Status: ${c['status']}',
+                                'Refund: ₹${r['totalRefund'] ?? 0} | Status: ${r['status'] ?? ''}',
                               ),
                               Text('Total Qty: $totalQty sets/pieces'),
                             ],
                           ),
                           isThreeLine: true,
                           trailing: Text(
-                            c['customer'] ?? '',
+                            customerLabel,
                             style: const TextStyle(color: Colors.indigo),
                           ),
-                          onTap: () => _showChallanDetails(c),
+                          onTap: () => _showReturnDetails(r),
                         );
                       }).toList(),
                     ),
@@ -3263,6 +4832,174 @@ class _ChallanScreenState extends State<ChallanScreen> {
       ),
     );
   }
+
+  // Widget _buildReportSectionReturn() {
+  //   final reportData = (() {
+  //     if (selectedReport == 'Daily') {
+  //       return dailyReturns;
+  //     } else if (selectedReport == 'Monthly') {
+  //       return monthlyReturns;
+  //     } else {
+  //       return yearlyReturns;
+  //     }
+  //   })();
+
+  //   return SafeArea(
+  //     child: Padding(
+  //       padding: EdgeInsets.only(
+  //         bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+  //         left: 16,
+  //         right: 16,
+  //         top: 16,
+  //       ),
+  //       child: SingleChildScrollView(
+  //         child: Column(
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             Text(
+  //               'Return Reports',
+  //               style: TextStyle(
+  //                 fontWeight: FontWeight.bold,
+  //                 color: Colors.orangeAccent,
+  //               ),
+  //             ),
+  //             SizedBox(height: 12),
+  //             Row(
+  //               children: reportTypes
+  //                   .map(
+  //                     (type) => Padding(
+  //                       padding: const EdgeInsets.symmetric(horizontal: 4.0),
+  //                       child: ChoiceChip(
+  //                         label: Text(
+  //                           type,
+  //                           style: TextStyle(fontWeight: FontWeight.w500),
+  //                         ),
+  //                         selected: selectedReport == type,
+  //                         selectedColor: Colors.orangeAccent,
+  //                         backgroundColor: Colors.white,
+  //                         labelStyle: TextStyle(
+  //                           color: selectedReport == type
+  //                               ? Colors.white
+  //                               : Colors.black,
+  //                         ),
+  //                         onSelected: (_) {
+  //                           setState(() => selectedReport = type);
+  //                           Navigator.of(context).pop();
+  //                           Future.delayed(Duration(milliseconds: 200), () {
+  //                             showModalBottomSheet(
+  //                               context: context,
+  //                               backgroundColor: Colors.white,
+  //                               shape: RoundedRectangleBorder(
+  //                                 borderRadius: BorderRadius.vertical(
+  //                                   top: Radius.circular(24),
+  //                                 ),
+  //                               ),
+  //                               isScrollControlled: true,
+  //                               builder: (context) =>
+  //                                   _buildReportSectionReturn(),
+  //                             );
+  //                           });
+  //                         },
+  //                       ),
+  //                     ),
+  //                   )
+  //                   .toList(),
+  //             ),
+  //             SizedBox(height: 16),
+  //             Text(
+  //               '$selectedReport Return Report',
+  //               style: TextStyle(
+  //                 fontWeight: FontWeight.bold,
+  //                 color: Colors.orangeAccent,
+  //               ),
+  //             ),
+  //             SizedBox(height: 8),
+  //             reportData.isEmpty
+  //                 ? Center(
+  //                     child: Padding(
+  //                       padding: const EdgeInsets.symmetric(vertical: 32.0),
+  //                       child: Text(
+  //                         "No data to show for this section",
+  //                         style: TextStyle(
+  //                           color: Colors.grey,
+  //                           fontWeight: FontWeight.w500,
+  //                           fontSize: 16,
+  //                         ),
+  //                       ),
+  //                     ),
+  //                   )
+  //                 : Column(
+  //                     // children: reportData
+  //                     //     .take(10)
+  //                     //     .map(
+  //                     //       (r) => ListTile(
+  //                     //         leading: Icon(
+  //                     //           Icons.undo,
+  //                     //           color: Colors.orangeAccent,
+  //                     //         ),
+  //                     //         title: Text('Return #${r['returnNumber']}'),
+  //                     //         subtitle: Text(
+  //                     //           'Refund: ₹${r['totalRefund']} | Reason: ${r['reason'] ?? ''}',
+  //                     //         ),
+  //                     //         trailing: Text(
+  //                     //           r['customer'] ?? '',
+  //                     //           style: TextStyle(color: Colors.indigo),
+  //                     //         ),
+  //                     //       ),
+  //                     //     )
+  //                     //     .toList(),
+  //                     children: reportData.take(10).map((c) {
+  //                       // try parse date display
+  //                       final dateStr = (c['date'] ?? '').toString();
+  //                       final displayDate = dateStr.isNotEmpty
+  //                           ? dateStr.substring(0, 10)
+  //                           : '';
+  //                       // compute total qty (sum dispatchedQty/quantity fields)
+  //                       int totalQty = 0;
+  //                       final items = (c['items'] as List<dynamic>?) ?? [];
+  //                       for (var it in items) {
+  //                         totalQty +=
+  //                             int.tryParse(
+  //                               (it['dispatchedQty'] ??
+  //                                       it['quantity'] ??
+  //                                       it['returnPcs'] ??
+  //                                       0)
+  //                                   .toString(),
+  //                             ) ??
+  //                             0;
+  //                       }
+
+  //                       return ListTile(
+  //                         leading: const Icon(
+  //                           Icons.receipt_long,
+  //                           color: Colors.indigo,
+  //                         ),
+  //                         title: Text('Challan #${c['challanNumber']}'),
+  //                         subtitle: Column(
+  //                           crossAxisAlignment: CrossAxisAlignment.start,
+  //                           children: [
+  //                             Text('Date: $displayDate'),
+  //                             Text(
+  //                               'Value: ₹${c['totalValue']} | Status: ${c['status']}',
+  //                             ),
+  //                             Text('Total Qty: $totalQty sets/pieces'),
+  //                           ],
+  //                         ),
+  //                         isThreeLine: true,
+  //                         trailing: Text(
+  //                           c['customer'] ?? '',
+  //                           style: const TextStyle(color: Colors.indigo),
+  //                         ),
+  //                         onTap: () => _showChallanDetails(c),
+  //                       );
+  //                     }).toList(),
+  //                   ),
+  //           ],
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   // show detailed challan in modal with full items and total qty
   void _showChallanDetails(Map<String, dynamic> challan) {
@@ -3711,20 +5448,70 @@ class _ChallanScreenState extends State<ChallanScreen> {
                         ),
                         elevation: 2,
                       ),
-                      onPressed: () {
-                        showModalBottomSheet(
-                          context: context,
-                          backgroundColor: Colors.white,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(24),
-                            ),
-                          ),
-                          isScrollControlled: true,
-                          builder: (context) => _currentPage == 0
+                      onPressed: () async {
+                        // determine live page from controller (fallback to _currentPage)
+                        final pageIndex = _pageController.hasClients
+                            ? (_pageController.page?.round() ?? _currentPage)
+                            : _currentPage;
+
+                        // ensure data for the selected page is loaded
+                        if (pageIndex == 1) {
+                          final ok = await fetchReturns();
+                          if (!ok) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Failed to load returns. Check network and try again.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                        } else {
+                          await fetchChallans();
+                        }
+
+                        // open full-height report sheet
+                        _showFullHeightReportSheet(
+                          pageIndex == 0
                               ? _buildReportSectionChallan()
                               : _buildReportSectionReturn(),
                         );
+
+                        // showModalBottomSheet(
+                        //   context: context,
+                        //   backgroundColor: Colors.white,
+                        //   shape: const RoundedRectangleBorder(
+                        //     borderRadius: BorderRadius.vertical(
+                        //       top: Radius.circular(24),
+                        //     ),
+                        //   ),
+                        //   isScrollControlled: true,
+                        //   builder: (context) => pageIndex == 0
+                        //       ? _buildReportSectionChallan()
+                        //       : _buildReportSectionReturn(),
+                        // );
+
+                        // // ensure data for the selected page is loaded
+                        // if (pageIndex == 1) {
+                        //   await fetchReturns();
+                        // } else {
+                        //   await fetchChallans();
+                        // }
+
+                        // showModalBottomSheet(
+                        //   context: context,
+                        //   backgroundColor: Colors.white,
+                        //   shape: const RoundedRectangleBorder(
+                        //     borderRadius: BorderRadius.vertical(
+                        //       top: Radius.circular(24),
+                        //     ),
+                        //   ),
+                        //   isScrollControlled: true,
+                        //   builder: (context) => pageIndex == 0
+                        //       ? _buildReportSectionChallan()
+                        //       : _buildReportSectionReturn(),
+                        // );
                       },
                     ),
                   ),
@@ -3937,7 +5724,622 @@ class _ChallanScreenState extends State<ChallanScreen> {
     );
   }
 
+  Future<void> _pickAndUploadLR(Map<String, dynamic> challan) async {
+    final id =
+        (challan['_id'] ??
+                challan['challanId'] ??
+                challan['challanNumber']?.toString() ??
+                '')
+            .toString();
+    // choose image source
+    final source = await showModalBottomSheet<ImageSource?>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.of(ctx).pop(null),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final picked = await _picker.pickImage(source: source, imageQuality: 80);
+    if (picked == null) return;
+
+    final file = File(picked.path);
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Uploading LR...')));
+
+    try {
+      final resp = await AppDataRepo().uploadChallanSlip(
+        file: file,
+        challanId: id,
+      );
+
+      try {
+        debugPrint('uploadChallanSlip response: ${jsonEncode(resp)}');
+      } catch (_) {
+        debugPrint('uploadChallanSlip response (toString): $resp');
+      }
+
+      if (resp['success'] == true && resp['url'] != null) {
+        setState(() {
+          challanLrUrls[id] = resp['url'].toString();
+          // also update the local challan object so detail view sees it
+          challan['biltiSlip'] = resp['url'].toString();
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('LR uploaded')));
+      } else {
+        final msg = resp['message']?.toString() ?? 'Upload failed';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e, st) {
+      debugPrint('Error uploading LR: $e\n$st');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error uploading: $e')));
+    }
+  }
+
+  Future<void> _viewLrUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cannot open URL')));
+    }
+  }
+
+  Future<void> _showLrPreview(String url) async {
+    if (url.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(12),
+          backgroundColor: Colors.black,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Top bar with close + external/open + download buttons
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 6.0,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.open_in_new, color: Colors.white),
+                      onPressed: () => _viewLrUrl(url),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.download, color: Colors.white),
+                      onPressed: () => _downloadLr(url),
+                    ),
+                  ],
+                ),
+              ),
+              // Image preview with pinch/zoom
+              Flexible(
+                child: InteractiveViewer(
+                  maxScale: 5.0,
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.75,
+                      maxWidth: MediaQuery.of(context).size.width * 0.95,
+                    ),
+                    color: Colors.black,
+                    child: Center(
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return SizedBox(
+                            height: 120,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: progress.expectedTotalBytes != null
+                                    ? progress.cumulativeBytesLoaded /
+                                          (progress.expectedTotalBytes ?? 1)
+                                    : null,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, err, st) {
+                          return const Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Text(
+                              'Failed to load image',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _downloadLr(String url) async {
+    if (url.isEmpty) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Downloading LR...')));
+
+    try {
+      // Request Android storage permissions when needed
+      if (Platform.isAndroid) {
+        if (!await Permission.storage.isGranted) {
+          final p = await Permission.storage.request();
+          debugPrint('Permission.storage => ${p.isGranted}');
+        }
+        if (!await Permission.manageExternalStorage.isGranted) {
+          final p2 = await Permission.manageExternalStorage.request();
+          debugPrint('Permission.manageExternalStorage => ${p2.isGranted}');
+        }
+      }
+
+      final resp = await http.get(Uri.parse(url));
+      if (resp.statusCode != 200)
+        throw Exception('Download failed: ${resp.statusCode}');
+      final bytes = resp.bodyBytes;
+
+      // Determine Downloads directory (prefer /storage/emulated/0/Download or /storage/emulated/0/Downloads)
+      String? targetPath;
+      if (Platform.isAndroid) {
+        final candidates = [
+          '/storage/emulated/0/Download',
+          '/storage/emulated/0/Downloads',
+        ];
+        for (var cand in candidates) {
+          try {
+            final d = Directory(cand);
+            if (!await d.exists()) await d.create(recursive: true);
+            // writable test
+            final testFile = File(p.join(d.path, '.write_test'));
+            await testFile.writeAsBytes([0]);
+            await testFile.delete();
+            targetPath = d.path;
+            break;
+          } catch (_) {
+            targetPath ??= null;
+          }
+        }
+      } else if (Platform.isIOS) {
+        targetPath = (await getApplicationDocumentsDirectory()).path;
+      } else {
+        final dl = await getDownloadsDirectory();
+        targetPath =
+            dl?.path ?? (await getApplicationDocumentsDirectory()).path;
+      }
+
+      // fallback to external/app directory if needed
+      if (targetPath == null) {
+        final fallback = Platform.isAndroid
+            ? (await getExternalStorageDirectory())?.path ??
+                  (await getApplicationDocumentsDirectory()).path
+            : (await getApplicationDocumentsDirectory()).path;
+        targetPath = fallback;
+      }
+
+      if (targetPath == null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Unable to determine save directory')),
+          );
+        return;
+      }
+
+      final fileNameCandidate = p.basename(Uri.parse(url).path);
+      final safeName = fileNameCandidate.isNotEmpty
+          ? fileNameCandidate
+          : 'bilti_${DateTime.now().millisecondsSinceEpoch}.png';
+      final filePath = p.join(targetPath, safeName);
+
+      try {
+        final file = File(filePath);
+        await file.writeAsBytes(bytes, flush: true);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text('LR saved to: $filePath')));
+        await _showSavedNotification(filePath);
+        debugPrint('LR downloaded to: $filePath');
+        return;
+      } on FileSystemException catch (fsErr) {
+        debugPrint('Write to Download folder failed: $fsErr');
+        // fallback to app-specific directory
+        String? fallbackDir;
+        if (Platform.isAndroid) {
+          fallbackDir =
+              (await getExternalStorageDirectory())?.path ??
+              (await getApplicationDocumentsDirectory()).path;
+        } else {
+          fallbackDir = (await getApplicationDocumentsDirectory()).path;
+        }
+        if (fallbackDir == null) throw fsErr;
+        final fallbackPath = p.join(fallbackDir, safeName);
+        final file2 = File(fallbackPath);
+        await file2.writeAsBytes(bytes, flush: true);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(content: Text('LR saved to app folder: $fallbackPath')),
+          );
+        await _showSavedNotification(fallbackPath);
+        debugPrint('LR downloaded to app folder: $fallbackPath');
+        return;
+      }
+    } catch (e, st) {
+      debugPrint('Error downloading LR: $e\n$st');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Download failed: $e')));
+    }
+  }
+
+  void _removeLr(Map<String, dynamic> challan) async {
+    final id =
+        (challan['_id'] ??
+                challan['challanId'] ??
+                challan['challanNumber']?.toString() ??
+                '')
+            .toString();
+
+    // optimistic UI: show progress snackbar
+    final removingSnack = ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Removing LR...')));
+
+    try {
+      final resp = await AppDataRepo().removeChallanSlip(challanId: id);
+
+      try {
+        debugPrint('removeChallanSlip response: ${jsonEncode(resp)}');
+      } catch (_) {
+        debugPrint('removeChallanSlip response (toString): $resp');
+      }
+
+      if (resp['success'] == true) {
+        setState(() {
+          challanLrUrls.remove(id);
+          // also remove keys set on local challan object if present
+          challan.remove('biltiSlip');
+          challan.remove('biltiSlipUrl');
+        });
+
+        // replace removing snackbar with success
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(resp['message']?.toString() ?? 'LR removed'),
+            ),
+          );
+      } else {
+        final msg = resp['message']?.toString() ?? 'Failed to remove LR';
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e, st) {
+      debugPrint('Error removing LR: $e\n$st');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Error removing LR: $e')));
+    }
+  }
+
+  Future<Uint8List> _buildReturnPdfData(Map<String, dynamic> ret) async {
+    final pdf = pw.Document();
+    final pw.Font noto = await PdfGoogleFonts.notoSansRegular();
+
+    double _toDouble(dynamic v) {
+      if (v == null) return 0.0;
+      if (v is num) return v.toDouble();
+      return double.tryParse(v.toString()) ?? 0.0;
+    }
+
+    final items = List<Map<String, dynamic>>.from(ret['items'] ?? []);
+    final customer = ret['customer'] is Map
+        ? (ret['customer']['name'] ?? '')
+        : (ret['customer']?.toString() ?? '');
+    final returnNumber = ret['returnNumber']?.toString() ?? '';
+    final dateStr = (ret['date'] ?? '').toString();
+    final displayDate = dateStr.isNotEmpty ? dateStr.substring(0, 10) : '';
+    final refundMethod = ret['refundMethod']?.toString() ?? '';
+    final totalRefund = _toDouble(ret['totalRefund'] ?? 0).round();
+
+    final baseStyle = pw.TextStyle(font: noto, fontSize: 11);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) {
+          return pw.DefaultTextStyle(
+            style: baseStyle,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'RETURN NOTE',
+                          style: baseStyle.copyWith(
+                            fontSize: 18,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 6),
+                        pw.Text('Return # $returnNumber', style: baseStyle),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text('Date: $displayDate'),
+                        pw.Text('Refund Method: $refundMethod'),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 12),
+                pw.Text(
+                  'Customer: $customer',
+                  style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  'Items:',
+                  style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 6),
+                pw.Table.fromTextArray(
+                  headers: ['Name', 'Qty', 'PCS/SET', 'Refund'],
+                  data: items.map((it) {
+                    final name = it['name']?.toString() ?? '';
+                    final qty = (it['returnPcs'] ?? it['returnQty'] ?? 0)
+                        .toString();
+                    final pcs = it['pcsInSet']?.toString() ?? '';
+                    final refund = (it['refundAmount'] ?? '').toString();
+                    return [name, qty, pcs, '₹$refund'];
+                  }).toList(),
+                  headerStyle: baseStyle.copyWith(
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                  cellStyle: baseStyle,
+                  headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+                  cellAlignment: pw.Alignment.centerLeft,
+                ),
+                pw.Spacer(),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.end,
+                  children: [
+                    pw.Text(
+                      'Total Refund: ',
+                      style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.SizedBox(width: 6),
+                    pw.Text(
+                      '₹$totalRefund',
+                      style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+                pw.Align(
+                  alignment: pw.Alignment.bottomRight,
+                  child: pw.Text(
+                    'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
+                    style: baseStyle.copyWith(
+                      fontSize: 9,
+                      color: PdfColors.grey,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  Future<void> _downloadReturnPdf(Map<String, dynamic> ret) async {
+    try {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
+      final bytes = await _buildReturnPdfData(ret);
+
+      // prefer public download folder on Android
+      String? downloadsPath;
+      if (Platform.isAndroid) {
+        final candidates = [
+          '/storage/emulated/0/Download',
+          '/storage/emulated/0/Downloads',
+        ];
+        for (var cand in candidates) {
+          try {
+            final d = Directory(cand);
+            if (!await d.exists()) await d.create(recursive: true);
+            final testFile = File(p.join(d.path, '.write_test'));
+            await testFile.writeAsBytes([0]);
+            await testFile.delete();
+            downloadsPath = d.path;
+            break;
+          } catch (_) {
+            downloadsPath ??= null;
+          }
+        }
+      } else if (Platform.isIOS) {
+        downloadsPath = (await getApplicationDocumentsDirectory()).path;
+      } else {
+        final dl = await getDownloadsDirectory();
+        downloadsPath =
+            dl?.path ?? (await getApplicationDocumentsDirectory()).path;
+      }
+
+      if (downloadsPath == null) {
+        final fallback = Platform.isAndroid
+            ? (await getExternalStorageDirectory())?.path
+            : (await getApplicationDocumentsDirectory()).path;
+        downloadsPath = fallback;
+      }
+
+      if (downloadsPath == null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Unable to determine save directory')),
+          );
+        return;
+      }
+
+      final nameBase = (ret['returnNumber'] ?? 'return').toString().replaceAll(
+        RegExp(r'[^A-Za-z0-9\-_]'),
+        '_',
+      );
+      final filename =
+          '${nameBase}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final pathFile = p.join(downloadsPath, filename);
+
+      try {
+        final file = File(pathFile);
+        await file.writeAsBytes(bytes, flush: true);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text('Saved PDF: $pathFile')));
+        await _showSavedNotification(pathFile);
+      } on FileSystemException catch (fsErr) {
+        debugPrint('Write to Download folder failed: $fsErr');
+        final fallbackDir = Platform.isAndroid
+            ? (await getExternalStorageDirectory())?.path
+            : (await getApplicationDocumentsDirectory()).path;
+        if (fallbackDir == null) throw fsErr;
+        final fallbackPath = p.join(fallbackDir, filename);
+        final file2 = File(fallbackPath);
+        await file2.writeAsBytes(bytes, flush: true);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(content: Text('Saved PDF to app folder: $fallbackPath')),
+          );
+        await _showSavedNotification(fallbackPath);
+      }
+    } catch (e, st) {
+      debugPrint('Error saving return pdf: $e\n$st');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Failed to save PDF: $e')));
+    }
+  }
+
+  Future<void> _shareReturnPdf(Map<String, dynamic> ret) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preparing PDF for sharing...')),
+      );
+      final bytes = await _buildReturnPdfData(ret);
+      final tmpDir = await getTemporaryDirectory();
+      final nameBase = (ret['returnNumber'] ?? 'return').toString().replaceAll(
+        RegExp(r'[^A-Za-z0-9\-_]'),
+        '_',
+      );
+      final tmpPath = p.join(
+        tmpDir.path,
+        '${nameBase}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+      final tmpFile = File(tmpPath);
+      await tmpFile.writeAsBytes(bytes);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      try {
+        await Share.shareXFiles([
+          XFile(tmpFile.path),
+        ], text: 'Return ${ret['returnNumber'] ?? ''}');
+      } on MissingPluginException catch (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Share plugin not registered. Do a full rebuild (flutter clean && flutter pub get && flutter run)',
+            ),
+          ),
+        );
+      }
+    } catch (e, st) {
+      debugPrint('Error sharing return pdf: $e\n$st');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Failed to prepare share: $e')));
+    }
+  }
+
   Widget _buildChallanCard(Map<String, dynamic> c) {
+    final id = (c['_id'] ?? c['challanNumber']?.toString() ?? '').toString();
+    final isExpanded = expandedChallanIds.contains(id);
+    final lrUrl =
+        challanLrUrls[id] ??
+        (c['biltiSlipUrl']?.toString()) ??
+        (c['biltiSlip']?.toString());
+    // compute total pieces: sum of (qty * pcsInSet) for each item
+    final itemsList = List<Map<String, dynamic>>.from(c['items'] ?? []);
+    int totalPieces = 0;
+    for (var it in itemsList) {
+      final qty =
+          int.tryParse(
+            (it['dispatchedQty'] ?? it['quantity'] ?? 0).toString(),
+          ) ??
+          0;
+      final pcsInSet = int.tryParse(it['pcsInSet']?.toString() ?? '1') ?? 1;
+      totalPieces += qty * pcsInSet;
+    }
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -3948,6 +6350,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header rows (unchanged)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -3955,7 +6358,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
                   '#${c['challanNumber']}',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
-
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
@@ -3982,6 +6384,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
             ),
             Text('Customer: ${c['customer']}', style: TextStyle(fontSize: 11)),
             Text('Order: ${c['orderNumber']}', style: TextStyle(fontSize: 11)),
+
             Row(
               children: [
                 Text('Value: ', style: TextStyle(fontSize: 11)),
@@ -3995,17 +6398,283 @@ class _ChallanScreenState extends State<ChallanScreen> {
                 ),
               ],
             ),
+            // show total pieces below value
+            Padding(
+              padding: const EdgeInsets.only(top: 2.0),
+              child: Text(
+                'Total Pieces: $totalPieces',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
             Text('Vendor: ${c['vendor']}', style: TextStyle(fontSize: 11)),
-
             if (c['notes'] != null && c['notes'].toString().isNotEmpty)
               Text('Notes: ${c['notes']}', style: TextStyle(fontSize: 10)),
+            // Collapsible items section
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                key: ValueKey('challan_items_$id'),
+                initiallyExpanded: isExpanded,
+                onExpansionChanged: (open) {
+                  setState(() {
+                    if (open)
+                      expandedChallanIds.add(id);
+                    else
+                      expandedChallanIds.remove(id);
+                  });
+                },
+                tilePadding: EdgeInsets.zero,
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Items:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    // show count on right
+                    Text(
+                      '${(c['items'] as List<dynamic>?)?.length ?? 0}',
+                      style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                    ),
+                  ],
+                ),
+                trailing: Icon(
+                  isExpanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  color: Colors.grey[700],
+                ),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: List<Widget>.from(
+                        (c['items'] ?? []).map((item) {
+                          final name = item['name'] ?? '';
+                          final qty =
+                              (item['dispatchedQty'] ?? item['quantity'] ?? 0)
+                                  .toString();
+                          final pcsInSet = item['pcsInSet']?.toString() ?? '';
+                          final price = item['price']?.toString() ?? '';
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: Text(
+                              '- $name | Qty: $qty${pcsInSet.isNotEmpty ? " • PCS/SET:$pcsInSet" : ""}${price.isNotEmpty ? " • Price: ₹$price" : ""}',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
             Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.indigo),
+                // LR actions (single chip + popup menu). If no LR -> LR chip uploads.
+                if (lrUrl != null && lrUrl.isNotEmpty) ...[
+                  PopupMenuButton<String>(
+                    onSelected: (val) {
+                      if (val == 'view') {
+                        _showLrPreview(lrUrl);
+                      } else if (val == 'download') {
+                        _downloadLr(lrUrl);
+                      } else if (val == 'remove') {
+                        _removeLr(c);
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'view',
+                        child: Row(
+                          children: const [
+                            Icon(
+                              Icons.visibility,
+                              size: 18,
+                              color: Colors.black54,
+                            ),
+                            SizedBox(width: 8),
+                            Text('View'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'download',
+                        child: Row(
+                          children: const [
+                            Icon(
+                              Icons.download,
+                              size: 18,
+                              color: Colors.black54,
+                            ),
+                            SizedBox(width: 8),
+                            Text('Download'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'remove',
+                        child: Row(
+                          children: const [
+                            Icon(
+                              Icons.delete,
+                              size: 18,
+                              color: Colors.redAccent,
+                            ),
+                            SizedBox(width: 8),
+                            Text('Remove'),
+                          ],
+                        ),
+                      ),
+                    ],
+                    child: Chip(
+                      avatar: const Icon(
+                        Icons.attach_file,
+                        size: 18,
+                        color: Colors.indigo,
+                      ),
+                      label: const Text('LR'),
+                      backgroundColor: Colors.indigo.shade50,
+                    ),
+                  ),
+                ] else ...[
+                  ActionChip(
+                    avatar: const Icon(Icons.upload_file, size: 18),
+                    label: const Text('LR'),
+                    onPressed: () => _pickAndUploadLR(c),
+                    backgroundColor: Colors.indigo.shade50,
+                  ),
+                ],
+
+                const SizedBox(width: 8),
+                ActionChip(
+                  avatar: const Icon(Icons.edit, size: 18),
+                  label: const Text('Edit'),
                   onPressed: () => _editChallan(c),
-                  tooltip: 'Edit Challan',
+                  backgroundColor: Colors.green.shade50,
+                ),
+                const SizedBox(width: 8),
+                PopupMenuButton<String>(
+                  onSelected: (val) async {
+                    if (val == 'download') {
+                      await _downloadChallanPdf(c);
+                    } else if (val == 'share') {
+                      await _shareChallanPdf(c);
+                    }
+                  },
+                  itemBuilder: (ctx) => const [
+                    PopupMenuItem(
+                      value: 'download',
+                      child: Text('Download PDF'),
+                    ),
+                    PopupMenuItem(value: 'share', child: Text('Share PDF')),
+                  ],
+                  child: Chip(
+                    avatar: const Icon(Icons.picture_as_pdf, size: 18),
+                    label: const Text('PDF'),
+                    backgroundColor: Colors.orange.shade50,
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+                // Delete challan button (confirmation + API call)
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete_forever,
+                    color: Colors.redAccent,
+                  ),
+                  tooltip: 'Delete Challan',
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (dctx) => AlertDialog(
+                        title: const Text('Delete Challan'),
+                        content: Text(
+                          'Are you sure you want to delete challan #${c['challanNumber'] ?? c['_id'] ?? ''}?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(true),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm != true) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Deleting challan...')),
+                    );
+                    try {
+                      final idToDelete = (c['_id'] ?? '').toString();
+                      final resp = await AppDataRepo().deleteChallan(
+                        id: idToDelete,
+                      );
+                      try {
+                        debugPrint(
+                          'deleteChallan response: ${jsonEncode(resp)}',
+                        );
+                      } catch (_) {}
+                      if (resp['success'] == true) {
+                        setState(() {
+                          challans.removeWhere(
+                            (el) => (el['_id'] ?? '') == idToDelete,
+                          );
+                        });
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                resp['message']?.toString() ??
+                                    'Challan deleted',
+                              ),
+                            ),
+                          );
+                      } else {
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                resp['message']?.toString() ??
+                                    'Failed to delete challan',
+                              ),
+                            ),
+                          );
+                        // Optionally refresh
+                        await fetchChallans();
+                      }
+                    } catch (e, st) {
+                      debugPrint('Error deleting challan: $e\n$st');
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          SnackBar(content: Text('Error deleting challan: $e')),
+                        );
+                      await fetchChallans();
+                    }
+                  },
                 ),
               ],
             ),
@@ -4016,97 +6685,170 @@ class _ChallanScreenState extends State<ChallanScreen> {
   }
 
   Widget _buildReturnCard(Map<String, dynamic> r) {
+    final id = (r['_id'] ?? r['returnNumber']?.toString() ?? '').toString();
+    final isExpanded = expandedReturnIds.contains(id);
+
+    // Compute total pieces
+    final returnItems = List<Map<String, dynamic>>.from(r['items'] ?? []);
+    int returnTotalPieces = 0;
+    for (var it in returnItems) {
+      final qty =
+          int.tryParse((it['returnPcs'] ?? it['returnQty'] ?? 0).toString()) ??
+          0;
+      final pcsInSet = int.tryParse(it['pcsInSet']?.toString() ?? '1') ?? 1;
+      returnTotalPieces += qty * pcsInSet;
+    }
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: Colors.white,
-      margin: EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Return #${r['returnNumber']}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
+            // Header row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Return #${r['returnNumber']}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Date: ${r['date']?.toString().substring(0, 10) ?? ''}',
-                    style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                  Text(
-                    'Customer: ${r['customer']}',
-                    style: TextStyle(fontSize: 13),
+                  decoration: BoxDecoration(
+                    color: r['status'] == 'Pending'
+                        ? Colors.yellow.shade100
+                        : r['status'] == 'Approved'
+                        ? Colors.green.shade100
+                        : r['status'] == 'Rejected'
+                        ? Colors.red.shade100
+                        : Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  Text(
-                    'Refund Method: ${r['refundMethod']}',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                  Row(
-                    children: [
-                      Text('Refund: ', style: TextStyle(fontSize: 13)),
-                      Text(
-                        '₹${r['totalRefund']}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.redAccent,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: r['status'] == 'Pending'
-                              ? Colors.yellow.shade100
-                              : r['status'] == 'Approved'
-                              ? Colors.green.shade100
-                              : r['status'] == 'Rejected'
-                              ? Colors.red.shade100
-                              : Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          r['status'],
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (r['notes'] != null && r['notes'].toString().isNotEmpty)
-                    Text(
-                      'Notes: ${r['notes']}',
-                      style: TextStyle(fontSize: 12),
+                  child: Text(
+                    r['status'],
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
                     ),
-                  SizedBox(height: 8),
-                  Text('Items:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ...List<Widget>.from(
-                    (r['items'] ?? []).map(
-                      (item) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
-                        child: Text(
-                          '- ${item['name']} | Return Pcs: ${item['returnPcs'] ?? item['returnQty'] ?? ''} | Reason: ${item['reason'] ?? ''} | Refund: ₹${item['refundAmount'] ?? ''}',
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 4),
+            Text(
+              'Date: ${r['date']?.toString().substring(0, 10) ?? ''}',
+              style: TextStyle(color: Colors.grey[700], fontSize: 11),
+            ),
+            Text(
+              'Customer: ${r['customer']}',
+              style: const TextStyle(fontSize: 11),
+            ),
+            Text(
+              'Refund Method: ${r['refundMethod']}',
+              style: const TextStyle(fontSize: 11),
+            ),
+            Row(
+              children: [
+                const Text('Refund: ', style: TextStyle(fontSize: 11)),
+                Text(
+                  '₹${r['totalRefund']}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.redAccent,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                'Total Pieces: $returnTotalPieces',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+
+            if (r['notes'] != null && r['notes'].toString().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text(
+                  'Notes: ${r['notes']}',
+                  style: const TextStyle(fontSize: 11),
+                ),
+              ),
+
+            const SizedBox(height: 6),
+
+            // Collapsible items
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                key: ValueKey('return_items_$id'),
+                initiallyExpanded: isExpanded,
+                onExpansionChanged: (open) {
+                  setState(() {
+                    if (open) {
+                      expandedReturnIds.add(id);
+                    } else {
+                      expandedReturnIds.remove(id);
+                    }
+                  });
+                },
+                tilePadding: EdgeInsets.zero,
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Items:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      '${(r['items'] as List<dynamic>?)?.length ?? 0}',
+                      style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                    ),
+                  ],
+                ),
+                trailing: Icon(
+                  isExpanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  color: Colors.grey[700],
+                ),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: List<Widget>.from(
+                        (r['items'] ?? []).map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0),
+                            child: Text(
+                              '- ${item['name']} | Return Pcs: ${item['returnPcs'] ?? item['returnQty'] ?? ''} | Reason: ${item['reason'] ?? ''} | Refund: ₹${item['refundAmount'] ?? ''}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -4114,12 +6856,138 @@ class _ChallanScreenState extends State<ChallanScreen> {
                 ],
               ),
             ),
-            Column(
+
+            const SizedBox(height: 8),
+
+            // Action chips row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.redAccent),
+                ActionChip(
+                  label: const Text('Edit', style: TextStyle(fontSize: 11)),
+                  backgroundColor: Colors.blue.shade50,
                   onPressed: () => _editReturn(r),
-                  tooltip: 'Edit Return',
+                  avatar: const Icon(Icons.edit, size: 14, color: Colors.blue),
+                ),
+                const SizedBox(width: 8),
+                // ActionChip(
+                //   label: const Text('Print', style: TextStyle(fontSize: 11)),
+                //   backgroundColor: Colors.grey.shade100,
+                //   onPressed: () {},
+                //   avatar: const Icon(
+                //     Icons.print,
+                //     size: 14,
+                //     color: Colors.black54,
+                //   ),
+                // ),
+                PopupMenuButton<String>(
+                  onSelected: (val) async {
+                    if (val == 'download') {
+                      await _downloadReturnPdf(r);
+                    } else if (val == 'share') {
+                      await _shareReturnPdf(r);
+                    }
+                  },
+                  itemBuilder: (ctx) => const [
+                    PopupMenuItem(
+                      value: 'download',
+                      child: Text('Download PDF'),
+                    ),
+                    PopupMenuItem(value: 'share', child: Text('Share PDF')),
+                  ],
+                  child: Chip(
+                    avatar: const Icon(
+                      Icons.print,
+                      size: 14,
+                      color: Colors.black54,
+                    ),
+                    label: const Text('Print', style: TextStyle(fontSize: 11)),
+                    backgroundColor: Colors.grey.shade100,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete_forever,
+                    color: Colors.redAccent,
+                  ),
+                  tooltip: 'Delete Return',
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (dctx) => AlertDialog(
+                        title: const Text('Delete Return'),
+                        content: Text(
+                          'Are you sure you want to delete return #${r['returnNumber'] ?? r['_id'] ?? ''}?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(true),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm != true) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Deleting return...')),
+                    );
+                    try {
+                      final idToDelete = (r['_id'] ?? '').toString();
+                      final resp = await AppDataRepo().deleteReturn(
+                        id: idToDelete,
+                      );
+                      try {
+                        debugPrint(
+                          'deleteReturn response: ${jsonEncode(resp)}',
+                        );
+                      } catch (_) {}
+                      if (resp['success'] == true) {
+                        setState(() {
+                          returns.removeWhere(
+                            (el) => (el['_id'] ?? '') == idToDelete,
+                          );
+                        });
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                resp['message']?.toString() ?? 'Return deleted',
+                              ),
+                            ),
+                          );
+                      } else {
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                resp['message']?.toString() ??
+                                    'Failed to delete return',
+                              ),
+                            ),
+                          );
+                        await fetchReturns();
+                      }
+                    } catch (e, st) {
+                      debugPrint('Error deleting return: $e\n$st');
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          SnackBar(content: Text('Error deleting return: $e')),
+                        );
+                      await fetchReturns();
+                    }
+                  },
                 ),
               ],
             ),
@@ -4184,17 +7052,20 @@ class _ChallanScreenState extends State<ChallanScreen> {
                             setState(() => selectedReport = type);
                             Navigator.of(context).pop();
                             Future.delayed(Duration(milliseconds: 200), () {
-                              showModalBottomSheet(
-                                context: context,
-                                backgroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(24),
-                                  ),
-                                ),
-                                isScrollControlled: true,
-                                builder: (context) =>
-                                    _buildReportSectionChallan(),
+                              // showModalBottomSheet(
+                              //   context: context,
+                              //   backgroundColor: Colors.white,
+                              //   shape: RoundedRectangleBorder(
+                              //     borderRadius: BorderRadius.vertical(
+                              //       top: Radius.circular(24),
+                              //     ),
+                              //   ),
+                              //   isScrollControlled: true,
+                              //   builder: (context) =>
+                              //       _buildReportSectionChallan(),
+                              // );
+                              _showFullHeightReportSheet(
+                                _buildReportSectionChallan(),
                               );
                             });
                           },

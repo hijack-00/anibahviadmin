@@ -74,8 +74,9 @@ class _CataloguePageState extends State<CataloguePage> {
           }
 
           if (_allProducts.isEmpty) {
-            _allProducts = snapshot.data ?? [];
-            _filteredProducts = _allProducts;
+            final data = snapshot.data ?? [];
+            _allProducts = data.reversed.toList();
+            _filteredProducts = List.from(_allProducts);
           }
 
           return Column(

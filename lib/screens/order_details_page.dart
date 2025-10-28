@@ -600,15 +600,15 @@ class OrderDetailsPage extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(height: 18),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(
-                  'Delete Order',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
+              SizedBox(height: 40),
+              // ElevatedButton(
+              //   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              //   onPressed: () => Navigator.of(context).pop(true),
+              //   child: Text(
+              //     'Delete Order',
+              //     style: TextStyle(color: Colors.white),
+              //   ),
+              // ),
             ],
           ),
         ),

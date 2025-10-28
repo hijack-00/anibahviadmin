@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/product.dart';
+import 'package:path/path.dart' as p;
 
 class ApiService {
   Future<Map<String, dynamic>> fetchChallansWithPagination({
@@ -12,6 +13,111 @@ class ApiService {
         "$baseUrl/challan/get-all-challans-with-pagination?page=$page&limit=$limit";
     final response = await http.get(Uri.parse(url), headers: defaultHeaders);
     return jsonDecode(response.body);
+  }
+
+  Future<Map<String, dynamic>> updateChallan({
+    required String id,
+    required Map<String, dynamic> data,
+  }) async {
+    final url = '$baseUrl/challan/update-challan/$id';
+    final body = jsonEncode({'data': data});
+    final resp = await http.post(
+      Uri.parse(url),
+      headers: {...defaultHeaders, 'Content-Type': 'application/json'},
+      body: body,
+    );
+    try {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    } catch (_) {
+      return {
+        'success': resp.statusCode >= 200 && resp.statusCode < 300,
+        'message': resp.body,
+        'statusCode': resp.statusCode,
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteReturn({required String id}) async {
+    final url = '$baseUrl/return/delete-return/$id';
+    try {
+      final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateReturn({
+    required String id,
+    required Map<String, dynamic> data,
+  }) async {
+    final url = '$baseUrl/return/update-return/$id';
+    final body = jsonEncode({'data': data});
+    try {
+      final resp = await http.post(
+        Uri.parse(url),
+        headers: {...defaultHeaders, 'Content-Type': 'application/json'},
+        body: body,
+      );
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteChallan({required String id}) async {
+    final url = '$baseUrl/challan/delete-challan/$id';
+    try {
+      final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Remove bilti slip for a challan (POST JSON body { "challanId": "<id>" })
+  Future<Map<String, dynamic>> removeChallanSlip({
+    required String challanId,
+  }) async {
+    final url = '$baseUrl/challan/remove-slip';
+    final resp = await http.post(
+      Uri.parse(url),
+      headers: {...defaultHeaders, 'Content-Type': 'application/json'},
+      body: jsonEncode({'challanId': challanId}),
+    );
+    try {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    } catch (_) {
+      return {
+        'success': resp.statusCode >= 200 && resp.statusCode < 300,
+        'message': resp.body,
+        'statusCode': resp.statusCode,
+      };
+    }
   }
 
   Future<Map<String, dynamic>> fetchReturnsWithPagination({
@@ -50,6 +156,56 @@ class ApiService {
     final url = "$baseUrl/product/get-all-products";
     final response = await http.get(Uri.parse(url), headers: defaultHeaders);
     return jsonDecode(response.body);
+  }
+
+  // Added: fetch all main categories
+  Future<Map<String, dynamic>> getAllMainCategories() async {
+    final url = "$baseUrl/mainCategory/get-all-main-categorys-with-pagination";
+    final response = await http.get(Uri.parse(url), headers: defaultHeaders);
+    return jsonDecode(response.body);
+  }
+
+  Future<Map<String, dynamic>> uploadChallanSlip({
+    required File file,
+    required String challanId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/challan/upload-slip');
+    final request = http.MultipartRequest('POST', uri);
+    try {
+      // Attach auth headers if any (remove content-type header, MultipartRequest sets it)
+      request.headers.addAll(defaultHeaders);
+    } catch (_) {}
+
+    // field for challan id
+    request.fields['challanId'] = challanId;
+
+    final fileName = p.basename(file.path);
+    final multipartFile = await http.MultipartFile.fromPath(
+      'biltiSlip',
+      file.path,
+      filename: fileName,
+    );
+    request.files.add(multipartFile);
+
+    final streamed = await request.send();
+    final respStr = await streamed.stream.bytesToString();
+    if (streamed.statusCode >= 200 && streamed.statusCode < 300) {
+      try {
+        return jsonDecode(respStr) as Map<String, dynamic>;
+      } catch (_) {
+        return {'success': true, 'url': respStr};
+      }
+    } else {
+      try {
+        return jsonDecode(respStr) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': false,
+          'message': 'Upload failed',
+          'statusCode': streamed.statusCode,
+        };
+      }
+    }
   }
 
   Future<Map<String, dynamic>> createSubProduct({

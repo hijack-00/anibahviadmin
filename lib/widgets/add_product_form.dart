@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../widgets/barcode_generator.dart';
 import 'dart:io';
@@ -5,8 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import '../services/app_data_repo.dart';
 import '../constants/image_placeholder.dart';
-
-
 
 class AddProductForm extends StatefulWidget {
   final void Function()? onSubmit;
@@ -19,16 +19,23 @@ class AddProductForm extends StatefulWidget {
 class _AddProductFormState extends State<AddProductForm> {
   final _formKey = GlobalKey<FormState>();
 
-    bool _isSubmitting = false;
-
+  bool _isSubmitting = false;
 
   List<Map<String, dynamic>> products = [];
   bool loadingProducts = false;
   String selectedProductId = '';
   Map<String, dynamic>? selectedProduct;
   List<Map<String, dynamic>> sizeOptions = [];
-bool loadingSizes = false;
+  bool loadingSizes = false;
 
+  // new: main category map and loader
+  Map<String, String> mainCategoryNames = {};
+  bool loadingMainCategories = false;
+
+  final TextEditingController pcsController = TextEditingController();
+  final TextEditingController lotStockController = TextEditingController();
+  final TextEditingController singlePicPriceController =
+      TextEditingController();
 
   TextEditingController nameController = TextEditingController();
   String parentProduct = '';
@@ -65,40 +72,106 @@ bool loadingSizes = false;
   }
 
   Future<void> _fetchProducts() async {
-    setState(() { loadingProducts = true; });
+    setState(() {
+      loadingProducts = true;
+    });
     final repo = AppDataRepo();
     final res = await repo.fetchAllProducts();
     setState(() {
       products = res;
       loadingProducts = false;
     });
+    // print full API response (safe JSON encode)
+    try {
+      debugPrint('Fetched products response: ${jsonEncode(res)}');
+    } catch (e) {
+      debugPrint('Fetched products (toString): $res');
+    }
   }
 
   @override
   void initState() {
     super.initState();
+    pcsController.text = pcsInSet.toString();
+    lotStockController.text = lotStock.toString();
+    singlePicPriceController.text = singlePicPrice.toString();
     _fetchProducts();
     _fetchSizes();
+    _fetchMainCategories(); // fetch main categories
   }
 
+  @override
+  void dispose() {
+    pcsController.dispose();
+    lotStockController.dispose();
+    singlePicPriceController.dispose();
+    nameController.dispose();
+    lotNumberController.dispose();
+    descriptionController.dispose();
+    barcodeController.dispose();
+    super.dispose();
+  }
 
-Future<void> _fetchSizes() async {
-  setState(() { loadingSizes = true; });
-  final repo = AppDataRepo();
-  final sizes = await repo.fetchAllSizes();
-  setState(() {
-    sizeOptions = sizes;
-    loadingSizes = false;
-  });
-}
+  Future<void> _fetchSizes() async {
+    setState(() {
+      loadingSizes = true;
+    });
+    final repo = AppDataRepo();
+    final sizes = await repo.fetchAllSizes();
+    setState(() {
+      sizeOptions = sizes;
+      loadingSizes = false;
+    });
+  }
 
+  Future<void> _fetchMainCategories() async {
+    setState(() {
+      loadingMainCategories = true;
+    });
+    final repo = AppDataRepo();
+    try {
+      final res = await repo.fetchAllMainCategories();
+      final map = <String, String>{};
+      for (var m in res) {
+        if (m['_id'] != null && m['mainCategoryName'] != null) {
+          map[m['_id'].toString()] = m['mainCategoryName'].toString();
+        }
+      }
+      setState(() {
+        mainCategoryNames = map;
+      });
+      try {
+        debugPrint('Fetched main categories: ${jsonEncode(res)}');
+      } catch (e) {
+        debugPrint('Fetched main categories (toString): $res');
+      }
+    } catch (e) {
+      debugPrint('Error fetching main categories: $e');
+    } finally {
+      setState(() {
+        loadingMainCategories = false;
+      });
+    }
+  }
+
+  void _printDropdownProducts() {
+    try {
+      debugPrint('Dropdown products: ${jsonEncode(products)}');
+    } catch (e) {
+      debugPrint('Dropdown products (toString): $products');
+    }
+  }
 
   Widget numberField({
     required String label,
     required int value,
     required void Function(int) onChanged,
+    required TextEditingController controller,
   }) {
-    TextEditingController controller = TextEditingController(text: value.toString());
+    // use the passed controller (do not recreate it)
+    controller.text = controller.text.isEmpty
+        ? value.toString()
+        : controller.text;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -131,7 +204,9 @@ Future<void> _fetchSizes() async {
                     padding: EdgeInsets.zero,
                     icon: Icon(Icons.arrow_drop_up),
                     onPressed: () {
-                      onChanged(value + 1);
+                      final newVal = value + 1;
+                      controller.text = newVal.toString();
+                      onChanged(newVal);
                     },
                   ),
                 ),
@@ -142,7 +217,11 @@ Future<void> _fetchSizes() async {
                     padding: EdgeInsets.zero,
                     icon: Icon(Icons.arrow_drop_down),
                     onPressed: () {
-                      if (value > 1) onChanged(value - 1);
+                      if (value > 1) {
+                        final newVal = value - 1;
+                        controller.text = newVal.toString();
+                        onChanged(newVal);
+                      }
                     },
                   ),
                 ),
@@ -158,8 +237,11 @@ Future<void> _fetchSizes() async {
     required String label,
     required double value,
     required void Function(double) onChanged,
+    required TextEditingController controller,
   }) {
-    TextEditingController controller = TextEditingController(text: value.toStringAsFixed(0));
+    controller.text = controller.text.isEmpty
+        ? value.toStringAsFixed(0)
+        : controller.text;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -192,7 +274,9 @@ Future<void> _fetchSizes() async {
                     padding: EdgeInsets.zero,
                     icon: Icon(Icons.arrow_drop_up),
                     onPressed: () {
-                      onChanged(value + 1);
+                      final newVal = value + 1;
+                      controller.text = newVal.toStringAsFixed(0);
+                      onChanged(newVal);
                     },
                   ),
                 ),
@@ -203,7 +287,11 @@ Future<void> _fetchSizes() async {
                     padding: EdgeInsets.zero,
                     icon: Icon(Icons.arrow_drop_down),
                     onPressed: () {
-                      if (value > 1) onChanged(value - 1);
+                      if (value > 1) {
+                        final newVal = value - 1;
+                        controller.text = newVal.toStringAsFixed(0);
+                        onChanged(newVal);
+                      }
                     },
                   ),
                 ),
@@ -216,186 +304,157 @@ Future<void> _fetchSizes() async {
   }
 
   Widget _imageUploadSection() {
-  int totalSlots = 8;
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text('Product Images', style: TextStyle(fontWeight: FontWeight.bold)),
-      SizedBox(height: 8),
-      SizedBox(
-        height: 100,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: totalSlots,
-          separatorBuilder: (_, __) => SizedBox(width: 8),
-          itemBuilder: (context, idx) {
-            if (idx < imageFiles.length) {
-              return Stack(
-                children: [
-                  ClipRRect(
+    int totalSlots = 8;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Product Images', style: TextStyle(fontWeight: FontWeight.bold)),
+        SizedBox(height: 8),
+        SizedBox(
+          height: 100,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: totalSlots,
+            separatorBuilder: (_, __) => SizedBox(width: 8),
+            itemBuilder: (context, idx) {
+              if (idx < imageFiles.length) {
+                return Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        imageFiles[idx],
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: IconButton(
+                        icon: Icon(Icons.close, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            imageFiles.removeAt(idx);
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                // Placeholder for empty slots
+                return GestureDetector(
+                  onTap: () async {
+                    if (imageFiles.length >= 8) return;
+                    final picker = ImagePicker();
+                    final picked = await picker.pickMultiImage();
+                    if (picked != null) {
+                      setState(() {
+                        imageFiles.addAll(picked.map((x) => File(x.path)));
+                        if (imageFiles.length > 8)
+                          imageFiles = imageFiles.sublist(0, 8);
+                      });
+                    }
+                  },
+                  child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      imageFiles[idx],
+                    child: Image.network(
+                      kImagePlaceholderUrl,
                       width: 100,
                       height: 100,
                       fit: BoxFit.cover,
                     ),
                   ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: IconButton(
-                      icon: Icon(Icons.close, color: Colors.red),
-                      onPressed: () {
-                        setState(() {
-                          imageFiles.removeAt(idx);
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              );
-            } else {
-              // Placeholder for empty slots
-              return GestureDetector(
-                onTap: () async {
-                  if (imageFiles.length >= 8) return;
-                  final picker = ImagePicker();
-                  final picked = await picker.pickMultiImage();
-                  if (picked != null) {
-                    setState(() {
-                      imageFiles.addAll(picked.map((x) => File(x.path)));
-                      if (imageFiles.length > 8) imageFiles = imageFiles.sublist(0, 8);
-                    });
-                  }
-                },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    kImagePlaceholderUrl,
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              );
+                );
+              }
+            },
+          ),
+        ),
+        SizedBox(height: 8),
+        ElevatedButton.icon(
+          onPressed: () async {
+            if (imageFiles.length >= 8) return;
+            final picker = ImagePicker();
+            final picked = await picker.pickMultiImage();
+            if (picked != null) {
+              setState(() {
+                imageFiles.addAll(picked.map((x) => File(x.path)));
+                if (imageFiles.length > 8)
+                  imageFiles = imageFiles.sublist(0, 8);
+              });
             }
           },
+          icon: Icon(Icons.upload),
+          label: Text('Upload Images (3-8)'),
         ),
-      ),
-      SizedBox(height: 8),
-      ElevatedButton.icon(
-        onPressed: () async {
-          if (imageFiles.length >= 8) return;
-          final picker = ImagePicker();
-          final picked = await picker.pickMultiImage();
-          if (picked != null) {
-            setState(() {
-              imageFiles.addAll(picked.map((x) => File(x.path)));
-              if (imageFiles.length > 8) imageFiles = imageFiles.sublist(0, 8);
-            });
-          }
-        },
-        icon: Icon(Icons.upload),
-        label: Text('Upload Images (3-8)'),
-      ),
-      if (imageFiles.length < 3)
-        Padding(
-          padding: const EdgeInsets.only(top: 4.0),
-          child: Text('Please upload at least 3 images.', style: TextStyle(color: Colors.red)),
-        ),
-    ],
-  );
-}
-
-
-  // Widget _sizesSection() {
-  //   return Column(
-  //     crossAxisAlignment: CrossAxisAlignment.start,
-  //     children: [
-  //       Text('Available Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-  //       Wrap(
-  //         spacing: 8,
-  //         children: availableSizes.map((size) {
-  //           return ChoiceChip(
-  //             label: Text(size),
-  //             selected: false,
-  //             onSelected: (_) {
-  //               setState(() {
-  //                 selectedSizes.add(size);
-  //               });
-  //             },
-  //           );
-  //         }).toList(),
-  //       ),
-  //       SizedBox(height: 8),
-  //       Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-  //       Wrap(
-  //         spacing: 8,
-  //         children: selectedSizes.map((size) {
-  //           return Chip(
-  //             label: Text(size),
-  //             onDeleted: () {
-  //               setState(() {
-  //                 selectedSizes.remove(size);
-  //               });
-  //             },
-  //           );
-  //         }).toList(),
-  //       ),
-  //     ],
-  //   );
-  // }
-
-
-Widget _sizesSection() {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text('Available Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-      loadingSizes
-          ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: CircularProgressIndicator(),
-            )
-          : Wrap(
-              spacing: 8,
-              children: sizeOptions.map((sizeObj) {
-                final size = sizeObj['size']?.toString() ?? '';
-                return ActionChip(
-                  label: Text(size),
-                  onPressed: () {
-                    setState(() {
-                      selectedSizes.add(size); // Always add, even if already present
-                    });
-                  },
-                );
-              }).toList(),
+        if (imageFiles.length < 3)
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Text(
+              'Please upload at least 3 images.',
+              style: TextStyle(color: Colors.red),
             ),
-      SizedBox(height: 8),
-      Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-      Wrap(
-        spacing: 8,
-        children: selectedSizes.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final size = entry.value;
-          return Chip(
-            label: Text(size),
-            onDeleted: () {
-              setState(() {
-                selectedSizes.removeAt(idx); // Remove only this instance
-              });
-            },
-          );
-        }).toList(),
-      ),
-    ],
-  );
-}
+          ),
+      ],
+    );
+  }
+
+  Widget _sizesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Available Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
+        loadingSizes
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: CircularProgressIndicator(),
+              )
+            : Wrap(
+                spacing: 8,
+                children: sizeOptions.map((sizeObj) {
+                  final size = sizeObj['size']?.toString() ?? '';
+                  return ActionChip(
+                    label: Text(size),
+                    onPressed: () {
+                      setState(() {
+                        selectedSizes.add(
+                          size,
+                        ); // Always add, even if already present
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+        SizedBox(height: 8),
+        Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
+        Wrap(
+          spacing: 8,
+          children: selectedSizes.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final size = entry.value;
+            return Chip(
+              label: Text(size),
+              onDeleted: () {
+                setState(() {
+                  selectedSizes.removeAt(idx); // Remove only this instance
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
 
   // Generates a valid random EAN13 barcode
   String _generateRandomEAN13() {
-    final rand = List.generate(12, (_) => (1 + (DateTime.now().microsecond + DateTime.now().millisecond) % 9).toString());
+    final rand = List.generate(
+      12,
+      (_) => (1 + (DateTime.now().microsecond + DateTime.now().millisecond) % 9)
+          .toString(),
+    );
     final base = rand.join();
     int sum = 0;
     for (int i = 0; i < base.length; i++) {
@@ -412,34 +471,21 @@ Widget _sizesSection() {
       children: [
         Text('Barcode', style: TextStyle(fontWeight: FontWeight.bold)),
         SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: barcodeController,
-                decoration: InputDecoration(
-                  labelText: 'Barcode Number',
-                  border: OutlineInputBorder(),
-                  counterText: '', // Hide character counter
-                ),
-                keyboardType: TextInputType.number,
-              ),
-            ),
-            SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: () {
-                // Always generate a new random EAN13 barcode
-                String randomBarcode = _generateRandomEAN13();
-                setState(() {
-                  barcodeController.text = randomBarcode;
-                  generatedBarcode = randomBarcode;
-                });
-              },
-              child: Text('Generate Barcode'),
-            ),
-          ],
+
+        ElevatedButton(
+          onPressed: () {
+            // Always generate a new random EAN13 barcode
+            String randomBarcode = _generateRandomEAN13();
+            setState(() {
+              barcodeController.text = randomBarcode;
+              generatedBarcode = randomBarcode;
+            });
+          },
+          child: Text('Generate Barcode'),
         ),
+
         SizedBox(height: 8),
+
         if (generatedBarcode.isNotEmpty)
           Column(
             children: [
@@ -448,7 +494,10 @@ Widget _sizesSection() {
                 child: BarcodeGenerator(barcode: generatedBarcode),
               ),
               SizedBox(height: 8),
-              Text(generatedBarcode, style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                generatedBarcode,
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ],
           ),
       ],
@@ -458,15 +507,17 @@ Widget _sizesSection() {
   @override
   Widget build(BuildContext context) {
     int lotPrice = 0;
-if (selectedProduct != null) {
-  final price = selectedProduct!['price'] is int || selectedProduct!['price'] is double
-      ? int.tryParse(selectedProduct!['price'].toString()) ?? 0
-      : 0;
-  final pcs = pcsInSet;
-  lotPrice = price * pcs;
-}
-final String filnalLotPrice = lotPrice.toString();
-  
+    if (selectedProduct != null) {
+      final price =
+          selectedProduct!['price'] is int ||
+              selectedProduct!['price'] is double
+          ? int.tryParse(selectedProduct!['price'].toString()) ?? 0
+          : 0;
+      final pcs = pcsInSet;
+      lotPrice = price * pcs;
+    }
+    final String filnalLotPrice = lotPrice.toString();
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
       child: Form(
@@ -479,28 +530,94 @@ final String filnalLotPrice = lotPrice.toString();
             loadingProducts
                 ? Center(child: CircularProgressIndicator())
                 : DropdownButtonFormField<String>(
-                    value: selectedProductId.isNotEmpty ? selectedProductId : null,
-                   items: products.map((prod) => DropdownMenuItem(
-  value: prod['_id']?.toString() ?? '',
-  child: Text(prod['productName']?.toString() ?? ''),
-)).toList(),
+                    // print products to console as soon as dropdown is clicked/opened
+                    onTap: () {
+                      try {
+                        debugPrint(
+                          'Dropdown opened — products: ${jsonEncode(products)}',
+                        );
+                      } catch (e) {
+                        debugPrint(
+                          'Dropdown opened — products (toString): $products',
+                        );
+                      }
+                    },
+                    value: selectedProductId.isNotEmpty
+                        ? selectedProductId
+                        : null,
+                    items: products
+                        .map((prod) {
+                          final productName =
+                              prod['productName']?.toString() ?? '';
+
+                          // derive main category id from product's categoryId array (if present)
+                          String mainName = '';
+                          try {
+                            if (prod['categoryId'] is List &&
+                                (prod['categoryId'] as List).isNotEmpty) {
+                              final firstCat =
+                                  (prod['categoryId'] as List).first;
+                              String? mainCatId;
+                              if (firstCat is Map) {
+                                mainCatId = firstCat['mainCategoryId']
+                                    ?.toString();
+                              } else if (firstCat is String) {
+                                mainCatId = firstCat;
+                              }
+                              if (mainCatId != null &&
+                                  mainCategoryNames.containsKey(mainCatId)) {
+                                mainName = mainCategoryNames[mainCatId]!;
+                              }
+                            }
+                          } catch (_) {
+                            mainName = '';
+                          }
+
+                          final display = mainName.isNotEmpty
+                              ? '$productName (${mainName.toUpperCase()})'
+                              : productName;
+
+                          return DropdownMenuItem(
+                            value: prod['_id']?.toString() ?? '',
+                            child: Text(display),
+                          );
+                        })
+                        .toList()
+                        .toList(),
                     decoration: InputDecoration(
                       labelText: 'Select Product',
                       border: OutlineInputBorder(),
                     ),
                     onChanged: (val) {
-                      final prod = products.firstWhere((p) => p['_id'] == val, orElse: () => {});
+                      final prod = products.firstWhere(
+                        (p) => p['_id'] == val,
+                        orElse: () => {},
+                      );
                       setState(() {
                         selectedProductId = val ?? '';
                         selectedProduct = prod;
                         lotNumberController.text = prod['productName'] ?? '';
-                        // singlePicPrice = prod['price'] is int || prod['price'] is double ? double.parse(prod['price'].toString()) : 1;
-                       singlePicPrice = prod['price'] is int || prod['price'] is double
-    ? int.tryParse(prod['price'].toString().split('.').first) ?? 1
-    : 1; 
+                        singlePicPrice =
+                            prod['price'] is int || prod['price'] is double
+                            ? int.tryParse(
+                                    prod['price'].toString().split('.').first,
+                                  ) ??
+                                  1
+                            : 1;
+                        singlePicPriceController.text = singlePicPrice
+                            .toString();
                       });
+                      // print selected product API response
+                      try {
+                        debugPrint(
+                          'Selected product response: ${jsonEncode(prod)}',
+                        );
+                      } catch (e) {
+                        debugPrint('Selected product (toString): $prod');
+                      }
                     },
                   ),
+
             SizedBox(height: 16),
             TextField(
               controller: nameController,
@@ -522,29 +639,46 @@ final String filnalLotPrice = lotPrice.toString();
             numberField(
               label: 'Pcs in Set',
               value: pcsInSet,
-              onChanged: (val) => setState(() => pcsInSet = val),
+              onChanged: (val) => setState(() {
+                pcsInSet = val;
+                pcsController.text = val.toString();
+              }),
+              controller: pcsController,
             ),
             SizedBox(height: 16),
             numberField(
               label: 'Lot Stock',
               value: lotStock,
-              onChanged: (val) => setState(() => lotStock = val),
+              onChanged: (val) => setState(() {
+                lotStock = val;
+                lotStockController.text = val.toString();
+              }),
+              controller: lotStockController,
             ),
             SizedBox(height: 16),
             numberField(
               label: 'Single Pic Price',
               value: singlePicPrice,
-              onChanged: (val) => setState(() => singlePicPrice = val),
+              onChanged: (val) => setState(() {
+                singlePicPrice = val;
+                singlePicPriceController.text = val.toString();
+              }),
+              controller: singlePicPriceController,
             ),
             SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
-                  child: Text('Date of Opening', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Date of Opening',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
-                Text(dateOfOpening != null
-                    ? '${dateOfOpening!.day}/${dateOfOpening!.month}/${dateOfOpening!.year}'
-                    : 'Select Date'),
+                Text(
+                  dateOfOpening != null
+                      ? '${dateOfOpening!.day}/${dateOfOpening!.month}/${dateOfOpening!.year}'
+                      : 'Select Date',
+                ),
                 IconButton(
                   icon: Icon(Icons.calendar_today),
                   onPressed: () => _selectDate(context),
@@ -571,10 +705,9 @@ final String filnalLotPrice = lotPrice.toString();
             SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: status,
-              items: statusOptions.map((opt) => DropdownMenuItem(
-                value: opt,
-                child: Text(opt),
-              )).toList(),
+              items: statusOptions
+                  .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                  .toList(),
               decoration: InputDecoration(
                 labelText: 'Stock Status',
                 border: OutlineInputBorder(),
@@ -588,10 +721,9 @@ final String filnalLotPrice = lotPrice.toString();
             SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: activeStatus,
-              items: activeOptions.map((opt) => DropdownMenuItem(
-                value: opt,
-                child: Text(opt),
-              )).toList(),
+              items: activeOptions
+                  .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                  .toList(),
               decoration: InputDecoration(
                 labelText: 'Active Status',
                 border: OutlineInputBorder(),
@@ -607,7 +739,14 @@ final String filnalLotPrice = lotPrice.toString();
             SizedBox(height: 16),
             _sizesSection(),
             SizedBox(height: 24),
-            Text('Final Lot Price: ₹$filnalLotPrice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.green)),
+            Text(
+              'Final Lot Price: ₹$filnalLotPrice',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                color: Colors.green,
+              ),
+            ),
             SizedBox(height: 24),
             Row(
               children: [
@@ -617,11 +756,17 @@ final String filnalLotPrice = lotPrice.toString();
                         ? null
                         : () async {
                             if (imageFiles.length < 3) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload at least 3 images.')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Upload at least 3 images.'),
+                                ),
+                              );
                               return;
                             }
                             if (selectedProductId.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Select a product.')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Select a product.')),
+                              );
                               return;
                             }
                             setState(() => _isSubmitting = true);
@@ -645,17 +790,32 @@ final String filnalLotPrice = lotPrice.toString();
                                 isActive: activeStatus == 'Active',
                                 createdAt: DateTime.now(),
                                 updatedAt: DateTime.now(),
-                                filnalLotPrice: filnalLotPrice, // <-- changed here
+                                filnalLotPrice:
+                                    filnalLotPrice, // <-- changed here
                               );
                               if (res['success'] == true) {
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sub-product created successfully!')));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Sub-product created successfully!',
+                                    ),
+                                  ),
+                                );
                                 if (widget.onSubmit != null) widget.onSubmit!();
                                 Navigator.of(context).pop(true);
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to create sub-product.')));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Failed to create sub-product.',
+                                    ),
+                                  ),
+                                );
                               }
                             } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
                             } finally {
                               setState(() => _isSubmitting = false);
                             }
@@ -666,7 +826,9 @@ final String filnalLotPrice = lotPrice.toString();
                             height: 22,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : Text('Add Product'),
@@ -683,7 +845,7 @@ final String filnalLotPrice = lotPrice.toString();
                 ),
               ],
             ),
-            SizedBox(height: 24),
+            SizedBox(height: 40),
           ],
         ),
       ),

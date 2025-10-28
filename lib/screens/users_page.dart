@@ -38,6 +38,9 @@ class _UsersPageState extends State<UsersPage>
   String _searchActive = '';
   String _searchInactive = '';
   late TabController _tabController;
+  // Single search controller shared between both tabs
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -54,6 +57,8 @@ class _UsersPageState extends State<UsersPage>
   void dispose() {
     _disposed = true;
     _tabController.dispose();
+    _searchController.dispose();
+
     super.dispose();
   }
 
@@ -89,34 +94,85 @@ class _UsersPageState extends State<UsersPage>
     }
   }
 
-  void _searchUsers(bool active, String value) async {
+  // Single search function applied to both active & inactive users.
+  Future<void> _applySearch(String value) async {
     if (_disposed) return;
+    final q = value.trim().toLowerCase();
     setState(() {
-      if (active) {
-        _searchActive = value;
-        _filteredActive = _activeUsers
-            .where(
-              (u) => (u['name'] ?? '').toLowerCase().contains(
-                _searchActive.toLowerCase(),
-              ),
-            )
-            .toList();
+      _searchQuery = q;
+      // if empty, show all
+      if (q.isEmpty) {
+        _filteredActive = List.from(_activeUsers);
+        _filteredInactive = List.from(_inactiveUsers);
       } else {
-        _searchInactive = value;
-        _filteredInactive = _inactiveUsers
-            .where(
-              (u) => (u['name'] ?? '').toLowerCase().contains(
-                _searchInactive.toLowerCase(),
-              ),
-            )
-            .toList();
+        _filteredActive = _activeUsers.where((u) {
+          final name = (u['name'] ?? '').toString().toLowerCase();
+          final shop = (u['shopname'] ?? '').toString().toLowerCase();
+          final phone = (u['phone'] ?? '').toString().toLowerCase();
+          final email = (u['email'] ?? '').toString().toLowerCase();
+          return name.contains(q) ||
+              shop.contains(q) ||
+              phone.contains(q) ||
+              email.contains(q);
+        }).toList();
+
+        _filteredInactive = _inactiveUsers.where((u) {
+          final name = (u['name'] ?? '').toString().toLowerCase();
+          final shop = (u['shopname'] ?? '').toString().toLowerCase();
+          final phone = (u['phone'] ?? '').toString().toLowerCase();
+          final email = (u['email'] ?? '').toString().toLowerCase();
+          return name.contains(q) ||
+              shop.contains(q) ||
+              phone.contains(q) ||
+              email.contains(q);
+        }).toList();
       }
     });
-    // Preload orders for filtered users after search
-    await _preloadUserOrders(active ? _filteredActive : _filteredInactive);
+
+    // preload orders for the filtered users (both lists) to keep UI consistent
+    final combined = <Map<String, dynamic>>[];
+    combined.addAll(_filteredActive);
+    combined.addAll(_filteredInactive);
+    await _preloadUserOrders(combined);
     if (_disposed) return;
     setState(() {});
   }
+
+  // void _searchUsers(bool active, String value) async {
+  //   if (_disposed) return;
+  //   final q = value.trim().toLowerCase();
+  //   setState(() {
+  //     if (active) {
+  //       _searchActive = value;
+  //       _filteredActive = _activeUsers.where((u) {
+  //         final name = (u['name'] ?? '').toString().toLowerCase();
+  //         final shop = (u['shopname'] ?? '').toString().toLowerCase();
+  //         final phone = (u['phone'] ?? '').toString().toLowerCase();
+  //         final email = (u['email'] ?? '').toString().toLowerCase();
+  //         return name.contains(q) ||
+  //             shop.contains(q) ||
+  //             phone.contains(q) ||
+  //             email.contains(q);
+  //       }).toList();
+  //     } else {
+  //       _searchInactive = value;
+  //       _filteredInactive = _inactiveUsers.where((u) {
+  //         final name = (u['name'] ?? '').toString().toLowerCase();
+  //         final shop = (u['shopname'] ?? '').toString().toLowerCase();
+  //         final phone = (u['phone'] ?? '').toString().toLowerCase();
+  //         final email = (u['email'] ?? '').toString().toLowerCase();
+  //         return name.contains(q) ||
+  //             shop.contains(q) ||
+  //             phone.contains(q) ||
+  //             email.contains(q);
+  //       }).toList();
+  //     }
+  //   });
+  //   // Preload orders for filtered users after search
+  //   await _preloadUserOrders(active ? _filteredActive : _filteredInactive);
+  //   if (_disposed) return;
+  //   setState(() {});
+  // }
 
   // Cache for user orders and spent
   Map<String, Map<String, dynamic>> _userOrderCache = {};
@@ -158,234 +214,241 @@ class _UsersPageState extends State<UsersPage>
     if (users.isEmpty) {
       return Center(child: Text('No users found'));
     }
-    return ListView.builder(
-      itemCount: users.length,
-      itemBuilder: (context, idx) {
-        final user = users[idx];
-        final cache = _userOrderCache[user['_id']];
-        final shopName = user['shopname'] ?? '';
-        final addressObj = user['address'] ?? {};
-        final address = [
-          addressObj['street'],
-          addressObj['city'],
-          addressObj['state'],
-          addressObj['zipCode'],
-          addressObj['country'],
-        ].where((e) => e != null && e.toString().isNotEmpty).join(', ');
-        return Card(
-          color: Colors.white,
-          margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => UserDetailsPage(userId: user['_id']),
-                ),
-              );
-              _fetchUsers();
-            },
-            child: Stack(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundImage:
-                            user['photo'] != null &&
-                                user['photo'].toString().isNotEmpty
-                            ? NetworkImage(user['photo'])
-                            : null,
-                        child:
-                            user['photo'] == null ||
-                                user['photo'].toString().isEmpty
-                            ? Icon(Icons.person, size: 28, color: Colors.grey)
-                            : null,
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user['name'] ?? '',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              shopName,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.indigo,
-                              ),
-                            ),
-                            if ((user['email'] ?? '').toString().isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2.0),
-                                child: Text(
-                                  user['email'],
-                                  style: TextStyle(
-                                    color: Colors.grey[800],
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            if ((user['phone'] ?? '').toString().isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2.0),
-                                child: Text(
-                                  user['phone'],
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[800],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            if (address.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2.0),
-                                child: Text(
-                                  address,
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ),
-                            SizedBox(height: 8),
-                            Row(
-                              children: [
-                                cache == null
-                                    ? Expanded(
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 60,
-                                              height: 22,
-                                              decoration: BoxDecoration(
-                                                color: Colors.yellow[100],
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                            ),
-                                            SizedBox(width: 12),
-                                            Container(
-                                              width: 80,
-                                              height: 22,
-                                              decoration: BoxDecoration(
-                                                color: Colors.indigo[100],
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    : Expanded(
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 4,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.yellow[100],
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  Text(
-                                                    'Orders: ',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 11,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    '${cache['orderCount']}',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 11,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            SizedBox(width: 12),
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 4,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.blue[100],
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  Text(
-                                                    'Spent: ',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 11,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    '₹${cache['totalSpent'].toStringAsFixed(2)}',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 11,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Removed chevron arrow to avoid overlay with status icon
-                    ],
-                  ),
-                ),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Icon(
-                    user['isActive'] == true
-                        ? Icons.check_circle
-                        : Icons.cancel,
-                    color: user['isActive'] == true ? Colors.green : Colors.red,
-                    size: 22,
-                  ),
-                ),
-              ],
+    // return ListView.builder(
+    // wrap list with RefreshIndicator so user can pull to refresh the whole users list
+    return RefreshIndicator(
+      onRefresh: _fetchUsers,
+      child: ListView.builder(
+        itemCount: users.length,
+        itemBuilder: (context, idx) {
+          final user = users[idx];
+          final cache = _userOrderCache[user['_id']];
+          final shopName = user['shopname'] ?? '';
+          final addressObj = user['address'] ?? {};
+          final address = [
+            addressObj['street'],
+            addressObj['city'],
+            addressObj['state'],
+            addressObj['zipCode'],
+            addressObj['country'],
+          ].where((e) => e != null && e.toString().isNotEmpty).join(', ');
+          return Card(
+            color: Colors.white,
+            margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-          ),
-        );
-      },
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => UserDetailsPage(userId: user['_id']),
+                  ),
+                );
+                _fetchUsers();
+              },
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundImage:
+                              user['photo'] != null &&
+                                  user['photo'].toString().isNotEmpty
+                              ? NetworkImage(user['photo'])
+                              : null,
+                          child:
+                              user['photo'] == null ||
+                                  user['photo'].toString().isEmpty
+                              ? Icon(Icons.person, size: 28, color: Colors.grey)
+                              : null,
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user['name'] ?? '',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                shopName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.indigo,
+                                ),
+                              ),
+                              if ((user['email'] ?? '').toString().isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2.0),
+                                  child: Text(
+                                    user['email'],
+                                    style: TextStyle(
+                                      color: Colors.grey[800],
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              if ((user['phone'] ?? '').toString().isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2.0),
+                                  child: Text(
+                                    user['phone'],
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[800],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              if (address.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2.0),
+                                  child: Text(
+                                    address,
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  cache == null
+                                      ? Expanded(
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 60,
+                                                height: 22,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.yellow[100],
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              SizedBox(width: 12),
+                                              Container(
+                                                width: 80,
+                                                height: 22,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.indigo[100],
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : Expanded(
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.yellow[100],
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Text(
+                                                      'Orders: ',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '${cache['orderCount']}',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              SizedBox(width: 12),
+                                              Container(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue[100],
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Text(
+                                                      'Spent: ',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '₹${cache['totalSpent'].toStringAsFixed(2)}',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Removed chevron arrow to avoid overlay with status icon
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Icon(
+                      user['isActive'] == true
+                          ? Icons.check_circle
+                          : Icons.cancel,
+                      color: user['isActive'] == true
+                          ? Colors.green
+                          : Colors.red,
+                      size: 22,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -453,70 +516,38 @@ class _UsersPageState extends State<UsersPage>
         ),
       ),
 
-      // appBar: AppBar(
-      //   title: Text('Users'),
-      //   bottom: TabBar(
-      //     controller: _tabController,
-      //     tabs: [
-      //       Tab(text: 'Active Users'),
-      //       Tab(text: 'Inactive Users'),
-      //     ],
-      //   ),
-      // ),
-      // body: _loading
-      //     ? _UsersSkeleton()
-      //     : TabBarView(
-      //         controller: _tabController,
-      //         children: [
-      //           Column(
-      //             children: [
-      //               Padding(
-      //                 padding: const EdgeInsets.all(16.0),
-      //                 child: TextField(
-      //                   decoration: InputDecoration(
-      //                     labelText: 'Search by name',
-      //                     border: OutlineInputBorder(),
-      //                     prefixIcon: Icon(Icons.search),
-      //                   ),
-      //                   onChanged: (v) => _searchUsers(true, v),
-      //                 ),
-      //               ),
-      //               Expanded(child: _buildUserList(_filteredActive)),
-      //             ],
-      //           ),
-      //           Column(
-      //             children: [
-      //               Padding(
-      //                 padding: const EdgeInsets.all(16.0),
-      //                 child: TextField(
-      //                   decoration: InputDecoration(
-      //                     labelText: 'Search by name',
-      //                     border: OutlineInputBorder(),
-      //                     prefixIcon: Icon(Icons.search),
-      //                   ),
-      //                   onChanged: (v) => _searchUsers(false, v),
-      //                 ),
-      //               ),
-      //               Expanded(child: _buildUserList(_filteredInactive)),
-      //             ],
-      //           ),
-      //         ],
-      //       ),
       body: _loading
           ? _UsersSkeleton()
           : Column(
               children: [
-                // TabBar at the top of the body
+                // TabBar + single shared search bar
                 Container(
                   color: Colors.white,
-                  child: TabBar(
-                    controller: _tabController,
-                    indicatorColor: Colors.indigo,
-                    labelColor: Colors.indigo,
-                    unselectedLabelColor: Colors.grey,
-                    tabs: [
-                      Tab(text: 'Active Users'),
-                      Tab(text: 'Inactive Users'),
+                  child: Column(
+                    children: [
+                      TabBar(
+                        controller: _tabController,
+                        indicatorColor: Colors.indigo,
+                        labelColor: Colors.indigo,
+                        unselectedLabelColor: Colors.grey,
+                        tabs: const [
+                          Tab(text: 'Active Users'),
+                          Tab(text: 'Inactive Users'),
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: const InputDecoration(
+                            labelText: 'Search by name / shop / phone / email',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.search),
+                            isDense: true,
+                          ),
+                          onChanged: (v) => _applySearch(v),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -524,41 +555,69 @@ class _UsersPageState extends State<UsersPage>
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: TextField(
-                              decoration: InputDecoration(
-                                labelText: 'Search by name',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.search),
-                              ),
-                              onChanged: (v) => _searchUsers(true, v),
-                            ),
-                          ),
-                          Expanded(child: _buildUserList(_filteredActive)),
-                        ],
-                      ),
-                      Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: TextField(
-                              decoration: InputDecoration(
-                                labelText: 'Search by name',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.search),
-                              ),
-                              onChanged: (v) => _searchUsers(false, v),
-                            ),
-                          ),
-                          Expanded(child: _buildUserList(_filteredInactive)),
-                        ],
-                      ),
+                      // Active
+                      _filteredActive.isEmpty && !_loading
+                          ? Center(child: Text('No users found'))
+                          : _buildUserList(_filteredActive),
+                      // Inactive
+                      _filteredInactive.isEmpty && !_loading
+                          ? Center(child: Text('No users found'))
+                          : _buildUserList(_filteredInactive),
                     ],
                   ),
                 ),
+                // Container(
+                //   color: Colors.white,
+                //   child: TabBar(
+                //     controller: _tabController,
+                //     indicatorColor: Colors.indigo,
+                //     labelColor: Colors.indigo,
+                //     unselectedLabelColor: Colors.grey,
+                //     tabs: [
+                //       Tab(text: 'Active Users'),
+                //       Tab(text: 'Inactive Users'),
+                //     ],
+                //   ),
+                // ),
+                // Expanded(
+                //   child: TabBarView(
+                //     controller: _tabController,
+                //     children: [
+                //       Column(
+                //         children: [
+                //           Padding(
+                //             padding: const EdgeInsets.all(16.0),
+                //             child: TextField(
+                //               decoration: InputDecoration(
+                //                 labelText: 'Search by name',
+                //                 border: OutlineInputBorder(),
+                //                 prefixIcon: Icon(Icons.search),
+                //               ),
+                //               onChanged: (v) => _searchUsers(true, v),
+                //             ),
+                //           ),
+                //           Expanded(child: _buildUserList(_filteredActive)),
+                //         ],
+                //       ),
+                //       Column(
+                //         children: [
+                //           Padding(
+                //             padding: const EdgeInsets.all(16.0),
+                //             child: TextField(
+                //               decoration: InputDecoration(
+                //                 labelText: 'Search by name',
+                //                 border: OutlineInputBorder(),
+                //                 prefixIcon: Icon(Icons.search),
+                //               ),
+                //               onChanged: (v) => _searchUsers(false, v),
+                //             ),
+                //           ),
+                //           Expanded(child: _buildUserList(_filteredInactive)),
+                //         ],
+                //       ),
+                //     ],
+                //   ),
+                // ),
               ],
             ),
       floatingActionButton: FloatingActionButton(

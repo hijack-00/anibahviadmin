@@ -56,11 +56,23 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
       _error = null;
     });
     try {
+      // Log request details
+      debugPrint(
+        'Fetch Orders -> ApiService.fetchAllOrdersByAdminWithPagination(page:1, limit:1000)',
+      );
+
       // Fetch from new endpoint and response structure
       final response = await ApiService().fetchAllOrdersByAdminWithPagination(
         page: 1,
         limit: 1000,
       );
+      // Log response body
+      try {
+        debugPrint('Fetch Orders Response: ${jsonEncode(response)}');
+      } catch (_) {
+        debugPrint('Fetch Orders Response (raw): $response');
+      }
+
       if (response['success'] == true && response['orders'] is List) {
         _orders = List<Map<String, dynamic>>.from(response['orders']);
       } else {
@@ -501,6 +513,15 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                             onTap: () async {
                               // Some orders may not have '_id', try 'order['_id']' or fallback to 'order['id']'
                               final orderId = order['_id'] ?? order['id'] ?? '';
+                              debugPrint('Order tapped -> orderId: $orderId');
+                              try {
+                                debugPrint(
+                                  'Order object being passed to OrderDetailsPage: ${jsonEncode(order)}',
+                                );
+                              } catch (_) {
+                                debugPrint('Order object (raw): $order');
+                              }
+
                               if (orderId.toString().isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(

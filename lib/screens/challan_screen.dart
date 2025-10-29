@@ -1214,6 +1214,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          SizedBox(height: 12),
                           Row(
                             children: [
                               const Expanded(

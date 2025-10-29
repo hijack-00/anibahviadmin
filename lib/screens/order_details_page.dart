@@ -333,6 +333,1368 @@ class OrderDetailsPage extends StatelessWidget {
     }
   }
 
+  Future<void> _openCreateChallanFromOrder(
+    BuildContext context,
+    Map<String, dynamic> order,
+  ) async {
+    // This implementation mirrors ChallanScreen._showCreateChallanDialog
+    // but pre-selects customer and order coming from the OrderDetailsPage.
+    Map<String, dynamic>? selectedCustomer;
+    Map<String, dynamic>? selectedOrder;
+    String selectedVendor = 'BlueDart';
+    String notes = '';
+    List<Map<String, dynamic>> userOrders = [];
+    List<Map<String, dynamic>> existingChallans = [];
+    final vendors = ['BlueDart', 'Delhivery', 'DTDC', 'Transport', 'Other'];
+
+    // map of order item idx -> new dispatch int
+    final Map<int, int> newDispatchMap = {};
+    // controllers for each item input so UI updates when value changes
+    final Map<int, TextEditingController> dispatchControllers = {};
+
+    // ensure users list is available (used if user wants to change customer)
+    await AppDataRepo().loadAllUsers();
+
+    // Pre-select customer & order from passed `order`
+    // normalize customer object
+    final orderCustomer = order['customer'];
+    if (orderCustomer is Map && orderCustomer['_id'] != null) {
+      selectedCustomer = Map<String, dynamic>.from(orderCustomer);
+    } else if (order['customerId'] != null) {
+      // try to find in cached users
+      final cid = order['customerId'].toString();
+      final found = AppDataRepo.users.firstWhere(
+        (u) => (u['_id']?.toString() ?? '') == cid,
+        orElse: () => {},
+      );
+      if (found.isNotEmpty)
+        selectedCustomer = Map<String, dynamic>.from(found);
+      else
+        selectedCustomer = {
+          '_id': cid,
+          'name': orderCustomer?.toString() ?? '',
+        };
+    } else {
+      selectedCustomer = null;
+    }
+
+    selectedOrder = Map<String, dynamic>.from(order);
+    notes = order['notes']?.toString() ?? '';
+
+    final List<Map<String, dynamic>> initialOrderItems =
+        List<Map<String, dynamic>>.from(order['items'] ?? []);
+    // Preload existing challans and initialize controllers BEFORE opening the sheet.
+    // This prevents the async loader running after the first build and resetting
+    // controller values when user taps + / - quickly.
+    bool _preloaded = false;
+    try {
+      if (selectedCustomer != null &&
+          (selectedCustomer!['_id'] ?? selectedCustomer!['id']) != null &&
+          selectedOrder != null &&
+          (selectedOrder!['_id'] ?? selectedOrder!['id']) != null) {
+        final resp = await AppDataRepo().getChallansByCustomerAndOrder(
+          customerId: (selectedCustomer!['_id'] ?? selectedCustomer!['id'])
+              .toString(),
+          orderId: (selectedOrder!['_id'] ?? selectedOrder!['id']).toString(),
+        );
+        if ((resp['status'] == true || resp['success'] == true) &&
+            resp['data'] is List) {
+          existingChallans = List<Map<String, dynamic>>.from(
+            resp['data'] as List,
+          );
+        } else {
+          existingChallans = [];
+        }
+      }
+    } catch (_) {
+      existingChallans = [];
+    }
+
+    // compute alreadyDispatched into items copy
+    for (var it in initialOrderItems) {
+      final name = (it['name'] ?? '').toString();
+      int already = 0;
+      for (var ch in existingChallans) {
+        final chItems = (ch['items'] as List<dynamic>?) ?? [];
+        for (var cit in chItems) {
+          if ((cit['name'] ?? '').toString() == name) {
+            already +=
+                int.tryParse((cit['dispatchedQty'] ?? '0').toString()) ?? 0;
+          }
+        }
+      }
+      it['alreadyDispatched'] = already;
+    }
+
+    // initialize controllers with defaults (0) and dispatch map
+    newDispatchMap.clear();
+    dispatchControllers.clear();
+    for (var i = 0; i < initialOrderItems.length; i++) {
+      dispatchControllers[i] = TextEditingController(text: '0');
+      newDispatchMap[i] = 0;
+    }
+    _preloaded = true;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) {
+        final height = MediaQuery.of(sheetCtx).size.height;
+        return SafeArea(
+          child: SizedBox(
+            height: height * 0.98, // almost full screen
+            child: StatefulBuilder(
+              builder: (ctx2, setStateModal) {
+                // load existing challans for this order/customer to compute alreadyDispatched
+                Future<void> _loadExistingChallans() async {
+                  existingChallans = [];
+                  if (selectedCustomer != null &&
+                      (selectedCustomer!['_id'] ?? selectedCustomer!['id']) !=
+                          null &&
+                      selectedOrder != null &&
+                      (selectedOrder!['_id'] ?? selectedOrder!['id']) != null) {
+                    try {
+                      final resp = await AppDataRepo()
+                          .getChallansByCustomerAndOrder(
+                            customerId:
+                                (selectedCustomer!['_id'] ??
+                                        selectedCustomer!['id'])
+                                    .toString(),
+                            orderId:
+                                (selectedOrder!['_id'] ?? selectedOrder!['id'])
+                                    .toString(),
+                          );
+                      if ((resp['status'] == true || resp['success'] == true) &&
+                          resp['data'] is List) {
+                        existingChallans = List<Map<String, dynamic>>.from(
+                          resp['data'] as List,
+                        );
+                      } else {
+                        existingChallans = [];
+                      }
+                    } catch (_) {
+                      existingChallans = [];
+                    }
+                  } else {
+                    existingChallans = [];
+                  }
+
+                  // compute alreadyDispatched into items copy
+                  for (var it in initialOrderItems) {
+                    final name = (it['name'] ?? '').toString();
+                    int already = 0;
+                    for (var ch in existingChallans) {
+                      final chItems = (ch['items'] as List<dynamic>?) ?? [];
+                      for (var cit in chItems) {
+                        if ((cit['name'] ?? '').toString() == name) {
+                          already +=
+                              int.tryParse(
+                                (cit['dispatchedQty'] ?? '0').toString(),
+                              ) ??
+                              0;
+                        }
+                      }
+                    }
+                    it['alreadyDispatched'] = already;
+                  }
+
+                  // initialize controllers with defaults
+                  newDispatchMap.clear();
+                  dispatchControllers.clear();
+                  for (var i = 0; i < initialOrderItems.length; i++) {
+                    // final defaultQty =
+                    //     (initialOrderItems[i]['dispatchedQty'] ??
+                    //             initialOrderItems[i]['quantity'] ??
+                    //             0)
+                    //         .toString();
+                    // default to 0 so user explicitly sets dispatch qty (limited by remaining)
+                    final defaultQty = '0';
+
+                    dispatchControllers[i] = TextEditingController(
+                      text: defaultQty,
+                    );
+                    newDispatchMap[i] = int.tryParse(defaultQty) ?? 0;
+                  }
+
+                  setStateModal(() {});
+                }
+
+                // helper to compute already dispatched for a single item
+                int _alreadyDispatchedForItem(Map<String, dynamic> item) {
+                  return int.tryParse(
+                        item['alreadyDispatched']?.toString() ?? '0',
+                      ) ??
+                      0;
+                }
+
+                final orderItems =
+                    List<Map<String, dynamic>>.from(initialOrderItems).where((
+                      it,
+                    ) {
+                      final status = (it['status'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      return !(status == 'cancelled' ||
+                          status == 'returned' ||
+                          status == 'dispatched');
+                    }).toList();
+
+                int _computeTotalValue() {
+                  double total = 0;
+                  for (int i = 0; i < orderItems.length; i++) {
+                    final item = orderItems[i];
+                    final int dispatchSets = newDispatchMap[i] ?? 0;
+                    final prod = item['productId'] as Map<String, dynamic>?;
+                    final filnalRaw =
+                        item['filnalLotPrice'] ?? prod?['filnalLotPrice'];
+                    final bool hasFilnal =
+                        filnalRaw != null &&
+                        filnalRaw.toString().trim().isNotEmpty;
+
+                    if (hasFilnal) {
+                      final double pricePerSet =
+                          double.tryParse(filnalRaw.toString()) ?? 0.0;
+                      total += pricePerSet * dispatchSets;
+                    } else {
+                      final double pricePerPiece =
+                          double.tryParse(
+                            (item['singlePicPrice'] ?? item['price'] ?? 0)
+                                .toString(),
+                          ) ??
+                          0.0;
+                      final int pcsInSet =
+                          int.tryParse(item['pcsInSet']?.toString() ?? '1') ??
+                          1;
+                      total += pricePerPiece * pcsInSet * dispatchSets;
+                    }
+                  }
+                  return total.round();
+                }
+
+                // initial load existing challans when sheet opens
+                // if (existingChallans.isEmpty) {
+                //   Future.microtask(_loadExistingChallans);
+                // }
+
+                // avoid re-loading after we've preloaded above
+                if (!_preloaded) {
+                  Future.microtask(_loadExistingChallans);
+                }
+
+                return Padding(
+                  padding: EdgeInsets.only(
+                    left: 12,
+                    right: 12,
+                    top: 12,
+                    bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 12,
+                  ),
+                  child: SingleChildScrollView(
+                    child: DefaultTextStyle.merge(
+                      style: const TextStyle(fontSize: 11, color: Colors.black),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Create Delivery Challan',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.of(sheetCtx).pop(),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // const Text('Customer'),
+                          // const SizedBox(height: 6),
+                          // InkWell(
+                          //   onTap: () async {
+                          //     // allow user to change customer if needed
+                          //     final picked = await showModalBottomSheet<Map<String, dynamic>>(
+                          //       context: sheetCtx,
+                          //       isScrollControlled: true,
+                          //       backgroundColor: Colors.white,
+                          //       constraints: BoxConstraints(
+                          //         maxHeight:
+                          //             MediaQuery.of(sheetCtx).size.height *
+                          //             0.95,
+                          //       ),
+                          //       shape: const RoundedRectangleBorder(
+                          //         borderRadius: BorderRadius.vertical(
+                          //           top: Radius.circular(16),
+                          //         ),
+                          //       ),
+                          //       builder: (pickerCtx) {
+                          //         String q = '';
+                          //         final users = AppDataRepo.users;
+                          //         return StatefulBuilder(
+                          //           builder: (pc, pcSet) {
+                          //             final filtered = users.where((u) {
+                          //               final label =
+                          //                   '${u['name'] ?? ''} ${u['phone'] ?? ''}'
+                          //                       .toLowerCase();
+                          //               return label.contains(q.toLowerCase());
+                          //             }).toList();
+
+                          //             return SafeArea(
+                          //               child: Padding(
+                          //                 padding: const EdgeInsets.all(12.0),
+                          //                 child: Column(
+                          //                   children: [
+                          //                     Row(
+                          //                       children: [
+                          //                         const Expanded(
+                          //                           child: Text(
+                          //                             'Select Customer',
+                          //                             style: TextStyle(
+                          //                               fontWeight:
+                          //                                   FontWeight.bold,
+                          //                               fontSize: 16,
+                          //                             ),
+                          //                           ),
+                          //                         ),
+                          //                         IconButton(
+                          //                           icon: const Icon(
+                          //                             Icons.close,
+                          //                           ),
+                          //                           onPressed: () =>
+                          //                               Navigator.pop(
+                          //                                 pickerCtx,
+                          //                               ),
+                          //                         ),
+                          //                       ],
+                          //                     ),
+                          //                     const SizedBox(height: 8),
+                          //                     TextField(
+                          //                       decoration:
+                          //                           const InputDecoration(
+                          //                             prefixIcon: Icon(
+                          //                               Icons.search,
+                          //                             ),
+                          //                             hintText:
+                          //                                 'Search customer...',
+                          //                             isDense: true,
+                          //                             border:
+                          //                                 OutlineInputBorder(),
+                          //                           ),
+                          //                       onChanged: (v) =>
+                          //                           pcSet(() => q = v),
+                          //                     ),
+                          //                     const SizedBox(height: 8),
+                          //                     Expanded(
+                          //                       child: ListView.separated(
+                          //                         itemCount: filtered.length,
+                          //                         separatorBuilder: (_, __) =>
+                          //                             const Divider(height: 1),
+                          //                         itemBuilder: (context, i) {
+                          //                           final u = filtered[i];
+                          //                           final label =
+                          //                               '${u['name'] ?? ''} • ${u['phone'] ?? ''}';
+                          //                           return ListTile(
+                          //                             title: Text(label),
+                          //                             onTap: () =>
+                          //                                 Navigator.pop(
+                          //                                   pickerCtx,
+                          //                                   u,
+                          //                                 ),
+                          //                           );
+                          //                         },
+                          //                       ),
+                          //                     ),
+                          //                   ],
+                          //                 ),
+                          //               ),
+                          //             );
+                          //           },
+                          //         );
+                          //       },
+                          //     );
+
+                          //     if (picked != null) {
+                          //       selectedCustomer = picked;
+                          //       // reload existing challans / orders for newly selected customer
+                          //       await _loadExistingChallans();
+                          //     }
+                          //     setStateModal(() {});
+                          //   },
+                          //   child: InputDecorator(
+                          //     decoration: const InputDecoration(
+                          //       labelText: 'Customer',
+                          //       border: OutlineInputBorder(),
+                          //       isDense: true,
+                          //     ),
+                          //     child: Text(
+                          //       selectedCustomer != null
+                          //           ? '${selectedCustomer!['name'] ?? ''} • ${selectedCustomer!['phone'] ?? ''}'
+                          //           : 'Select Customer',
+                          //       style: const TextStyle(fontSize: 13),
+                          //     ),
+                          //   ),
+                          // ),
+                          const Text('Customer'),
+                          const SizedBox(height: 6),
+                          // show customer pre-selected (not editable here)
+                          InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Customer',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            child: Text(
+                              selectedCustomer != null
+                                  ? '${selectedCustomer!['name'] ?? ''} • ${selectedCustomer!['phone'] ?? ''}'
+                                  : '${order['customer'] is Map ? order['customer']['name'] ?? '' : order['customer'] ?? ''}',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // const Text('Order'),
+                          // const SizedBox(height: 6),
+                          // InkWell(
+                          //   onTap: () async {
+                          //     // allow changing order — show orders for this customer
+                          //     if (selectedCustomer == null ||
+                          //         (selectedCustomer!['_id'] ??
+                          //                 selectedCustomer!['id']) ==
+                          //             null) {
+                          //       ScaffoldMessenger.of(context).showSnackBar(
+                          //         const SnackBar(
+                          //           content: Text('Select customer first'),
+                          //         ),
+                          //       );
+                          //       return;
+                          //     }
+
+                          //     // fetch orders for user
+                          //     final resp = await AppDataRepo()
+                          //         .fetchOrdersByUser(
+                          //           (selectedCustomer!['_id'] ??
+                          //                   selectedCustomer!['id'])
+                          //               .toString(),
+                          //         );
+                          //     if (resp['success'] == true &&
+                          //         resp['orders'] is List) {
+                          //       userOrders = List<Map<String, dynamic>>.from(
+                          //         resp['orders'] as List,
+                          //       );
+                          //     } else {
+                          //       userOrders = [];
+                          //     }
+
+                          //     final picked =
+                          //         await showModalBottomSheet<
+                          //           Map<String, dynamic>
+                          //         >(
+                          //           context: sheetCtx,
+                          //           isScrollControlled: true,
+                          //           backgroundColor: Colors.white,
+                          //           constraints: BoxConstraints(
+                          //             maxHeight:
+                          //                 MediaQuery.of(sheetCtx).size.height *
+                          //                 0.95,
+                          //           ),
+                          //           shape: const RoundedRectangleBorder(
+                          //             borderRadius: BorderRadius.vertical(
+                          //               top: Radius.circular(16),
+                          //             ),
+                          //           ),
+                          //           builder: (pickerCtx) {
+                          //             String q = '';
+                          //             final orders = userOrders;
+                          //             return StatefulBuilder(
+                          //               builder: (pc, pcSet) {
+                          //                 final delivered = orders.where((o) {
+                          //                   final label =
+                          //                       '${o['orderNumber'] ?? ''} ${o['total'] ?? o['subtotal'] ?? ''}'
+                          //                           .toLowerCase();
+                          //                   return label.contains(
+                          //                     q.toLowerCase(),
+                          //                   );
+                          //                 }).toList();
+
+                          //                 return SafeArea(
+                          //                   child: Padding(
+                          //                     padding: const EdgeInsets.all(
+                          //                       12.0,
+                          //                     ),
+                          //                     child: Column(
+                          //                       children: [
+                          //                         Row(
+                          //                           children: [
+                          //                             const Expanded(
+                          //                               child: Text(
+                          //                                 'Select Order',
+                          //                                 style: TextStyle(
+                          //                                   fontWeight:
+                          //                                       FontWeight.bold,
+                          //                                   fontSize: 16,
+                          //                                 ),
+                          //                               ),
+                          //                             ),
+                          //                             IconButton(
+                          //                               icon: const Icon(
+                          //                                 Icons.close,
+                          //                               ),
+                          //                               onPressed: () =>
+                          //                                   Navigator.pop(
+                          //                                     pickerCtx,
+                          //                                   ),
+                          //                             ),
+                          //                           ],
+                          //                         ),
+                          //                         const SizedBox(height: 8),
+                          //                         TextField(
+                          //                           decoration:
+                          //                               const InputDecoration(
+                          //                                 prefixIcon: Icon(
+                          //                                   Icons.search,
+                          //                                 ),
+                          //                                 hintText:
+                          //                                     'Search order...',
+                          //                                 isDense: true,
+                          //                                 border:
+                          //                                     OutlineInputBorder(),
+                          //                               ),
+                          //                           onChanged: (v) =>
+                          //                               pcSet(() => q = v),
+                          //                         ),
+                          //                         const SizedBox(height: 8),
+                          //                         Expanded(
+                          //                           child: ListView.separated(
+                          //                             itemCount:
+                          //                                 delivered.length,
+                          //                             separatorBuilder:
+                          //                                 (_, __) =>
+                          //                                     const Divider(
+                          //                                       height: 1,
+                          //                                     ),
+                          //                             itemBuilder: (context, i) {
+                          //                               final o = delivered[i];
+                          //                               final label =
+                          //                                   '${o['orderNumber'] ?? ''} • ₹${o['total'] ?? o['subtotal'] ?? ''} (${o['status'] ?? ''})';
+                          //                               return ListTile(
+                          //                                 title: Text(label),
+                          //                                 onTap: () =>
+                          //                                     Navigator.pop(
+                          //                                       pickerCtx,
+                          //                                       o,
+                          //                                     ),
+                          //                               );
+                          //                             },
+                          //                           ),
+                          //                         ),
+                          //                       ],
+                          //                     ),
+                          //                   ),
+                          //                 );
+                          //               },
+                          //             );
+                          //           },
+                          //         );
+
+                          //     if (picked != null) {
+                          //       selectedOrder = Map<String, dynamic>.from(
+                          //         picked,
+                          //       );
+                          //       // reinitialize item state to selected order
+                          //       initialOrderItems.clear();
+                          //       initialOrderItems.addAll(
+                          //         List<Map<String, dynamic>>.from(
+                          //           selectedOrder!['items'] ?? [],
+                          //         ),
+                          //       );
+                          //       await _loadExistingChallans();
+                          //     }
+                          //     setStateModal(() {});
+                          //   },
+                          //   child: InputDecorator(
+                          //     decoration: const InputDecoration(
+                          //       labelText: 'Order',
+                          //       border: OutlineInputBorder(),
+                          //       isDense: true,
+                          //     ),
+                          //     child: Text(
+                          //       selectedOrder != null
+                          //           ? '${selectedOrder!['orderNumber'] ?? ''} • ₹${selectedOrder!['total'] ?? selectedOrder!['subtotal'] ?? ''}'
+                          //           : 'Select Order',
+                          //       style: const TextStyle(fontSize: 13),
+                          //     ),
+                          //   ),
+                          // ),
+                          const Text('Order'),
+                          const SizedBox(height: 6),
+                          // show order pre-selected (not editable here)
+                          InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Order',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            child: Text(
+                              selectedOrder != null
+                                  ? '${selectedOrder!['orderNumber'] ?? ''} • ₹${selectedOrder!['total'] ?? selectedOrder!['subtotal'] ?? ''}'
+                                  : '${order['orderNumber'] ?? order['_id'] ?? ''}',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          if (selectedOrder != null) ...[
+                            const Text(
+                              'Dispatch Quantities per Item',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            for (int i = 0; i < orderItems.length; i++)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 6.0,
+                                ),
+                                child: Card(
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  color: Colors.grey.shade50,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          orderItems[i]['name'] ?? '',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        if ((orderItems[i]['availableSizes'] ??
+                                                [])
+                                            .isNotEmpty)
+                                          Text(
+                                            'Sizes: ${(orderItems[i]['availableSizes'] as List).join(", ")}',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            const Text(
+                                              'Ordered Qty',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '${orderItems[i]['quantity'] ?? ''}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            const Text(
+                                              'Already Dispatched',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '${_alreadyDispatchedForItem(orderItems[i])}',
+                                              style: const TextStyle(
+                                                color: Colors.green,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.remove_circle_outline,
+                                                size: 20,
+                                              ),
+                                              onPressed: () {
+                                                final orderedSets =
+                                                    int.tryParse(
+                                                      orderItems[i]['quantity']
+                                                              ?.toString() ??
+                                                          '0',
+                                                    ) ??
+                                                    0;
+                                                final already =
+                                                    _alreadyDispatchedForItem(
+                                                      orderItems[i],
+                                                    );
+                                                final remaining =
+                                                    (orderedSets - already) > 0
+                                                    ? (orderedSets - already)
+                                                    : 0;
+                                                int cur =
+                                                    (newDispatchMap[i] ?? 0) -
+                                                    1;
+                                                if (cur < 0) cur = 0;
+                                                newDispatchMap[i] = cur;
+                                                dispatchControllers
+                                                    .putIfAbsent(
+                                                      i,
+                                                      () =>
+                                                          TextEditingController(),
+                                                    )
+                                                    .text = newDispatchMap[i]
+                                                    .toString();
+                                                setStateModal(() {});
+                                              },
+                                            ),
+                                            Expanded(
+                                              child: Builder(
+                                                builder: (_) {
+                                                  final orderedSets =
+                                                      int.tryParse(
+                                                        orderItems[i]['quantity']
+                                                                ?.toString() ??
+                                                            '0',
+                                                      ) ??
+                                                      0;
+                                                  final already =
+                                                      _alreadyDispatchedForItem(
+                                                        orderItems[i],
+                                                      );
+                                                  final remaining =
+                                                      (orderedSets - already) >
+                                                          0
+                                                      ? (orderedSets - already)
+                                                      : 0;
+                                                  final controller =
+                                                      dispatchControllers.putIfAbsent(
+                                                        i,
+                                                        () => TextEditingController(
+                                                          text:
+                                                              (newDispatchMap[i] ??
+                                                                      0)
+                                                                  .toString(),
+                                                        ),
+                                                      );
+                                                  return TextFormField(
+                                                    controller: controller,
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                    ),
+                                                    keyboardType:
+                                                        TextInputType.number,
+                                                    textAlign: TextAlign.center,
+                                                    decoration:
+                                                        const InputDecoration(
+                                                          isDense: true,
+                                                          contentPadding:
+                                                              EdgeInsets.symmetric(
+                                                                vertical: 6,
+                                                              ),
+                                                        ),
+                                                    onChanged: (v) {
+                                                      int val =
+                                                          int.tryParse(v) ?? 0;
+                                                      if (val < 0) val = 0;
+                                                      if (val > remaining)
+                                                        val = remaining;
+                                                      newDispatchMap[i] = val;
+                                                      if (controller.text !=
+                                                          val.toString())
+                                                        controller.text = val
+                                                            .toString();
+                                                      controller.selection =
+                                                          TextSelection.collapsed(
+                                                            offset: controller
+                                                                .text
+                                                                .length,
+                                                          );
+                                                      setStateModal(() {});
+                                                    },
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.add_circle_outline,
+                                                size: 20,
+                                              ),
+                                              onPressed: () {
+                                                final orderedSets =
+                                                    int.tryParse(
+                                                      orderItems[i]['quantity']
+                                                              ?.toString() ??
+                                                          '0',
+                                                    ) ??
+                                                    0;
+                                                final already =
+                                                    _alreadyDispatchedForItem(
+                                                      orderItems[i],
+                                                    );
+                                                final remaining =
+                                                    (orderedSets - already) > 0
+                                                    ? (orderedSets - already)
+                                                    : 0;
+                                                int cur =
+                                                    (newDispatchMap[i] ?? 0) +
+                                                    1;
+                                                if (cur > remaining)
+                                                  cur = remaining;
+                                                newDispatchMap[i] = cur;
+                                                dispatchControllers
+                                                    .putIfAbsent(
+                                                      i,
+                                                      () =>
+                                                          TextEditingController(),
+                                                    )
+                                                    .text = newDispatchMap[i]
+                                                    .toString();
+                                                setStateModal(() {});
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Value: ₹${(() {
+                                            final item = orderItems[i];
+                                            final prod = item['productId'] as Map<String, dynamic>?;
+                                            final filnal = item['filnalLotPrice'] ?? prod?['filnalLotPrice'];
+                                            final hasFilnal = filnal != null && filnal.toString().trim().isNotEmpty;
+                                            final int sets = newDispatchMap[i] ?? 0;
+                                            if (hasFilnal) {
+                                              final double pricePerSet = double.tryParse(filnal.toString()) ?? 0.0;
+                                              return (pricePerSet * sets).round();
+                                            } else {
+                                              final double pricePerPiece = double.tryParse((item['singlePicPrice'] ?? item['price'] ?? 0).toString()) ?? 0.0;
+                                              final int pcs = int.tryParse(item['pcsInSet']?.toString() ?? '1') ?? 1;
+                                              return (pricePerPiece * pcs * sets).round();
+                                            }
+                                          }())}',
+                                          style: const TextStyle(
+                                            color: Colors.indigo,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            Card(
+                              color: Colors.indigo.shade50,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12.0),
+                                child: Row(
+                                  children: [
+                                    const Expanded(
+                                      child: Text(
+                                        'Total Dispatch Value:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '₹${_computeTotalValue()}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.indigo,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: selectedVendor,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Delivery Vendor',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                  items: vendors
+                                      .map(
+                                        (v) => DropdownMenuItem(
+                                          value: v,
+                                          child: Text(v),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) => setStateModal(
+                                    () => selectedVendor = v ?? selectedVendor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Notes / Tracking ID',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                  controller: TextEditingController(
+                                    text: notes,
+                                  ),
+                                  onChanged: (v) => notes = v,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.of(sheetCtx).pop(),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                // onPressed: () async {
+                                //   if (selectedCustomer == null ||
+                                //       selectedOrder == null) {
+                                //     ScaffoldMessenger.of(context).showSnackBar(
+                                //       const SnackBar(
+                                //         content: Text(
+                                //           'Select customer and order',
+                                //         ),
+                                //       ),
+                                //     );
+                                //     return;
+                                //   }
+
+                                //   final itemsPayload = <Map<String, dynamic>>[];
+                                //   for (int i = 0; i < orderItems.length; i++) {
+                                //     final item = orderItems[i];
+                                //     final int newDispatchSets =
+                                //         newDispatchMap[i] ?? 0;
+                                //     if (newDispatchSets <= 0) continue;
+                                //     final already = _alreadyDispatchedForItem(
+                                //       item,
+                                //     );
+                                //     final prod =
+                                //         item['productId']
+                                //             as Map<String, dynamic>?;
+                                //     final filnalRaw =
+                                //         item['filnalLotPrice'] ??
+                                //         prod?['filnalLotPrice'];
+                                //     final bool hasFilnal =
+                                //         filnalRaw != null &&
+                                //         filnalRaw.toString().trim().isNotEmpty;
+                                //     double priceValue = 0.0;
+                                //     String priceUnit = 'piece';
+                                //     if (hasFilnal) {
+                                //       priceValue =
+                                //           double.tryParse(
+                                //             filnalRaw.toString(),
+                                //           ) ??
+                                //           0.0;
+                                //       priceUnit = 'set';
+                                //     } else {
+                                //       priceValue =
+                                //           double.tryParse(
+                                //             (item['singlePicPrice'] ??
+                                //                     item['price'] ??
+                                //                     0)
+                                //                 .toString(),
+                                //           ) ??
+                                //           0.0;
+                                //       priceUnit = 'piece';
+                                //     }
+                                //     final pcsInSet =
+                                //         int.tryParse(
+                                //           item['pcsInSet']?.toString() ?? '1',
+                                //         ) ??
+                                //         1;
+                                //     itemsPayload.add({
+                                //       'name': item['name'] ?? '',
+                                //       'availableSizes':
+                                //           item['availableSizes'] ?? [],
+                                //       'dispatchedQty': newDispatchSets,
+                                //       'price': priceValue,
+                                //       'priceUnit': priceUnit,
+                                //       'pcsInSet': pcsInSet,
+                                //       'selectedSizes':
+                                //           item['selectedSizes'] ?? [],
+                                //       'alreadyDispatched': already,
+                                //     });
+                                //   }
+
+                                //   if (itemsPayload.isEmpty) {
+                                //     ScaffoldMessenger.of(context).showSnackBar(
+                                //       const SnackBar(
+                                //         content: Text(
+                                //           'Enter dispatch qty for at least one item',
+                                //         ),
+                                //       ),
+                                //     );
+                                //     return;
+                                //   }
+
+                                //   final totalValue = itemsPayload.fold<int>(0, (
+                                //     sum,
+                                //     it,
+                                //   ) {
+                                //     final p =
+                                //         double.tryParse(
+                                //           (it['price'] ?? 0).toString(),
+                                //         ) ??
+                                //         0.0;
+                                //     final pcs =
+                                //         int.tryParse(
+                                //           (it['pcsInSet'] ?? 1).toString(),
+                                //         ) ??
+                                //         1;
+                                //     final sets =
+                                //         int.tryParse(
+                                //           (it['dispatchedQty'] ?? 0).toString(),
+                                //         ) ??
+                                //         0;
+                                //     final unit = (it['priceUnit'] ?? 'piece')
+                                //         .toString();
+                                //     if (unit == 'set')
+                                //       return sum + (p * sets).round();
+                                //     return sum + (p * pcs * sets).round();
+                                //   });
+
+                                //   final body = {
+                                //     "customerId":
+                                //         (selectedCustomer!['_id'] ??
+                                //                 selectedCustomer!['id'])
+                                //             ?.toString(),
+                                //     "customer": selectedCustomer!['name'] ?? '',
+                                //     "orderId":
+                                //         (selectedOrder!['_id'] ??
+                                //                 selectedOrder!['id'])
+                                //             ?.toString(),
+                                //     "orderNumber":
+                                //         selectedOrder!['orderNumber'] ?? '',
+                                //     "items": itemsPayload,
+                                //     "totalValue": totalValue,
+                                //     "date": DateTime.now()
+                                //         .toIso8601String()
+                                //         .substring(0, 10),
+                                //     "status": "Dispatched",
+                                //     "vendor": selectedVendor,
+                                //     "notes": notes,
+                                //   };
+
+                                //   try {
+                                //     final resp = await AppDataRepo()
+                                //         .createChallan(body);
+                                //     if (resp['success'] == true ||
+                                //         resp['status'] == true ||
+                                //         resp['challan'] != null) {
+                                //       Navigator.of(sheetCtx).pop();
+                                //       ScaffoldMessenger.of(
+                                //         context,
+                                //       ).showSnackBar(
+                                //         const SnackBar(
+                                //           content: Text('Challan created'),
+                                //         ),
+                                //       );
+                                //       // Optionally navigate to challan screen or refresh parent - caller can implement refresh
+                                //     } else {
+                                //       final msg =
+                                //           resp['message']?.toString() ??
+                                //           'Failed to create challan';
+                                //       ScaffoldMessenger.of(
+                                //         context,
+                                //       ).showSnackBar(
+                                //         SnackBar(content: Text(msg)),
+                                //       );
+                                //     }
+                                //   } catch (e) {
+                                //     ScaffoldMessenger.of(context).showSnackBar(
+                                //       SnackBar(content: Text('Error: $e')),
+                                //     );
+                                //   }
+                                // },
+                                onPressed: () async {
+                                  debugPrint('Create Challan tapped');
+
+                                  // Derive customerId from selectedCustomer OR from order payload
+                                  String? effectiveCustomerId;
+                                  if (selectedCustomer != null) {
+                                    effectiveCustomerId =
+                                        (selectedCustomer!['_id'] ??
+                                                selectedCustomer!['id'])
+                                            ?.toString();
+                                  }
+                                  // order might store customer.userId._id (see console output), or customerId field
+                                  effectiveCustomerId ??=
+                                      (order['customer'] is Map)
+                                      ? (order['customer']['userId']?['_id']
+                                                ?.toString() ??
+                                            order['customer']['_id']
+                                                ?.toString())
+                                      : null;
+                                  effectiveCustomerId ??= order['customerId']
+                                      ?.toString();
+
+                                  // Derive orderId
+                                  final String? effectiveOrderId =
+                                      (selectedOrder?['_id'] ??
+                                              selectedOrder?['id'] ??
+                                              order['_id'] ??
+                                              order['id'])
+                                          ?.toString();
+
+                                  debugPrint(
+                                    'effectiveCustomerId: $effectiveCustomerId',
+                                  );
+                                  debugPrint(
+                                    'effectiveOrderId: $effectiveOrderId',
+                                  );
+
+                                  if (effectiveCustomerId == null ||
+                                      effectiveOrderId == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Missing customerId or orderId',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  final itemsPayload = <Map<String, dynamic>>[];
+                                  for (int i = 0; i < orderItems.length; i++) {
+                                    final item = orderItems[i];
+                                    final int newDispatchSets =
+                                        newDispatchMap[i] ?? 0;
+                                    if (newDispatchSets <= 0) continue;
+                                    final already = _alreadyDispatchedForItem(
+                                      item,
+                                    );
+                                    final prod =
+                                        item['productId']
+                                            as Map<String, dynamic>?;
+                                    final filnalRaw =
+                                        item['filnalLotPrice'] ??
+                                        prod?['filnalLotPrice'];
+                                    final bool hasFilnal =
+                                        filnalRaw != null &&
+                                        filnalRaw.toString().trim().isNotEmpty;
+                                    double priceValue = 0.0;
+                                    String priceUnit = 'piece';
+                                    if (hasFilnal) {
+                                      priceValue =
+                                          double.tryParse(
+                                            filnalRaw.toString(),
+                                          ) ??
+                                          0.0;
+                                      priceUnit = 'set';
+                                    } else {
+                                      priceValue =
+                                          double.tryParse(
+                                            (item['singlePicPrice'] ??
+                                                    item['price'] ??
+                                                    0)
+                                                .toString(),
+                                          ) ??
+                                          0.0;
+                                      priceUnit = 'piece';
+                                    }
+                                    final pcsInSet =
+                                        int.tryParse(
+                                          item['pcsInSet']?.toString() ?? '1',
+                                        ) ??
+                                        1;
+                                    itemsPayload.add({
+                                      'name': item['name'] ?? '',
+                                      'availableSizes':
+                                          item['availableSizes'] ?? [],
+                                      'dispatchedQty': newDispatchSets,
+                                      'price': priceValue,
+                                      'priceUnit': priceUnit,
+                                      'pcsInSet': pcsInSet,
+                                      'selectedSizes':
+                                          item['selectedSizes'] ?? [],
+                                      'alreadyDispatched': already,
+                                    });
+                                  }
+
+                                  if (itemsPayload.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Enter dispatch qty for at least one item',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  final totalValue = itemsPayload.fold<int>(0, (
+                                    sum,
+                                    it,
+                                  ) {
+                                    final p =
+                                        double.tryParse(
+                                          (it['price'] ?? 0).toString(),
+                                        ) ??
+                                        0.0;
+                                    final pcs =
+                                        int.tryParse(
+                                          (it['pcsInSet'] ?? 1).toString(),
+                                        ) ??
+                                        1;
+                                    final sets =
+                                        int.tryParse(
+                                          (it['dispatchedQty'] ?? 0).toString(),
+                                        ) ??
+                                        0;
+                                    final unit = (it['priceUnit'] ?? 'piece')
+                                        .toString();
+                                    if (unit == 'set')
+                                      return sum + (p * sets).round();
+                                    return sum + (p * pcs * sets).round();
+                                  });
+
+                                  final body = {
+                                    "customerId": effectiveCustomerId,
+                                    "customer":
+                                        selectedCustomer?['name'] ??
+                                        ((order['customer'] is Map)
+                                            ? (order['customer']['name']
+                                                      ?.toString() ??
+                                                  '')
+                                            : (order['customer']?.toString() ??
+                                                  '')),
+                                    "orderId": effectiveOrderId,
+                                    "orderNumber":
+                                        selectedOrder?['orderNumber'] ??
+                                        order['orderNumber'] ??
+                                        '',
+                                    "items": itemsPayload,
+                                    "totalValue": totalValue,
+                                    "date": DateTime.now()
+                                        .toIso8601String()
+                                        .substring(0, 10),
+                                    "status": "Dispatched",
+                                    "vendor": selectedVendor,
+                                    "notes": notes,
+                                  };
+
+                                  // Print URL/body/response to console
+                                  const String reqUrl =
+                                      'https://api.sddipl.com/api/challan/create-challan';
+                                  debugPrint('POST $reqUrl');
+                                  try {
+                                    debugPrint(
+                                      'Request body: ${jsonEncode(body)}',
+                                    );
+                                  } catch (_) {
+                                    debugPrint('Request body (raw): $body');
+                                  }
+
+                                  try {
+                                    final resp = await AppDataRepo()
+                                        .createChallan(body);
+                                    try {
+                                      debugPrint(
+                                        'Response body: ${jsonEncode(resp)}',
+                                      );
+                                    } catch (_) {
+                                      debugPrint('Response (raw): $resp');
+                                    }
+
+                                    if (resp['success'] == true ||
+                                        resp['status'] == true ||
+                                        resp['challan'] != null) {
+                                      Navigator.of(sheetCtx).pop();
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Challan created'),
+                                        ),
+                                      );
+                                    } else {
+                                      final msg =
+                                          resp['message']?.toString() ??
+                                          'Failed to create challan';
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text(msg)),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    debugPrint('Create challan error: $e');
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
+                                    );
+                                  }
+                                },
+
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.indigo,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text(
+                                  'Create Challan',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final allOrders =
@@ -348,6 +1710,16 @@ class OrderDetailsPage extends StatelessWidget {
         appBar: AppBar(title: Text('Order Details')),
         body: Center(child: Text('Order not found')),
       );
+    } else {
+      try {
+        debugPrint(
+          'OrderDetailsPage: displaying order for id=$orderId -> ${jsonEncode(order)}',
+        );
+      } catch (_) {
+        debugPrint(
+          'OrderDetailsPage: displaying order for id=$orderId -> $order',
+        );
+      }
     }
 
     final customer = order['customer'] ?? {};
@@ -1340,43 +2712,8 @@ class OrderDetailsPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      onPressed: () {
-                        // Offer download / share options for challan (uses existing pdf helpers)
-                        showModalBottomSheet(
-                          context: context,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(12),
-                            ),
-                          ),
-                          builder: (ctx) {
-                            return SafeArea(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ListTile(
-                                    leading: const Icon(Icons.download),
-                                    title: const Text('Download Challan PDF'),
-                                    onTap: () {
-                                      Navigator.of(ctx).pop();
-                                      _downloadOrderPdf(order, context);
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.share),
-                                    title: const Text('Share Challan PDF'),
-                                    onTap: () {
-                                      Navigator.of(ctx).pop();
-                                      _shareOrderPdf(order, context);
-                                    },
-                                  ),
-                                  const SizedBox(height: 8),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      },
+                      onPressed: () =>
+                          _openCreateChallanFromOrder(context, order),
                     ),
                   ),
                 ],

@@ -9,7 +9,11 @@ import '../constants/image_placeholder.dart';
 class UpdateProductPage extends StatefulWidget {
   final Map<String, dynamic> productData;
   final void Function()? onUpdated;
-  const UpdateProductPage({required this.productData, this.onUpdated, super.key});
+  const UpdateProductPage({
+    required this.productData,
+    this.onUpdated,
+    super.key,
+  });
 
   @override
   State<UpdateProductPage> createState() => _UpdateProductPageState();
@@ -35,7 +39,11 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
   late List<File> imageFiles;
   late List<String> existingImages;
   late String filnalLotPrice;
-String generatedBarcode = '';
+  String generatedBarcode = '';
+
+  // sizes
+  List<Map<String, dynamic>> sizeOptions = [];
+  bool loadingSizes = false;
 
   @override
   void initState() {
@@ -43,15 +51,26 @@ String generatedBarcode = '';
     final data = widget.productData;
     initialData = Map<String, dynamic>.from(data);
 
-    nameController = TextEditingController(text: data['color']?.toString() ?? '');
-    lotNumberController = TextEditingController(text: data['lotNumber']?.toString() ?? '');
-    descriptionController = TextEditingController(text: data['description']?.toString() ?? '');
-    barcodeController = TextEditingController(text: data['barcode']?.toString() ?? '');
+    nameController = TextEditingController(
+      text: data['color']?.toString() ?? '',
+    );
+    lotNumberController = TextEditingController(
+      text: data['lotNumber']?.toString() ?? '',
+    );
+    descriptionController = TextEditingController(
+      text: data['description']?.toString() ?? '',
+    );
+    barcodeController = TextEditingController(
+      text: data['barcode']?.toString() ?? '',
+    );
     pcsInSet = int.tryParse(data['pcsInSet']?.toString() ?? '') ?? 1;
     lotStock = int.tryParse(data['lotStock']?.toString() ?? '') ?? 1;
-    singlePicPrice = int.tryParse(data['singlePicPrice']?.toString() ?? '') ?? 1;
+    singlePicPrice =
+        int.tryParse(data['singlePicPrice']?.toString() ?? '') ?? 1;
     color = data['color']?.toString() ?? '';
-    status = data['stock']?.toString() ?? (data['status'] == true ? 'In Stock' : 'Out of Stock');
+    status =
+        data['stock']?.toString() ??
+        (data['status'] == true ? 'In Stock' : 'Out of Stock');
     activeStatus = data['isActive'] == true ? 'Active' : 'Inactive';
     dateOfOpening = data['dateOfOpening'] != null
         ? DateTime.tryParse(data['dateOfOpening'].toString())
@@ -80,6 +99,76 @@ String generatedBarcode = '';
     }
     imageFiles = [];
     filnalLotPrice = data['filnalLotPrice']?.toString() ?? '';
+
+    _fetchSizes();
+  }
+
+  Future<void> _fetchSizes() async {
+    setState(() => loadingSizes = true);
+    try {
+      final res = await AppDataRepo().fetchAllSizes();
+      setState(() {
+        sizeOptions = List<Map<String, dynamic>>.from(res);
+      });
+    } catch (e) {
+      debugPrint('Error fetching sizes: $e');
+    } finally {
+      setState(() => loadingSizes = false);
+    }
+  }
+
+  Widget _sizesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Available Sizes',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        loadingSizes
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: CircularProgressIndicator(),
+              )
+            : Wrap(
+                spacing: 8,
+                children: sizeOptions.map((sizeObj) {
+                  final size = sizeObj['size']?.toString() ?? '';
+                  return ActionChip(
+                    label: Text(size, style: const TextStyle(fontSize: 12)),
+                    onPressed: () {
+                      setState(() {
+                        // same behaviour as AddProductForm: add (allow duplicates if any)
+                        selectedSizes.add(size);
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+        const SizedBox(height: 8),
+        const Text(
+          'Selected Sizes',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: selectedSizes.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final size = entry.value;
+            return Chip(
+              label: Text(size, style: const TextStyle(fontSize: 12)),
+              onDeleted: () {
+                setState(() {
+                  selectedSizes.removeAt(idx);
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
   }
 
   Future<void> _pickImages() async {
@@ -107,13 +196,13 @@ String generatedBarcode = '';
   }
 
   Future<void> _submit() async {
-     final totalImages = existingImages.length + imageFiles.length;
-  if (totalImages < 3 || totalImages > 8) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Please provide between 3 and 8 images.')),
-    );
-    return;
-  }
+    final totalImages = existingImages.length + imageFiles.length;
+    if (totalImages < 3 || totalImages > 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please provide between 3 and 8 images.')),
+      );
+      return;
+    }
     setState(() => _isSubmitting = true);
     try {
       final Map<String, dynamic> updatedFields = {};
@@ -121,13 +210,16 @@ String generatedBarcode = '';
       if (nameController.text != (initialData['color']?.toString() ?? '')) {
         updatedFields['color'] = nameController.text;
       }
-      if (lotNumberController.text != (initialData['lotNumber']?.toString() ?? '')) {
+      if (lotNumberController.text !=
+          (initialData['lotNumber']?.toString() ?? '')) {
         updatedFields['lotNumber'] = lotNumberController.text;
       }
-      if (descriptionController.text != (initialData['description']?.toString() ?? '')) {
+      if (descriptionController.text !=
+          (initialData['description']?.toString() ?? '')) {
         updatedFields['description'] = descriptionController.text;
       }
-      if (barcodeController.text != (initialData['barcode']?.toString() ?? '')) {
+      if (barcodeController.text !=
+          (initialData['barcode']?.toString() ?? '')) {
         updatedFields['barcode'] = barcodeController.text;
       }
       if (pcsInSet != int.tryParse(initialData['pcsInSet']?.toString() ?? '')) {
@@ -136,19 +228,27 @@ String generatedBarcode = '';
       if (lotStock != int.tryParse(initialData['lotStock']?.toString() ?? '')) {
         updatedFields['lotStock'] = lotStock.toString();
       }
-      if (singlePicPrice != int.tryParse(initialData['singlePicPrice']?.toString() ?? '')) {
+      if (singlePicPrice !=
+          int.tryParse(initialData['singlePicPrice']?.toString() ?? '')) {
         updatedFields['singlePicPrice'] = singlePicPrice;
       }
-      if (status != (initialData['stock']?.toString() ?? (initialData['status'] == true ? 'In Stock' : 'Out of Stock'))) {
+      if (status !=
+          (initialData['stock']?.toString() ??
+              (initialData['status'] == true ? 'In Stock' : 'Out of Stock'))) {
         updatedFields['stock'] = status;
       }
-      if (activeStatus != (initialData['isActive'] == true ? 'Active' : 'Inactive')) {
+      if (activeStatus !=
+          (initialData['isActive'] == true ? 'Active' : 'Inactive')) {
         updatedFields['isActive'] = activeStatus == 'Active';
       }
-      if (dateOfOpening?.toIso8601String() != (initialData['dateOfOpening']?.toString() ?? '')) {
+      if (dateOfOpening?.toIso8601String() !=
+          (initialData['dateOfOpening']?.toString() ?? '')) {
         updatedFields['dateOfOpening'] = dateOfOpening?.toIso8601String();
       }
-      if (jsonEncode(selectedSizes) != (initialData['sizes'] is String ? initialData['sizes'] : jsonEncode(initialData['sizes']))) {
+      if (jsonEncode(selectedSizes) !=
+          (initialData['sizes'] is String
+              ? initialData['sizes']
+              : jsonEncode(initialData['sizes']))) {
         updatedFields['selectedSizes'] = jsonEncode(selectedSizes);
       }
       if (filnalLotPrice != (initialData['filnalLotPrice']?.toString() ?? '')) {
@@ -159,7 +259,9 @@ String generatedBarcode = '';
       }
 
       if (updatedFields.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No changes to update.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('No changes to update.')));
         setState(() => _isSubmitting = false);
         return;
       }
@@ -168,35 +270,48 @@ String generatedBarcode = '';
       final res = await AppDataRepo().updateSubProduct(id, updatedFields);
 
       if (res['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Product updated successfully!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Product updated successfully!')),
+        );
         if (widget.onUpdated != null) widget.onUpdated!();
         Navigator.of(context).pop(true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update product.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update product.')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       setState(() => _isSubmitting = false);
     }
   }
 
-String _generateRandomEAN13() {
-  final rand = List.generate(12, (_) => (1 + (DateTime.now().microsecond + DateTime.now().millisecond) % 9).toString());
-  final base = rand.join();
-  int sum = 0;
-  for (int i = 0; i < base.length; i++) {
-    int digit = int.parse(base[i]);
-    sum += (i % 2 == 0) ? digit : digit * 3;
+  String _generateRandomEAN13() {
+    final rand = List.generate(
+      12,
+      (_) => (1 + (DateTime.now().microsecond + DateTime.now().millisecond) % 9)
+          .toString(),
+    );
+    final base = rand.join();
+    int sum = 0;
+    for (int i = 0; i < base.length; i++) {
+      int digit = int.parse(base[i]);
+      sum += (i % 2 == 0) ? digit : digit * 3;
+    }
+    int checkDigit = (10 - (sum % 10)) % 10;
+    return base + checkDigit.toString();
   }
-  int checkDigit = (10 - (sum % 10)) % 10;
-  return base + checkDigit.toString();
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Update Product'), backgroundColor: Colors.indigo),
+      appBar: AppBar(
+        title: Text('Update Product'),
+        backgroundColor: Colors.indigo,
+      ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Form(
@@ -205,89 +320,93 @@ String _generateRandomEAN13() {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Images
-              Text('Product Images', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                'Product Images',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               SizedBox(height: 8),
               // In your image list builder inside UpdateProductPage:
-SizedBox(
-  height: 100,
-  child: ListView.separated(
-    scrollDirection: Axis.horizontal,
-    itemCount: 8,
-    separatorBuilder: (_, __) => SizedBox(width: 8),
-    itemBuilder: (context, idx) {
-      if (idx < existingImages.length) {
-        // Existing images
-        return Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                existingImages[idx],
-                width: 100,
+              SizedBox(
                 height: 100,
-                fit: BoxFit.cover,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: 8,
+                  separatorBuilder: (_, __) => SizedBox(width: 8),
+                  itemBuilder: (context, idx) {
+                    if (idx < existingImages.length) {
+                      // Existing images
+                      return Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              existingImages[idx],
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: IconButton(
+                              icon: Icon(Icons.close, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  existingImages.removeAt(idx);
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    } else if (idx <
+                        existingImages.length + imageFiles.length) {
+                      // New images
+                      final fileIdx = idx - existingImages.length;
+                      return Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              imageFiles[fileIdx],
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: IconButton(
+                              icon: Icon(Icons.close, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  imageFiles.removeAt(fileIdx);
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    } else {
+                      // Placeholder for empty slots
+                      return GestureDetector(
+                        onTap: _pickImages,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            kImagePlaceholderUrl,
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
               ),
-            ),
-            Positioned(
-              right: 0,
-              top: 0,
-              child: IconButton(
-                icon: Icon(Icons.close, color: Colors.red),
-                onPressed: () {
-                  setState(() {
-                    existingImages.removeAt(idx);
-                  });
-                },
-              ),
-            ),
-          ],
-        );
-      } else if (idx < existingImages.length + imageFiles.length) {
-        // New images
-        final fileIdx = idx - existingImages.length;
-        return Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(
-                imageFiles[fileIdx],
-                width: 100,
-                height: 100,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Positioned(
-              right: 0,
-              top: 0,
-              child: IconButton(
-                icon: Icon(Icons.close, color: Colors.red),
-                onPressed: () {
-                  setState(() {
-                    imageFiles.removeAt(fileIdx);
-                  });
-                },
-              ),
-            ),
-          ],
-        );
-      } else {
-        // Placeholder for empty slots
-        return GestureDetector(
-          onTap: _pickImages,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              kImagePlaceholderUrl,
-              width: 100,
-              height: 100,
-              fit: BoxFit.cover,
-            ),
-          ),
-        );
-      }
-    },
-  ),
-),
               SizedBox(height: 8),
               ElevatedButton.icon(
                 onPressed: _pickImages,
@@ -320,92 +439,100 @@ SizedBox(
                 maxLines: 2,
               ),
               SizedBox(height: 16),
-//               TextField(
-//                 controller: barcodeController,
-//                 decoration: InputDecoration(
-//                   labelText: 'Barcode',
-//                   border: OutlineInputBorder(),
-//                 ),
-//               ),
-//               SizedBox(height: 8),
-//            ElevatedButton.icon(
-//   onPressed: () {
-//     final rand = Random();
-//     final barcode = List.generate(13, (_) => rand.nextInt(10).toString()).join();
-//     setState(() {
-//       barcodeController.text = barcode;
-//     });
-//   },
-//   icon: Icon(Icons.qr_code),
-//   label: Text('Generate Barcode'),
-// ),
+              //               TextField(
+              //                 controller: barcodeController,
+              //                 decoration: InputDecoration(
+              //                   labelText: 'Barcode',
+              //                   border: OutlineInputBorder(),
+              //                 ),
+              //               ),
+              //               SizedBox(height: 8),
+              //            ElevatedButton.icon(
+              //   onPressed: () {
+              //     final rand = Random();
+              //     final barcode = List.generate(13, (_) => rand.nextInt(10).toString()).join();
+              //     setState(() {
+              //       barcodeController.text = barcode;
+              //     });
+              //   },
+              //   icon: Icon(Icons.qr_code),
+              //   label: Text('Generate Barcode'),
+              // ),
 
-// TextField(
-//   controller: barcodeController,
-//   decoration: InputDecoration(
-//     labelText: 'Barcode',
-//     border: OutlineInputBorder(),
-//   ),
-// ),
-SizedBox(height: 8),
-Text('Barcode', style: TextStyle(fontWeight: FontWeight.bold)),
-SizedBox(height: 8),
-Row(
-  children: [
-    Expanded(
-      child: TextField(
-        controller: barcodeController,
-        decoration: InputDecoration(
-          labelText: 'Barcode Number',
-          border: OutlineInputBorder(),
-          counterText: '',
-        ),
-        keyboardType: TextInputType.number,
-        onChanged: (val) {
-          setState(() {
-            generatedBarcode = val;
-          });
-        },
-      ),
-    ),
-    SizedBox(width: 8),
-    ElevatedButton(
-      onPressed: () {
-        String randomBarcode = _generateRandomEAN13();
-        setState(() {
-          barcodeController.text = randomBarcode;
-          generatedBarcode = randomBarcode;
-        });
-      },
-      child: Text('Generate Barcode'),
-    ),
-  ],
-),
-SizedBox(height: 8),
-if (barcodeController.text.isNotEmpty)
-  Row(
-    children: [
-      SizedBox(
-        height: 60,
-        child: Image.network(
-          'https://barcode.tec-it.com/barcode.ashx?data=${barcodeController.text}&code=EAN13',
-          height: 48,
-          fit: BoxFit.contain,
-        ),
-      ),
-      SizedBox(height: 8),
-      Text(barcodeController.text, style: TextStyle(fontWeight: FontWeight.bold)),
-    ],
-  ),// SizedBox(height: 16),
-SizedBox(height: 16),
+              // TextField(
+              //   controller: barcodeController,
+              //   decoration: InputDecoration(
+              //     labelText: 'Barcode',
+              //     border: OutlineInputBorder(),
+              //   ),
+              // ),
+              SizedBox(height: 8),
+              Text('Barcode', style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
-                    child: Text('Date of Opening', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: TextField(
+                      controller: barcodeController,
+                      decoration: InputDecoration(
+                        labelText: 'Barcode Number',
+                        border: OutlineInputBorder(),
+                        counterText: '',
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (val) {
+                        setState(() {
+                          generatedBarcode = val;
+                        });
+                      },
+                    ),
                   ),
-                  Text(dateOfOpening != null
-                      ? '${dateOfOpening!.day}/${dateOfOpening!.month}/${dateOfOpening!.year}'
-                      : 'Select Date'),
+                  SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      String randomBarcode = _generateRandomEAN13();
+                      setState(() {
+                        barcodeController.text = randomBarcode;
+                        generatedBarcode = randomBarcode;
+                      });
+                    },
+                    child: Text('Generate Barcode'),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              if (barcodeController.text.isNotEmpty)
+                Row(
+                  children: [
+                    SizedBox(
+                      height: 60,
+                      child: Image.network(
+                        'https://barcode.tec-it.com/barcode.ashx?data=${barcodeController.text}&code=EAN13',
+                        height: 48,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      barcodeController.text,
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ), // SizedBox(height: 16),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Date of Opening',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Text(
+                    dateOfOpening != null
+                        ? '${dateOfOpening!.day}/${dateOfOpening!.month}/${dateOfOpening!.year}'
+                        : 'Select Date',
+                  ),
                   IconButton(
                     icon: Icon(Icons.calendar_today),
                     onPressed: () => _selectDate(context),
@@ -447,8 +574,11 @@ SizedBox(height: 16),
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
-                controller: TextEditingController(text: singlePicPrice.toString()),
-                onChanged: (val) => singlePicPrice = int.tryParse(val) ?? singlePicPrice,
+                controller: TextEditingController(
+                  text: singlePicPrice.toString(),
+                ),
+                onChanged: (val) =>
+                    singlePicPrice = int.tryParse(val) ?? singlePicPrice,
               ),
               SizedBox(height: 16),
               TextField(
@@ -463,10 +593,11 @@ SizedBox(height: 16),
               SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: status,
-                items: ['In Stock', 'Out of Stock'].map((opt) => DropdownMenuItem(
-                  value: opt,
-                  child: Text(opt),
-                )).toList(),
+                items: ['In Stock', 'Out of Stock']
+                    .map(
+                      (opt) => DropdownMenuItem(value: opt, child: Text(opt)),
+                    )
+                    .toList(),
                 decoration: InputDecoration(
                   labelText: 'Stock Status',
                   border: OutlineInputBorder(),
@@ -480,10 +611,11 @@ SizedBox(height: 16),
               SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: activeStatus,
-                items: ['Active', 'Inactive'].map((opt) => DropdownMenuItem(
-                  value: opt,
-                  child: Text(opt),
-                )).toList(),
+                items: ['Active', 'Inactive']
+                    .map(
+                      (opt) => DropdownMenuItem(value: opt, child: Text(opt)),
+                    )
+                    .toList(),
                 decoration: InputDecoration(
                   labelText: 'Active Status',
                   border: OutlineInputBorder(),
@@ -495,26 +627,34 @@ SizedBox(height: 16),
                 },
               ),
               SizedBox(height: 16),
-              Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-              Wrap(
-                spacing: 8,
-                children: ['28', '30', '32', '34', '36', '38', '40'].map((size) {
-                  final isSelected = selectedSizes.contains(size);
-                  return ChoiceChip(
-                    label: Text(size),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          if (!selectedSizes.contains(size)) selectedSizes.add(size);
-                        } else {
-                          selectedSizes.remove(size);
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
+              // Text(
+              //   'Selected Sizes',
+              //   style: TextStyle(fontWeight: FontWeight.bold),
+              // ),
+              // Wrap(
+              //   spacing: 8,
+              //   children: ['28', '30', '32', '34', '36', '38', '40'].map((
+              //     size,
+              //   ) {
+              //     final isSelected = selectedSizes.contains(size);
+              //     return ChoiceChip(
+              //       label: Text(size),
+              //       selected: isSelected,
+              //       onSelected: (selected) {
+              //         setState(() {
+              //           if (selected) {
+              //             if (!selectedSizes.contains(size))
+              //               selectedSizes.add(size);
+              //           } else {
+              //             selectedSizes.remove(size);
+              //           }
+              //         });
+              //       },
+              //     );
+              //   }).toList(),
+              // ),
+              _sizesSection(),
+
               SizedBox(height: 24),
               Row(
                 children: [
@@ -527,7 +667,9 @@ SizedBox(height: 16),
                               height: 22,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : Text('Update Product'),

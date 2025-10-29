@@ -970,7 +970,7 @@ class _SalesReportsPageState extends State<SalesReportsPage> {
     'Custom Range',
   ];
   final List<String> sections = ['Overview', 'Jeans', 'Shirts'];
-  final List<String> reports = ['Section Wise', 'Daily Sales', 'Top Products'];
+  // final List<String> reports = ['Section Wise', 'Daily Sales', 'Top Products'];
 
   Map<String, dynamic>? jeansShirtData;
   Map<String, dynamic>? salesData;
@@ -1058,9 +1058,30 @@ class _SalesReportsPageState extends State<SalesReportsPage> {
     Widget sectionWidget;
 
     if (loading) {
-      sectionWidget = const Center(child: CircularProgressIndicator());
+      sectionWidget = const Center(
+        child: Padding(
+          padding: EdgeInsets.only(top: 40.0),
+          child: CircularProgressIndicator(color: Colors.indigo),
+        ),
+      );
     } else if (error != null) {
-      sectionWidget = Center(child: Text('Error: $error'));
+      sectionWidget = Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+            const SizedBox(height: 8),
+            Text(
+              'Error: $error',
+              style: const TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      );
     } else {
       sectionWidget = _buildSectionContent();
     }
@@ -1068,140 +1089,231 @@ class _SalesReportsPageState extends State<SalesReportsPage> {
     return UniversalScaffold(
       selectedIndex: -1,
       body: Container(
-        color: Colors.white,
+        color: Colors.grey[50],
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
+                // ---------- HEADER ----------
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12.0, left: 4.0),
-                  child: Text(
-                    'Sales & Reports',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 26,
-                      color: Colors.indigo,
-                    ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.bar_chart_rounded,
+                        color: Colors.indigo,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Sales & Reports',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
+                          color: Colors.indigo.shade700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                // Filter + Section Dropdowns
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedFilter,
-                        decoration: InputDecoration(
-                          labelText: 'Filter',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        items: filters
-                            .map(
-                              (f) => DropdownMenuItem(value: f, child: Text(f)),
-                            )
-                            .toList(),
-                        onChanged: (val) async {
-                          if (val == 'Custom Range') {
-                            final picked = await showDateRangePicker(
-                              context: context,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now(),
-                            );
-                            if (picked != null) {
-                              setState(() {
-                                _customDateRange = picked;
-                                _selectedFilter = val!;
-                              });
-                            }
-                          } else {
-                            setState(() {
-                              _selectedFilter = val!;
-                            });
-                          }
-                        },
+
+                const SizedBox(height: 6),
+
+                // ---------- FILTER SECTION ----------
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedSection,
-                        decoration: InputDecoration(
-                          labelText: 'Section',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Filters',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.indigo,
+                          fontSize: 13,
                         ),
-                        items: sections
-                            .map(
-                              (s) => DropdownMenuItem(value: s, child: Text(s)),
-                            )
-                            .toList(),
-                        onChanged: (val) {
-                          setState(() {
-                            _selectedSection = val!;
-                          });
-                        },
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Report Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: reports
-                        .map(
-                          (r) => Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4.0,
-                            ),
-                            child: ChoiceChip(
-                              label: Text(
-                                r,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedFilter,
+                              decoration: InputDecoration(
+                                labelText: 'Filter',
+                                labelStyle: const TextStyle(fontSize: 11),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
                                 ),
                               ),
-                              selected: _selectedReport == r,
-                              selectedColor: Colors.indigo,
-                              backgroundColor: Colors.white,
-                              labelStyle: TextStyle(
-                                color: _selectedReport == r
-                                    ? Colors.white
-                                    : Colors.indigo,
+                              items: filters
+                                  .map(
+                                    (f) => DropdownMenuItem(
+                                      value: f,
+                                      child: Text(
+                                        f,
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (val) async {
+                                if (val == 'Custom Range') {
+                                  final picked = await showDateRangePicker(
+                                    context: context,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime.now(),
+                                  );
+                                  if (picked != null) {
+                                    setState(() {
+                                      _customDateRange = picked;
+                                      _selectedFilter = val!;
+                                    });
+                                  }
+                                } else {
+                                  setState(() {
+                                    _selectedFilter = val!;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedSection,
+                              decoration: InputDecoration(
+                                labelText: 'Section',
+                                labelStyle: const TextStyle(fontSize: 11),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(color: Colors.indigo.shade100),
-                              ),
-                              onSelected: (selected) {
+                              items: sections
+                                  .map(
+                                    (s) => DropdownMenuItem(
+                                      value: s,
+                                      child: Text(
+                                        s,
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (val) {
                                 setState(() {
-                                  _selectedReport = r;
+                                  _selectedSection = val!;
                                 });
                               },
                             ),
                           ),
-                        )
-                        .toList(),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
+
                 const SizedBox(height: 16),
-                // Section Content
-                sectionWidget,
+
+                // ---------- REPORT CHIPS ----------
+                Text(
+                  'Reports',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.indigo.shade700,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Container(
+                //   decoration: BoxDecoration(
+                //     color: Colors.white,
+                //     borderRadius: BorderRadius.circular(12),
+                //     boxShadow: [
+                //       BoxShadow(
+                //         color: Colors.grey.withOpacity(0.1),
+                //         blurRadius: 6,
+                //         offset: const Offset(0, 2),
+                //       ),
+                //     ],
+                //   ),
+                //   padding: const EdgeInsets.symmetric(
+                //     horizontal: 8,
+                //     vertical: 8,
+                //   ),
+                //   child: SingleChildScrollView(
+                //     scrollDirection: Axis.horizontal,
+                //     child: Row(
+                //       children: reports.map((r) {
+                //         final bool selected = _selectedReport == r;
+                //         return Padding(
+                //           padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                //           child: ChoiceChip(
+                //             label: Text(
+                //               r,
+                //               style: TextStyle(
+                //                 fontWeight: FontWeight.w600,
+                //                 fontSize: 11.5,
+                //               ),
+                //             ),
+                //             selected: selected,
+                //             selectedColor: Colors.indigo.shade600,
+                //             backgroundColor: Colors.indigo.shade50,
+                //             labelStyle: TextStyle(
+                //               color: selected ? Colors.white : Colors.indigo,
+                //             ),
+                //             shape: RoundedRectangleBorder(
+                //               borderRadius: BorderRadius.circular(10),
+                //               side: BorderSide(
+                //                 color: selected
+                //                     ? Colors.indigo.shade200
+                //                     : Colors.indigo.shade100,
+                //               ),
+                //             ),
+                //             onSelected: (_) {
+                //               setState(() {
+                //                 _selectedReport = r;
+                //               });
+                //             },
+                //           ),
+                //         );
+                //       }).toList(),
+                //     ),
+                //   ),
+                // ),
+                const SizedBox(height: 20),
+
+                // ---------- SECTION CONTENT ----------
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  switchInCurve: Curves.easeInOut,
+                  switchOutCurve: Curves.easeInOut,
+                  child: sectionWidget,
+                ),
               ],
             ),
           ),
@@ -1209,6 +1321,163 @@ class _SalesReportsPageState extends State<SalesReportsPage> {
       ),
     );
   }
+
+  // @override
+  // Widget build(BuildContext context) {
+  //   Widget sectionWidget;
+
+  //   if (loading) {
+  //     sectionWidget = const Center(child: CircularProgressIndicator());
+  //   } else if (error != null) {
+  //     sectionWidget = Center(child: Text('Error: $error'));
+  //   } else {
+  //     sectionWidget = _buildSectionContent();
+  //   }
+
+  //   return UniversalScaffold(
+  //     selectedIndex: -1,
+  //     body: Container(
+  //       color: Colors.white,
+  //       child: Padding(
+  //         padding: const EdgeInsets.all(16.0),
+  //         child: SingleChildScrollView(
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               // Header
+  //               Padding(
+  //                 padding: const EdgeInsets.only(bottom: 12.0, left: 4.0),
+  //                 child: Text(
+  //                   'Sales & Reports',
+  //                   style: TextStyle(
+  //                     fontWeight: FontWeight.bold,
+  //                     fontSize: 26,
+  //                     color: Colors.indigo,
+  //                   ),
+  //                 ),
+  //               ),
+  //               // Filter + Section Dropdowns
+  //               Row(
+  //                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                 children: [
+  //                   Expanded(
+  //                     child: DropdownButtonFormField<String>(
+  //                       value: _selectedFilter,
+  //                       decoration: InputDecoration(
+  //                         labelText: 'Filter',
+  //                         border: OutlineInputBorder(
+  //                           borderRadius: BorderRadius.circular(8),
+  //                         ),
+  //                         contentPadding: const EdgeInsets.symmetric(
+  //                           horizontal: 12,
+  //                           vertical: 8,
+  //                         ),
+  //                       ),
+  //                       items: filters
+  //                           .map(
+  //                             (f) => DropdownMenuItem(value: f, child: Text(f)),
+  //                           )
+  //                           .toList(),
+  //                       onChanged: (val) async {
+  //                         if (val == 'Custom Range') {
+  //                           final picked = await showDateRangePicker(
+  //                             context: context,
+  //                             firstDate: DateTime(2020),
+  //                             lastDate: DateTime.now(),
+  //                           );
+  //                           if (picked != null) {
+  //                             setState(() {
+  //                               _customDateRange = picked;
+  //                               _selectedFilter = val!;
+  //                             });
+  //                           }
+  //                         } else {
+  //                           setState(() {
+  //                             _selectedFilter = val!;
+  //                           });
+  //                         }
+  //                       },
+  //                     ),
+  //                   ),
+  //                   const SizedBox(width: 16),
+  //                   Expanded(
+  //                     child: DropdownButtonFormField<String>(
+  //                       value: _selectedSection,
+  //                       decoration: InputDecoration(
+  //                         labelText: 'Section',
+  //                         border: OutlineInputBorder(
+  //                           borderRadius: BorderRadius.circular(8),
+  //                         ),
+  //                         contentPadding: const EdgeInsets.symmetric(
+  //                           horizontal: 12,
+  //                           vertical: 8,
+  //                         ),
+  //                       ),
+  //                       items: sections
+  //                           .map(
+  //                             (s) => DropdownMenuItem(value: s, child: Text(s)),
+  //                           )
+  //                           .toList(),
+  //                       onChanged: (val) {
+  //                         setState(() {
+  //                           _selectedSection = val!;
+  //                         });
+  //                       },
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //               const SizedBox(height: 16),
+  //               // Report Chips
+  //               SingleChildScrollView(
+  //                 scrollDirection: Axis.horizontal,
+  //                 child: Row(
+  //                   children: reports
+  //                       .map(
+  //                         (r) => Padding(
+  //                           padding: const EdgeInsets.symmetric(
+  //                             horizontal: 4.0,
+  //                           ),
+  //                           child: ChoiceChip(
+  //                             label: Text(
+  //                               r,
+  //                               style: const TextStyle(
+  //                                 fontWeight: FontWeight.bold,
+  //                               ),
+  //                             ),
+  //                             selected: _selectedReport == r,
+  //                             selectedColor: Colors.indigo,
+  //                             backgroundColor: Colors.white,
+  //                             labelStyle: TextStyle(
+  //                               color: _selectedReport == r
+  //                                   ? Colors.white
+  //                                   : Colors.indigo,
+  //                             ),
+  //                             shape: RoundedRectangleBorder(
+  //                               borderRadius: BorderRadius.circular(12),
+  //                               side: BorderSide(color: Colors.indigo.shade100),
+  //                             ),
+  //                             onSelected: (selected) {
+  //                               setState(() {
+  //                                 _selectedReport = r;
+  //                               });
+  //                             },
+  //                           ),
+  //                         ),
+  //                       )
+  //                       .toList(),
+  //                 ),
+  //               ),
+  //               const SizedBox(height: 16),
+  //               // Section Content
+  //               sectionWidget,
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildSectionContent() {
     final section = _selectedSection.toLowerCase();

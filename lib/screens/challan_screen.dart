@@ -5091,6 +5091,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
                           'Qty: $qty ${pcsInSet.isNotEmpty ? 'sets / pcsInSet:$pcsInSet' : ''} ${price.isNotEmpty ? '| Price: ₹$price' : ''}',
                           style: const TextStyle(fontSize: 12),
                         ),
+                        const SizedBox(height: 40),
                       ],
                     ),
                   );
@@ -5191,6 +5192,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
                           'Qty: $qty | Reason: $reason | Refund: ₹$refund',
                           style: const TextStyle(fontSize: 12),
                         ),
+                        SizedBox(height: 40),
                       ],
                     ),
                   );
@@ -5296,7 +5298,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
                       child: ChoiceChip(
                         label: Text(
                           status,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.w500,
                             fontSize: 13,
                           ),
@@ -5317,8 +5319,12 @@ class _ChallanScreenState extends State<ChallanScreen> {
                                 : Colors.indigo.shade100,
                           ),
                         ),
-                        onSelected: (_) =>
-                            setState(() => selectedStatus = status),
+                        // Toggle behavior: deselect when clicking selected chip
+                        onSelected: (_) {
+                          setState(() {
+                            selectedStatus = isSelected ? 'All' : status;
+                          });
+                        },
                       ),
                     );
                   }).toList(),
@@ -6896,13 +6902,9 @@ class _ChallanScreenState extends State<ChallanScreen> {
                     PopupMenuItem(value: 'share', child: Text('Share PDF')),
                   ],
                   child: Chip(
-                    avatar: const Icon(
-                      Icons.print,
-                      size: 14,
-                      color: Colors.black54,
-                    ),
-                    label: const Text('Print', style: TextStyle(fontSize: 11)),
-                    backgroundColor: Colors.grey.shade100,
+                    avatar: const Icon(Icons.picture_as_pdf, size: 18),
+                    label: const Text('PDF', style: TextStyle(fontSize: 12)),
+                    backgroundColor: Colors.orange.shade50,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -7100,22 +7102,44 @@ class _ChallanScreenState extends State<ChallanScreen> {
                   : Column(
                       children: reportData
                           .take(10)
-                          .map(
-                            (c) => ListTile(
-                              leading: Icon(
+                          // .map(
+                          //   (c) => ListTile(
+                          //     leading: Icon(
+                          //       Icons.receipt_long,
+                          //       color: Colors.indigo,
+                          //     ),
+                          //     title: Text('Challan #${c['challanNumber']}'),
+                          //     subtitle: Text(
+                          //       'Value: ₹${c['totalValue']} | Status: ${c['status']}',
+                          //     ),
+                          //     trailing: Text(
+                          //       c['customer'] ?? '',
+                          //       style: TextStyle(color: Colors.indigo),
+                          //     ),
+                          //   ),
+                          // )
+                          // .toList(),
+                          .map((c) {
+                            // ensure we pass a Map copy to the details helper
+                            final challan = Map<String, dynamic>.from(c);
+                            return ListTile(
+                              leading: const Icon(
                                 Icons.receipt_long,
                                 color: Colors.indigo,
                               ),
-                              title: Text('Challan #${c['challanNumber']}'),
+                              title: Text(
+                                'Challan #${challan['challanNumber']}',
+                              ),
                               subtitle: Text(
-                                'Value: ₹${c['totalValue']} | Status: ${c['status']}',
+                                'Value: ₹${challan['totalValue']} | Status: ${challan['status']}',
                               ),
                               trailing: Text(
-                                c['customer'] ?? '',
-                                style: TextStyle(color: Colors.indigo),
+                                challan['customer'] ?? '',
+                                style: const TextStyle(color: Colors.indigo),
                               ),
-                            ),
-                          )
+                              onTap: () => _showChallanDetails(challan),
+                            );
+                          })
                           .toList(),
                     ),
             ],

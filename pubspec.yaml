@@ -71,12 +71,13 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   flutter_native_splash: ^2.3.10
 
+
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -89,9 +90,9 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/logo12.png"
+  image_path: "assets/anibhavi12.png"
   adaptive_icon_background: "#F2F5F7"
-  adaptive_icon_foreground: "assets/logo12.png"
+  adaptive_icon_foreground: "assets/anibhavi12.png"
 
 flutter_native_splash:
   color: "#F2F5F7"

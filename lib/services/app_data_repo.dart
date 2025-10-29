@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:anibhaviadmin/services/api_service.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -58,6 +59,20 @@ class AppDataRepo {
     return await _api.updateReturn(id: id, data: data);
   }
 
+  Future<List<Map<String, dynamic>>> fetchAllProductsCatalog() async {
+    try {
+      final resp = await _api.fetchAllProductsEndpoint();
+      if (resp['success'] == true && resp['data'] is List) {
+        return List<Map<String, dynamic>>.from(resp['data']);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('fetchAllProductsCatalog error: $e');
+      print('fetchAllProductsCatalog error: $e');
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> deleteReturn({required String id}) async {
     return await _api.deleteReturn(id: id);
   }
@@ -107,6 +122,80 @@ class AppDataRepo {
       trackingId: trackingId,
       deliveryVendor: deliveryVendor,
     );
+  }
+
+  Future<Map<String, dynamic>> fetchAnyProductById(String id) async {
+    try {
+      final subResp = await _api.fetchProductDetailById(id);
+      // If subResp.data is list and empty -> try product endpoint
+      final subData = subResp['data'];
+      if (subData is List) {
+        if (subData.isNotEmpty) return subResp;
+        // fallback to product endpoint
+        final prodResp = await _api.fetchProductByProductId(id);
+        return prodResp;
+      } else if (subData is Map<String, dynamic>) {
+        return subResp;
+      } else {
+        // fallback
+        final prodResp = await _api.fetchProductByProductId(id);
+        return prodResp;
+      }
+    } catch (e) {
+      debugPrint('fetchAnyProductById error: $e');
+      // try product endpoint as last effort
+      try {
+        return await _api.fetchProductByProductId(id);
+      } catch (e2) {
+        return {'status': false, 'message': e.toString(), 'data': null};
+      }
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAllCategories({
+    int page = 1,
+    int limit = 1000,
+  }) async {
+    try {
+      final resp = await _api.fetchAllCategoriesEndpoint(
+        page: page,
+        limit: limit,
+      );
+      if (resp['success'] == true && resp['data'] is List) {
+        return List<Map<String, dynamic>>.from(resp['data']);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('fetchAllCategories error: $e');
+      return [];
+    }
+  }
+
+  /// Create product wrapper
+  Future<Map<String, dynamic>> createProduct({
+    required String name,
+    required String type,
+    required String categoryId,
+    required String subcategoryId,
+    required String price,
+    required String sku,
+    required List<File> images,
+  }) async {
+    try {
+      final resp = await _api.createProductMultipart(
+        name: name,
+        type: type,
+        categoryId: categoryId,
+        subcategoryId: subcategoryId,
+        price: price,
+        sku: sku,
+        files: images,
+      );
+      return resp;
+    } catch (e) {
+      debugPrint('createProduct error: $e');
+      return {'success': false, 'message': e.toString()};
+    }
   }
 
   Future<Map<String, dynamic>> updateOrderPaymentByAdmin({

@@ -37,6 +37,24 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchAllProductsEndpoint() async {
+    final url = "$baseUrl/product/get-all-products";
+    try {
+      final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> deleteReturn({required String id}) async {
     final url = '$baseUrl/return/delete-return/$id';
     try {
@@ -152,10 +170,93 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchProductByProductId(String productId) async {
+    final url = '$baseUrl/product/get_product_by_id/$productId';
+    print('Product (parent) Details API URL: $url');
+    try {
+      final resp = await get('/product/get_product_by_id/$productId');
+      if (resp.statusCode == 200) {
+        return json.decode(resp.body) as Map<String, dynamic>;
+      } else {
+        throw Exception('Failed to fetch product by id: ${resp.statusCode}');
+      }
+    } catch (e) {
+      print('fetchProductByProductId ERROR: $e');
+      rethrow;
+    }
+  }
+
   Future<Map<String, dynamic>> getAllProducts() async {
     final url = "$baseUrl/product/get-all-products";
     final response = await http.get(Uri.parse(url), headers: defaultHeaders);
     return jsonDecode(response.body);
+  }
+
+  Future<Map<String, dynamic>> fetchAllCategoriesEndpoint({
+    int page = 1,
+    int limit = 1000,
+  }) async {
+    final url =
+        "$baseUrl/category/get-all-categorys-with-pagination?page=$page&limit=$limit";
+    try {
+      final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> createProductMultipart({
+    required String name,
+    required String type,
+    required String categoryId,
+    required String subcategoryId,
+    required String price,
+    required String sku,
+    required List<File> files,
+  }) async {
+    final uri = Uri.parse('$baseUrl/product/create-product');
+    final request = http.MultipartRequest('POST', uri);
+
+    // add fields
+    request.fields['name'] = name;
+    request.fields['type'] = type;
+    request.fields['categoryId'] = categoryId;
+    request.fields['subcategoryId'] = subcategoryId;
+    request.fields['price'] = price;
+    request.fields['sku'] = sku;
+
+    // attach files
+    for (var f in files) {
+      if (await f.exists()) {
+        final multipart = await http.MultipartFile.fromPath('files', f.path);
+        request.files.add(multipart);
+      }
+    }
+
+    try {
+      final streamed = await request.send();
+      final resp = await http.Response.fromStream(streamed);
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
   }
 
   // Added: fetch all main categories

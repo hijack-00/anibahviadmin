@@ -879,13 +879,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                                   int todayOrders = 0;
                                   int todayRevenue = 0;
+                                  int todayPieces = 0;
+                                  int _extractPieces(dynamic d) {
+                                    if (d == null) return 0;
+                                    final v =
+                                        d['pieces'] ??
+                                        d['pcs'] ??
+                                        d['soldPieces'] ??
+                                        d['sold'] ??
+                                        d['quantity'] ??
+                                        0;
+                                    if (v is int) return v;
+                                    if (v is String)
+                                      return int.tryParse(v) ?? 0;
+                                    if (v is double) return v.toInt();
+                                    return 0;
+                                  }
+
                                   for (var d in jeansToday) {
                                     todayOrders += (d['orders'] ?? 0) as int;
                                     todayRevenue += (d['sales'] ?? 0) as int;
+                                    todayPieces += _extractPieces(d);
                                   }
                                   for (var d in shirtsToday) {
                                     todayOrders += (d['orders'] ?? 0) as int;
                                     todayRevenue += (d['sales'] ?? 0) as int;
+                                    todayPieces += _extractPieces(d);
                                   }
 
                                   return Container(
@@ -934,6 +953,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             SizedBox(height: 4),
                                             Text(
                                               '₹$todayRevenue',
+                                              style: TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Container(
+                                          width: 1,
+                                          height: 32,
+                                          color: Colors.indigo.shade100,
+                                        ),
+                                        Column(
+                                          children: [
+                                            Text(
+                                              "Pieces Sold",
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                            SizedBox(height: 4),
+                                            Text(
+                                              '$todayPieces',
                                               style: TextStyle(
                                                 fontSize: 20,
                                                 fontWeight: FontWeight.bold,

@@ -7,6 +7,15 @@ import 'package:printing/printing.dart';
 import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
 import 'update_product_page.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final String productId;
@@ -61,6 +70,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   void initState() {
     super.initState();
     _productFuture = AppDataRepo().fetchProductDetailById(widget.productId);
+    _productFuture = AppDataRepo().fetchAnyProductById(widget.productId);
   }
 
   @override
@@ -68,6 +78,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
+        foregroundColor: Colors.white,
         title: const Text('Product Details', style: TextStyle(fontSize: 12)),
         backgroundColor: Colors.indigo,
         elevation: 0,
@@ -79,141 +90,330 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             return _buildSkeletonLoader(context);
           }
           if (snapshot.hasError) {
-            return const Center(
-              child: Text(
-                'Error loading product details',
-                style: TextStyle(fontSize: 12),
-              ),
-            );
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final data = snapshot.data?['data'] ?? {};
-          final productId = data['productId'] ?? {};
-          final images = data['subProductImages'] ?? [];
-          final statusApi = data['status'] == true
-              ? 'In Stock'
-              : 'Out of Stock';
+          final resp = snapshot.data ?? {};
+          final rawData = resp['data'];
 
-          final sizesApiRaw = data['sizes'] ?? [];
-          List<String> sizesApi;
-          if (sizesApiRaw is String) {
-            try {
-              sizesApi = List<String>.from(jsonDecode(sizesApiRaw));
-            } catch (e) {
-              sizesApi = [];
+          // normalize to a Map representing the item to render and keep original raw for detection
+          Map<String, dynamic> product = {};
+          if (rawData is List) {
+            if (rawData.isEmpty) {
+              return Center(
+                child: Text(
+                  'No product data',
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+              );
             }
-          } else if (sizesApiRaw is List) {
-            sizesApi = sizesApiRaw.map((e) => e.toString()).toList();
+            if (rawData.first is Map<String, dynamic>) {
+              product = Map<String, dynamic>.from(rawData.first);
+            } else {
+              return Center(child: Text('Unexpected product format'));
+            }
+          } else if (rawData is Map<String, dynamic>) {
+            product = Map<String, dynamic>.from(rawData);
+          } else if (resp.containsKey('_id')) {
+            product = Map<String, dynamic>.from(resp);
           } else {
-            sizesApi = [];
+            return Center(child: Text('No product data'));
           }
-          selectedSizes = List<String>.from(sizesApi);
 
-          List<String> parsedImages = [];
-          if (images is String) {
-            parsedImages = images.split(',').map((e) => e.trim()).toList();
-          } else if (images is List) {
-            for (var item in images) {
-              if (item is String && item.contains(',')) {
-                parsedImages.addAll(item.split(',').map((e) => e.trim()));
-              } else if (item != null) {
-                parsedImages.add(item.toString());
+          // helper converters
+          String _string(dynamic v) {
+            if (v == null) return '';
+            return v.toString();
+          }
+
+          List<String> _toStringList(dynamic v) {
+            if (v == null) return [];
+            if (v is List) return v.map((e) => e.toString()).toList();
+            if (v is String) {
+              try {
+                final parsed = jsonDecode(v);
+                if (parsed is List)
+                  return parsed.map((e) => e.toString()).toList();
+              } catch (_) {}
+              if (v.contains(','))
+                return v
+                    .split(',')
+                    .map((e) => e.trim())
+                    .where((e) => e.isNotEmpty)
+                    .toList();
+              return [v];
+            }
+            return [v.toString()];
+          }
+
+          // Detect sub-product shape (opened from catalogue) vs parent product shape.
+          // Sub-product objects usually contain keys like 'productId', 'lotNumber', 'color', 'subProductImages', 'pcsInSet', 'lotStock'
+          final isSubProduct =
+              product.containsKey('productId') || resp['data'] is List;
+
+          if (isSubProduct) {
+            // Render the "catalogue->grid" detail layout (ListView with multiple cards)
+            final data = product;
+            final productId = data['productId'] ?? {};
+            final imagesRaw = data['subProductImages'] ?? data['images'] ?? [];
+            final sizesRaw = data['sizes'] ?? [];
+            final statusApi = (data['status'] == true)
+                ? 'In Stock'
+                : 'Out of Stock';
+
+            // parse sizes
+            List<String> sizesApi = [];
+            if (sizesRaw is String) {
+              try {
+                sizesApi = List<String>.from(jsonDecode(sizesRaw));
+              } catch (_) {
+                sizesApi = sizesRaw
+                    .split(',')
+                    .map((e) => e.trim())
+                    .where((e) => e.isNotEmpty)
+                    .toList();
+              }
+            } else if (sizesRaw is List) {
+              sizesApi = sizesRaw.map((e) => e.toString()).toList();
+            }
+
+            selectedSizes = List<String>.from(sizesApi);
+
+            // parse images
+            List<String> parsedImages = [];
+            if (imagesRaw is String) {
+              parsedImages = imagesRaw.split(',').map((e) => e.trim()).toList();
+            } else if (imagesRaw is List) {
+              for (var item in imagesRaw) {
+                if (item is String && item.contains(',')) {
+                  parsedImages.addAll(item.split(',').map((e) => e.trim()));
+                } else if (item != null) {
+                  parsedImages.add(item.toString());
+                }
               }
             }
-          }
-          if (imageUrls.isEmpty && parsedImages.isNotEmpty)
-            imageUrls = parsedImages;
+            if (imageUrls.isEmpty && parsedImages.isNotEmpty)
+              imageUrls = parsedImages;
 
-          final color = data['color']?.toString() ?? '';
-          final parentProduct = productId['productName']?.toString() ?? '';
-          final lotNumber = data['lotNumber']?.toString() ?? '';
-          final pcsInSet = data['pcsInSet']?.toString() ?? '';
-          final lotStock = data['lotStock']?.toString() ?? '';
-          final singlePicPrice = data['singlePicPrice']?.toString() ?? '';
-          final price =
-              data['filnalLotPrice']?.toString() ??
-              data['price']?.toString() ??
-              productId['price']?.toString() ??
-              '-';
-          final description = data['description']?.toString() ?? '';
-          final barcode = data['barcode']?.toString() ?? '';
+            final color = _string(data['color'] ?? data['colour']);
+            final parentProduct = _string(
+              productId['productName'] ??
+                  productId['productname'] ??
+                  productId['name'],
+            );
+            final lotNumber = _string(data['lotNumber'] ?? data['name']);
+            final pcsInSet = _string(data['pcsInSet']);
+            final lotStock = _string(data['lotStock'] ?? data['stock']);
+            final singlePicPrice = _string(
+              data['singlePicPrice'] ?? data['price'],
+            );
+            final price = _string(
+              data['filnalLotPrice'] ??
+                  data['price'] ??
+                  productId['price'] ??
+                  '-',
+            );
+            final description = _string(data['description']);
+            final barcode = _string(
+              data['barcode'] ?? data['barcodeNo'] ?? data['barCode'],
+            );
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (imageUrls.isNotEmpty)
-                SizedBox(
-                  height: 140,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: imageUrls.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, idx) => ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        imageUrls[idx],
-                        width: 140,
-                        height: 140,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            width: 140,
-                            height: 140,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) => Container(
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (imageUrls.isNotEmpty)
+                  SizedBox(
+                    height: 140,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: imageUrls.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, idx) => ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          imageUrls[idx],
                           width: 140,
                           height: 140,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.broken_image,
-                            color: Colors.grey,
-                            size: 28,
-                          ),
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              width: 140,
+                              height: 140,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                width: 140,
+                                height: 140,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.broken_image,
+                                  color: Colors.grey,
+                                  size: 28,
+                                ),
+                              ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              const SizedBox(height: 16),
-              _detailCard([
-                _stunningRow('Parent Product', parentProduct),
-                _stunningRow('Color', color),
-                _stunningRow('Lot Number', lotNumber),
-                _stunningRow('Pcs in Set', pcsInSet),
-                _stunningRow('Lot Stock', lotStock),
-                _stunningRow('Single Pic Price', singlePicPrice),
-                _stunningRow(
-                  'Status',
-                  statusApi,
-                  valueColor: statusApi == 'In Stock'
-                      ? Colors.green
-                      : Colors.red,
-                ),
-                _stunningRow('Description', description),
-              ]),
-              const SizedBox(height: 16),
-              if (barcode.isNotEmpty) _barcodeCard(barcode),
-              const SizedBox(height: 16),
-              _sizesCard(),
-              const SizedBox(height: 16),
-              _priceCard(price),
-              const SizedBox(height: 32),
-            ],
-          );
+                const SizedBox(height: 16),
+                _detailCard([
+                  _stunningRow('Parent Product', parentProduct),
+                  _stunningRow('Color', color),
+                  _stunningRow('Lot Number', lotNumber),
+                  _stunningRow('Pcs in Set', pcsInSet),
+                  _stunningRow('Lot Stock', lotStock),
+                  _stunningRow('Single Pic Price', singlePicPrice),
+                  _stunningRow(
+                    'Status',
+                    statusApi,
+                    valueColor: statusApi == 'In Stock'
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                  _stunningRow('Description', description),
+                ]),
+                const SizedBox(height: 16),
+                if (barcode.isNotEmpty) _barcodeCard(barcode),
+                const SizedBox(height: 16),
+                _sizesCard(),
+                const SizedBox(height: 16),
+                _priceCard(price),
+                const SizedBox(height: 32),
+              ],
+            );
+          } else {
+            // Render the parent-product detail layout (single product map)
+            final lotNumber = _string(
+              product['lotNumber'] ?? product['name'] ?? product['productName'],
+            );
+            final color = _string(product['color'] ?? product['colour']);
+            final displayName = color.isNotEmpty
+                ? '$lotNumber/$color'
+                : (lotNumber.isNotEmpty ? lotNumber : 'Unnamed');
+            final price = _string(
+              product['finalLotPrice'] ??
+                  product['singlePicPrice'] ??
+                  product['price'] ??
+                  product['finalPrice'],
+            );
+
+            final imagesRaw =
+                product['subProductImages'] ??
+                product['images'] ??
+                product['subImages'] ??
+                product['image'];
+            final images = _toStringList(imagesRaw);
+            final imageUrl = images.isNotEmpty ? images.first : null;
+            final sizes = _toStringList(product['sizes']);
+
+            if (mounted) {
+              if (selectedSizes.isEmpty && sizes.isNotEmpty)
+                selectedSizes = List<String>.from(sizes);
+              if (imageUrls.isEmpty && images.isNotEmpty)
+                imageUrls = List<String>.from(images);
+            }
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (imageUrl != null)
+                    Image.network(
+                      imageUrl,
+                      width: double.infinity,
+                      height: 260,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Container(height: 260, color: Colors.grey.shade200),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Price: ₹$price',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (sizes.isNotEmpty) ...[
+                          Text(
+                            'Sizes:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            children: sizes
+                                .map(
+                                  (s) => Chip(
+                                    label: Text(
+                                      s,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Text(
+                          'SKU: ${_string(product['sku'] ?? product['barcode'] ?? '-')}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Stock: ${_string(product['lotStock'] ?? product['stock'] ?? '-')}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Description:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _string(
+                            product['description'] ?? product['desc'] ?? '',
+                          ),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
         },
       ),
+
       floatingActionButton: FutureBuilder<Map<String, dynamic>>(
         future: _productFuture,
         builder: (context, snapshot) {
@@ -221,7 +421,26 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               snapshot.connectionState != ConnectionState.done) {
             return const SizedBox.shrink();
           }
-          final data = snapshot.data?['data'] ?? {};
+          // final data = snapshot.data?['data'] ?? {};
+          final resp = snapshot.data ?? {};
+          dynamic rawData = resp['data'];
+          Map<String, dynamic> data;
+          if (rawData is List && rawData.isNotEmpty && rawData.first is Map) {
+            data = Map<String, dynamic>.from(rawData.first);
+          } else if (rawData is Map<String, dynamic>) {
+            data = rawData;
+          } else {
+            // last-resort: try top-level fields
+            data = Map<String, dynamic>.from(resp);
+          }
+          // Determine whether the loaded item is a sub-product (catalogue) or a parent product.
+          final bool isSubProduct =
+              data.containsKey('productId') || resp['data'] is List;
+          if (!isSubProduct) {
+            // don't show FAB for parent-product detail view
+            return const SizedBox.shrink();
+          }
+
           return FloatingActionButton.extended(
             onPressed: () async {
               final result = await Navigator.of(context).push(
@@ -246,8 +465,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 });
               }
             },
-            label: const Text('Update', style: TextStyle(fontSize: 12)),
-            icon: const Icon(Icons.edit, size: 18),
+            label: const Text(
+              'Update',
+              style: TextStyle(fontSize: 12, color: Colors.white),
+            ),
+            icon: const Icon(Icons.edit, size: 18, color: Colors.white),
             backgroundColor: Colors.indigo,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -461,282 +683,3 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 }
-
-
-
-
-// import 'dart:convert';
-// import 'package:flutter/material.dart';
-// import 'package:pdf/pdf.dart';
-// import '../services/app_data_repo.dart';
-// import 'package:pdf/widgets.dart' as pw;
-// import 'package:printing/printing.dart';
-// import 'package:http/http.dart' as http;
-// import 'update_product_page.dart';
-
-
-// class ProductDetailPage extends StatefulWidget {
-//   final String productId;
-//   const ProductDetailPage({required this.productId});
-
-//   @override
-//   State<ProductDetailPage> createState() => _ProductDetailPageState();
-// }
-
-// class _ProductDetailPageState extends State<ProductDetailPage> {
-//   late Future<Map<String, dynamic>> _productFuture;
-
-//   List<String> selectedSizes = [];
-//   List<String> imageUrls = [];
-
-
-
-// Future<void> _downloadBarcodePdf(String barcode) async {
-//   final pdf = pw.Document();
-//   final barcodeUrl = 'https://barcode.tec-it.com/barcode.ashx?data=$barcode&code=EAN13';
-
-//   // Download the barcode image as bytes
-//   final response = await http.get(Uri.parse(barcodeUrl));
-//   final imageBytes = response.bodyBytes;
-
-//   pdf.addPage(
-//     pw.Page(
-//       build: (pw.Context context) {
-//         return pw.Column(
-//           mainAxisAlignment: pw.MainAxisAlignment.center,
-//           crossAxisAlignment: pw.CrossAxisAlignment.center,
-//           children: [
-//             pw.Text('Barcode', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-//             pw.SizedBox(height: 16),
-//             pw.Image(pw.MemoryImage(imageBytes), height: 80),
-//             pw.SizedBox(height: 16),
-//             pw.Text(barcode, style: pw.TextStyle(fontSize: 20)),
-//           ],
-//         );
-//       },
-//     ),
-//   );
-
-//   await Printing.layoutPdf(
-//     onLayout: (PdfPageFormat format) async => pdf.save(),
-//     name: 'barcode_$barcode.pdf',
-//   );
-// }
-
-
-
-
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _productFuture = AppDataRepo().fetchProductDetailById(widget.productId);
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: Colors.white,
-//       appBar: AppBar(
-//         title: Text('Product Details'),
-//         backgroundColor: Colors.indigo,
-//       ),
-//       body: FutureBuilder<Map<String, dynamic>>(
-//         future: _productFuture,
-//         builder: (context, snapshot) {
-//           if (snapshot.connectionState == ConnectionState.waiting) {
-//             return Center(child: CircularProgressIndicator());
-//           }
-//           if (snapshot.hasError) {
-//             return Center(child: Text('Error loading product details'));
-//           }
-//           print('Product Details API response: ${snapshot.data}');
-//           final data = snapshot.data?['data'] ?? {};
-//           final productId = data['productId'] ?? {};
-//           final images = data['subProductImages'] ?? [];
-//           final statusApi = data['status'] == true ? 'In Stock' : 'Out of Stock';
-//           final sizesApiRaw = data['sizes'] ?? [];
-//           List<String> sizesApi;
-//           if (sizesApiRaw is String) {
-//             try {
-//               sizesApi = List<String>.from(jsonDecode(sizesApiRaw));
-//             } catch (e) {
-//               sizesApi = [];
-//             }
-//           } else if (sizesApiRaw is List) {
-//             sizesApi = sizesApiRaw.map((e) => e.toString()).toList();
-//           } else {
-//             sizesApi = [];
-//           }
-//           selectedSizes = List<String>.from(sizesApi);
-
-//           // Robustly parse images into a list of URLs
-//           List<String> parsedImages = [];
-//           if (images is String) {
-//             parsedImages = images.split(',').map((e) => e.trim()).toList();
-//           } else if (images is List) {
-//             for (var item in images) {
-//               if (item is String && item.contains(',')) {
-//                 parsedImages.addAll(item.split(',').map((e) => e.trim()));
-//               } else if (item != null) {
-//                 parsedImages.add(item.toString());
-//               }
-//             }
-//           }
-//           if (imageUrls.isEmpty && parsedImages.isNotEmpty) imageUrls = parsedImages;
-
-//           // Prepare fields for display
-//           final color = data['color']?.toString() ?? '';
-//           final parentProduct = productId['productName']?.toString() ?? '';
-//           final lotNumber = data['lotNumber']?.toString() ?? '';
-//           final pcsInSet = data['pcsInSet']?.toString() ?? '';
-//           final lotStock = data['lotStock']?.toString() ?? '';
-//           final singlePicPrice = data['singlePicPrice']?.toString() ?? '';
-//           // --- Price logic: check all possible locations ---
-//           final price = data['filnalLotPrice']?.toString()
-//               ?? data['price']?.toString()
-//               ?? productId['price']?.toString()
-//               ?? '-';
-//           final description = data['description']?.toString() ?? '';
-//           final barcode = data['barcode']?.toString() ?? '';
-
-//           return ListView(
-//             padding: EdgeInsets.all(16),
-//             children: [
-//               // Images
-//               if (imageUrls.isNotEmpty)
-//                 SizedBox(
-//                   height: 120,
-//                   child: ListView.separated(
-//                     scrollDirection: Axis.horizontal,
-//                     itemCount: imageUrls.length,
-//                     separatorBuilder: (_, __) => SizedBox(width: 8),
-//                     itemBuilder: (context, idx) => ClipRRect(
-//                       borderRadius: BorderRadius.circular(8),
-//                       child: Image.network(
-//                         imageUrls[idx],
-//                         width: 120,
-//                         height: 120,
-//                         fit: BoxFit.cover,
-//                         errorBuilder: (context, error, stackTrace) => Container(
-//                           width: 120,
-//                           height: 120,
-//                           color: Colors.grey[300],
-//                           child: Icon(Icons.broken_image, color: Colors.grey),
-//                         ),
-//                       ),
-//                     ),
-//                   ),
-//                 ),
-//               SizedBox(height: 16),
-//               _detailRow('Color', color),
-//               _detailRow('Parent Product', parentProduct),
-//               _detailRow('Lot Number', lotNumber),
-//               _detailRow('Pcs in Set', pcsInSet),
-//               _detailRow('Lot Stock', lotStock),
-//               _detailRow('Single Pic Price', singlePicPrice),
-//               _detailRow('Status', statusApi),
-//               _detailRow('Description', description),
-//               // _detailRow('Barcode', barcode),
-//               // SizedBox(height: 16),
-//               if (barcode.isNotEmpty)
-//                 Column(
-//                   crossAxisAlignment: CrossAxisAlignment.start,
-//                   children: [
-//                     Text('Barcode:', style: TextStyle(fontWeight: FontWeight.bold)),
-//                     SizedBox(height: 8),
-//                     Image.network(
-//                       'https://barcode.tec-it.com/barcode.ashx?data=$barcode&code=EAN13',
-//                       height: 60,
-//                       fit: BoxFit.contain,
-//                     ),
-//                     SizedBox(height: 8),
-//                     Text(barcode, style: TextStyle(fontWeight: FontWeight.bold)),
-//                     SizedBox(height: 8),
-//                     ElevatedButton.icon(
-//                       onPressed: () => _downloadBarcodePdf(barcode),
-//                       icon: Icon(Icons.download),
-//                       label: Text('Download Barcode PDF'),
-//                       style: ElevatedButton.styleFrom(
-//                         backgroundColor: Colors.indigo,
-//                         foregroundColor: Colors.white,
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//               SizedBox(height: 16),
-//               Text('Selected Sizes', style: TextStyle(fontWeight: FontWeight.bold)),
-//               Wrap(
-//                 spacing: 8,
-//                 children: selectedSizes.map((size) => Chip(label: Text(size))).toList(),
-//               ),
-//               SizedBox(height: 24),
-//               Text('Final Price: ₹$price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.green)),
-//               SizedBox(height: 24),
-//             ],
-//           );
-//         },
-//       ),
-//       // floatingActionButton: FloatingActionButton.extended(
-//       //   onPressed: () {},
-//       //   label: Text('Update'),
-//       //   icon: Icon(Icons.edit),
-//       //   backgroundColor: Colors.indigo,
-//       // ),
-//       floatingActionButton: FutureBuilder<Map<String, dynamic>>(
-//   future: _productFuture,
-//   builder: (context, snapshot) {
-//     if (!snapshot.hasData || snapshot.connectionState != ConnectionState.done) {
-//       return SizedBox.shrink();
-//     }
-//     final data = snapshot.data?['data'] ?? {};
-//     return FloatingActionButton.extended(
-//       onPressed: () async {
-//         final result = await Navigator.of(context).push(
-//           MaterialPageRoute(
-//             builder: (_) => UpdateProductPage(
-//               productData: data,
-//               onUpdated: () {
-//                 setState(() {
-//                   _productFuture = AppDataRepo().fetchProductDetailById(widget.productId);
-//                 });
-//               },
-//             ),
-//           ),
-//         );
-//         if (result == true) {
-//           setState(() {
-//             _productFuture = AppDataRepo().fetchProductDetailById(widget.productId);
-//           });
-//         }
-//       },
-//       label: Text('Update'),
-//       icon: Icon(Icons.edit),
-//       backgroundColor: Colors.indigo,
-//     );
-//   },
-// ),
-//     );
-//   }
-
-//   Widget _detailRow(String label, String value) {
-//     return Padding(
-//       padding: const EdgeInsets.only(bottom: 12.0),
-//       child: Row(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           SizedBox(
-//             width: 140,
-//             child: Text(
-//               '$label:',
-//               style: TextStyle(fontWeight: FontWeight.bold),
-//             ),
-//           ),
-//           Expanded(
-//             child: Text(value.isNotEmpty ? value : '-', style: TextStyle(fontSize: 16)),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }

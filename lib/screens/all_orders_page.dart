@@ -11,8 +11,14 @@ import 'package:intl/intl.dart';
 
 // import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
 
+// class AllOrdersPage extends StatefulWidget {
+//   const AllOrdersPage({super.key});
 class AllOrdersPage extends StatefulWidget {
-  const AllOrdersPage({super.key});
+  // When true the page will automatically open the same "Create Order"
+  // bottom sheet used by the FAB. Dashboard will pass this to reuse the
+  // exact form.
+  final bool openCreateOrderOnStart;
+  const AllOrdersPage({super.key, this.openCreateOrderOnStart = false});
 
   @override
   State<AllOrdersPage> createState() => _AllOrdersPageState();
@@ -48,6 +54,33 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
   void initState() {
     super.initState();
     _fetchOrders();
+
+    // If caller requested, automatically open the Create Order sheet once
+    // the page has rendered.
+    if (widget.openCreateOrderOnStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // slight delay to let build settle
+        await Future.delayed(const Duration(milliseconds: 150));
+        final result = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          builder: (context) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 24,
+            ),
+            child: _CreateOrderSheet(),
+          ),
+        );
+        if (result == true) await _fetchOrders();
+      });
+    }
   }
 
   Future<void> _fetchOrders() async {
@@ -1884,6 +1917,10 @@ class _CreateOrderSheet extends StatefulWidget {
 }
 
 class _CreateOrderSheetState extends State<_CreateOrderSheet> {
+  // handling charges applied conditionally
+  int handlingCharges = 0;
+  int totalPiecesCount = 0;
+
   // Customer
   List<Map<String, dynamic>> _allCustomers = [];
   Map<String, dynamic>? _selectedCustomer;
@@ -2159,7 +2196,21 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
       0.0,
       (sum, p) => sum + (double.tryParse(p['amount'].toString()) ?? 0.0),
     );
-    balanceDue = subtotal - discountValue - totalPaid;
+    // balanceDue = subtotal - discountValue - totalPaid;
+    // compute total pieces across all selected products (sets * pcsInSet)
+    totalPiecesCount = _selectedProducts.fold<int>(0, (int sum, dynamic p) {
+      final int sets = p['quantity'] is int
+          ? (p['quantity'] as int)
+          : int.tryParse(p['quantity']?.toString() ?? '0') ?? 0;
+      final int pcsInSet = int.tryParse(p['pcsInSet']?.toString() ?? '1') ?? 1;
+      return sum + (sets * pcsInSet);
+    });
+
+    // Apply handling charges of ₹350 unless subtotal >= 100000 OR totalPiecesCount >= 250
+    handlingCharges = (subtotal >= 100000 || totalPiecesCount >= 250) ? 0 : 350;
+
+    // total includes handling charges
+    balanceDue = subtotal - discountValue + handlingCharges - totalPaid;
   }
 
   void _addPayment() {
@@ -2225,7 +2276,11 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
       "subtotal": subtotal,
       "pointsRedeemed": redeemNow,
       "pointsRedemptionValue": discountValue,
-      "total": subtotal - discountValue,
+      // "total": subtotal - discountValue,
+      // include handling charges into total
+      "handlingCharges": handlingCharges,
+      "total": subtotal - discountValue + handlingCharges,
+
       "status": "Pending",
       "paymentType": payments.length > 1
           ? "Partial Payment"
@@ -3765,12 +3820,28 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                       ],
                                                       decoration: InputDecoration(
                                                         isDense: true,
-                                                        border: OutlineInputBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                6,
-                                                              ),
-                                                        ),
+                                                        contentPadding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 4,
+                                                            ),
+                                                        enabledBorder:
+                                                            const UnderlineInputBorder(
+                                                              borderSide:
+                                                                  BorderSide(
+                                                                    color: Colors
+                                                                        .indigo,
+                                                                    width: 1.2,
+                                                                  ),
+                                                            ),
+                                                        focusedBorder:
+                                                            const UnderlineInputBorder(
+                                                              borderSide:
+                                                                  BorderSide(
+                                                                    color: Colors
+                                                                        .indigo,
+                                                                    width: 1.6,
+                                                                  ),
+                                                            ),
                                                       ),
                                                       style: const TextStyle(
                                                         fontWeight:
@@ -3812,6 +3883,86 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                                   ),
                                                 ],
                                               ),
+
+                                              // Row(
+                                              //   crossAxisAlignment:
+                                              //       CrossAxisAlignment.center,
+                                              //   children: [
+                                              //     const Text(
+                                              //       '₹',
+                                              //       style: TextStyle(
+                                              //         fontWeight:
+                                              //             FontWeight.bold,
+                                              //         fontSize: 12,
+                                              //         color: Colors.indigo,
+                                              //       ),
+                                              //     ),
+                                              //     const SizedBox(width: 2),
+                                              //     SizedBox(
+                                              //       width: 70,
+                                              //       child: TextField(
+                                              //         controller:
+                                              //             rateController,
+                                              //         keyboardType:
+                                              //             const TextInputType.numberWithOptions(
+                                              //               decimal: true,
+                                              //             ),
+                                              //         inputFormatters: [
+                                              //           FilteringTextInputFormatter.allow(
+                                              //             RegExp(
+                                              //               r'^\d*\.?\d{0,2}',
+                                              //             ),
+                                              //           ),
+                                              //         ],
+                                              //         decoration: InputDecoration(
+                                              //           isDense: true,
+                                              //           border: OutlineInputBorder(
+                                              //             borderRadius:
+                                              //                 BorderRadius.circular(
+                                              //                   6,
+                                              //                 ),
+                                              //           ),
+                                              //         ),
+                                              //         style: const TextStyle(
+                                              //           fontWeight:
+                                              //               FontWeight.w600,
+                                              //           fontSize: 12,
+                                              //           color: Colors.indigo,
+                                              //         ),
+                                              //         onChanged: (val) {
+                                              //           final newRate =
+                                              //               double.tryParse(
+                                              //                 val,
+                                              //               ) ??
+                                              //               perPieceRate;
+                                              //           setState(() {
+                                              //             p['singlePicPrice'] =
+                                              //                 newRate;
+                                              //             _recalculatePrice();
+                                              //           });
+                                              //         },
+                                              //       ),
+                                              //     ),
+                                              //     const SizedBox(width: 4),
+                                              //     const Text(
+                                              //       'per piece',
+                                              //       style: TextStyle(
+                                              //         fontSize: 10,
+                                              //         color: Colors.grey,
+                                              //       ),
+                                              //     ),
+                                              //     const Spacer(),
+                                              //     Text(
+                                              //       '₹${(perPieceRate * pcsInSet).toStringAsFixed(2)} / set',
+                                              //       style: const TextStyle(
+                                              //         fontSize: 11,
+                                              //         color: Colors.indigo,
+                                              //         fontWeight:
+                                              //             FontWeight.w500,
+                                              //       ),
+                                              //     ),
+                                              //   ],
+                                              // ),
                                             ],
                                           ),
                                         ),
@@ -4804,147 +4955,6 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                                         ),
                                       ],
                                     )
-                                  // Row(
-                                  //   children: [
-                                  //     Expanded(
-                                  //       flex: 2,
-                                  //       child: DropdownButtonFormField<String>(
-                                  //         isExpanded: true,
-                                  //         value:
-                                  //             paymentMethod.isNotEmpty &&
-                                  //                 availableMethods.contains(
-                                  //                   paymentMethod,
-                                  //                 )
-                                  //             ? paymentMethod
-                                  //             : availableMethods.first,
-                                  //         decoration: InputDecoration(
-                                  //           labelText: 'Method',
-                                  //           labelStyle: const TextStyle(
-                                  //             fontSize: 11,
-                                  //           ), // 👈 smaller label
-                                  //           contentPadding:
-                                  //               const EdgeInsets.symmetric(
-                                  //                 vertical:
-                                  //                     6, // 👈 Reduced vertical padding
-                                  //                 horizontal:
-                                  //                     10, // 👈 Slightly tighter spacing
-                                  //               ),
-                                  //           border: OutlineInputBorder(
-                                  //             borderRadius:
-                                  //                 BorderRadius.circular(6),
-                                  //           ),
-                                  //           prefixIcon: const Icon(
-                                  //             Icons
-                                  //                 .account_balance_wallet_outlined,
-                                  //             size: 18, // 👈 Smaller icon
-                                  //             color: Colors.indigo,
-                                  //           ),
-                                  //         ),
-                                  //         iconSize:
-                                  //             18, // 👈 smaller dropdown arrow
-                                  //         style: const TextStyle(
-                                  //           fontSize: 11, // 👈 compact font
-                                  //           color: Colors.black,
-                                  //         ),
-                                  //         items: availableMethods
-                                  //             .map(
-                                  //               (m) => DropdownMenuItem(
-                                  //                 value: m,
-                                  //                 child: Text(
-                                  //                   m,
-                                  //                   style: const TextStyle(
-                                  //                     fontSize:
-                                  //                         11, // 👈 smaller dropdown item text
-                                  //                     color: Colors.black,
-                                  //                   ),
-                                  //                 ),
-                                  //               ),
-                                  //             )
-                                  //             .toList(),
-                                  //         onChanged: (val) => setState(
-                                  //           () => paymentMethod = val ?? '',
-                                  //         ),
-                                  //       ),
-                                  //     ),
-                                  //     const SizedBox(width: 10),
-                                  //     Expanded(
-                                  //       flex: 2,
-                                  //       child: TextField(
-                                  //         controller: paymentAmountController,
-                                  //         keyboardType: TextInputType.number,
-                                  //         decoration: InputDecoration(
-                                  //           labelText: 'Amount',
-                                  //           border: OutlineInputBorder(
-                                  //             borderRadius:
-                                  //                 BorderRadius.circular(8),
-                                  //           ),
-                                  //           prefixIcon: const Icon(
-                                  //             Icons.currency_rupee,
-                                  //           ),
-                                  //         ),
-                                  //         style: const TextStyle(
-                                  //           fontSize: 12,
-                                  //           color: Colors.black,
-                                  //         ),
-                                  //       ),
-                                  //     ),
-                                  //     const SizedBox(width: 4),
-                                  //     ElevatedButton.icon(
-                                  //       icon: const Icon(Icons.add, size: 13),
-                                  //       label: const Text(
-                                  //         'Add',
-                                  //         style: TextStyle(fontSize: 10),
-                                  //       ),
-                                  //       style: ElevatedButton.styleFrom(
-                                  //         backgroundColor: Colors.indigo,
-                                  //         foregroundColor: Colors.white,
-                                  //         minimumSize: const Size(60, 30),
-                                  //         shape: RoundedRectangleBorder(
-                                  //           borderRadius:
-                                  //               BorderRadius.circular(8),
-                                  //         ),
-                                  //       ),
-                                  //       onPressed:
-                                  //           (balanceDue <= 0 ||
-                                  //               availableMethods.isEmpty)
-                                  //           ? null
-                                  //           : () {
-                                  //               final amt =
-                                  //                   double.tryParse(
-                                  //                     paymentAmountController
-                                  //                         .text,
-                                  //                   ) ??
-                                  //                   0.0;
-                                  //               if (amt <= 0) return;
-                                  //               setState(() {
-                                  //                 payments.add({
-                                  //                   'method': paymentMethod,
-                                  //                   'amount': amt,
-                                  //                   'editing': false,
-                                  //                 });
-                                  //                 paymentAmountController
-                                  //                     .clear();
-                                  //                 if (availableMethods
-                                  //                         .length >
-                                  //                     1) {
-                                  //                   paymentMethod =
-                                  //                       availableMethods
-                                  //                           .firstWhere(
-                                  //                             (m) =>
-                                  //                                 m !=
-                                  //                                 paymentMethod,
-                                  //                             orElse: () =>
-                                  //                                 '',
-                                  //                           );
-                                  //                 } else {
-                                  //                   paymentMethod = '';
-                                  //                 }
-                                  //                 _recalculatePrice();
-                                  //               });
-                                  //             },
-                                  //     ),
-                                  //   ],
-                                  // )
                                   else
                                     Padding(
                                       padding: const EdgeInsets.symmetric(
@@ -5135,6 +5145,25 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                         Text('- ₹${discountValue.toStringAsFixed(2)}'),
                       ],
                     ),
+                    // Handling charges row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Handling Charges:'),
+                        Text(
+                          '₹${handlingCharges.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: handlingCharges > 0
+                                ? Colors.black
+                                : Colors.green,
+                            fontWeight: handlingCharges > 0
+                                ? FontWeight.bold
+                                : FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [

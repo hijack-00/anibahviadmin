@@ -23,8 +23,14 @@ import 'package:printing/printing.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class ChallanScreen extends StatefulWidget {
-  const ChallanScreen({super.key});
+  final bool openCreateChallanOnStart;
+  final bool openCreateReturnOnStart;
 
+  const ChallanScreen({
+    super.key,
+    this.openCreateChallanOnStart = false,
+    this.openCreateReturnOnStart = false,
+  });
   @override
   State<ChallanScreen> createState() => _ChallanScreenState();
 }
@@ -109,275 +115,34 @@ class _ChallanScreenState extends State<ChallanScreen> {
     super.initState();
     fetchChallans();
     fetchReturns();
+
+    // If caller requested to immediately open a sheet (from Dashboard),
+    // run after first frame so `context` and scaffolds are ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.openCreateChallanOnStart == true) {
+        Future.microtask(() => _showCreateChallanDialog());
+      } else if (widget.openCreateReturnOnStart == true) {
+        Future.microtask(() => _showCreateReturnDialog());
+      }
+    });
   }
-
-  // Future<Uint8List> _buildChallanPdfData(Map<String, dynamic> challan) async {
-  //   final pdf = pw.Document();
-  //   double _toDouble(dynamic v) {
-  //     if (v == null) return 0.0;
-  //     if (v is num) return v.toDouble();
-  //     return double.tryParse(v.toString()) ?? 0.0;
-  //   }
-
-  //   double _unitPriceForItem(Map<String, dynamic> it) {
-  //     final filnal = it['filnalLotPrice'] ?? it['filnalPrice'];
-  //     if (filnal != null && filnal.toString().trim().isNotEmpty) {
-  //       return _toDouble(filnal);
-  //     }
-  //     final single = it['singlePicPrice'] ?? it['singlePrice'] ?? it['price'];
-  //     return _toDouble(single);
-  //   }
-
-  //   final items = List<Map<String, dynamic>>.from(challan['items'] ?? []);
-  //   final customerName = challan['customer']?.toString() ?? '';
-  //   final orderNumber = challan['orderNumber']?.toString() ?? '';
-  //   final challanNumber = challan['challanNumber']?.toString() ?? '';
-  //   final dateStr = (challan['date'] ?? '').toString();
-  //   final displayDate = dateStr.isNotEmpty ? dateStr.substring(0, 10) : '';
-  //   final vendor = challan['vendor']?.toString() ?? '';
-  //   final totalValue = _toDouble(challan['totalValue'] ?? 0).round();
-
-  //   // Build PDF
-  //   pdf.addPage(
-  //     pw.Page(
-  //       pageFormat: PdfPageFormat.a4,
-  //       build: (context) {
-  //         return pw.Column(
-  //           crossAxisAlignment: pw.CrossAxisAlignment.start,
-  //           children: [
-  //             pw.Row(
-  //               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-  //               children: [
-  //                 pw.Column(
-  //                   crossAxisAlignment: pw.CrossAxisAlignment.start,
-  //                   children: [
-  //                     pw.Text(
-  //                       'DELIVERY CHALLAN',
-  //                       style: pw.TextStyle(
-  //                         fontSize: 18,
-  //                         fontWeight: pw.FontWeight.bold,
-  //                       ),
-  //                     ),
-  //                     pw.SizedBox(height: 6),
-  //                     pw.Text(
-  //                       'Garments B2B & Offline Management Platform',
-  //                       style: pw.TextStyle(fontSize: 9),
-  //                     ),
-  //                   ],
-  //                 ),
-  //                 pw.Column(
-  //                   crossAxisAlignment: pw.CrossAxisAlignment.end,
-  //                   children: [
-  //                     pw.Text(
-  //                       'Challan Details',
-  //                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-  //                     ),
-  //                     pw.SizedBox(height: 4),
-  //                     pw.Text('Number: $challanNumber'),
-  //                     pw.Text('Date: $displayDate'),
-  //                     pw.Text('Vendor: $vendor'),
-  //                   ],
-  //                 ),
-  //               ],
-  //             ),
-  //             pw.SizedBox(height: 14),
-  //             pw.Row(
-  //               crossAxisAlignment: pw.CrossAxisAlignment.start,
-  //               children: [
-  //                 pw.Expanded(
-  //                   child: pw.Column(
-  //                     crossAxisAlignment: pw.CrossAxisAlignment.start,
-  //                     children: [
-  //                       pw.Text(
-  //                         'Customer Details',
-  //                         style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-  //                       ),
-  //                       pw.SizedBox(height: 6),
-  //                       pw.Text('Name: $customerName'),
-  //                       pw.Text('Order Number: $orderNumber'),
-  //                     ],
-  //                   ),
-  //                 ),
-  //                 pw.SizedBox(width: 10),
-  //               ],
-  //             ),
-  //             pw.SizedBox(height: 14),
-  //             pw.Text(
-  //               'Items:',
-  //               style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-  //             ),
-  //             pw.SizedBox(height: 6),
-  //             pw.Table.fromTextArray(
-  //               headers: ['Product Name', 'Size', 'Quantity', 'Price', 'Total'],
-  //               data: items.map((it) {
-  //                 final name = it['name']?.toString() ?? '';
-  //                 final size =
-  //                     (it['availableSizes'] is List &&
-  //                         (it['availableSizes'] as List).isNotEmpty)
-  //                     ? (it['availableSizes'] as List).join(', ')
-  //                     : '';
-  //                 final pcsInSet =
-  //                     int.tryParse(it['pcsInSet']?.toString() ?? '1') ?? 1;
-  //                 final qty =
-  //                     int.tryParse(
-  //                       (it['dispatchedQty'] ?? it['quantity'] ?? 0).toString(),
-  //                     ) ??
-  //                     0;
-  //                 final unitPrice = _unitPriceForItem(it);
-  //                 final bool isPerSet =
-  //                     (it['filnalLotPrice'] ?? it['filnalPrice']) != null &&
-  //                     (it['filnalLotPrice']?.toString().trim().isNotEmpty ??
-  //                         false);
-  //                 final total = isPerSet
-  //                     ? unitPrice * qty
-  //                     : unitPrice * pcsInSet * qty;
-  //                 // Show price as unit price (like screenshot)
-  //                 final priceDisplay = unitPrice.round();
-  //                 return [
-  //                   name,
-  //                   size,
-  //                   qty.toString(),
-  //                   '₹$priceDisplay',
-  //                   '₹${total.round()}',
-  //                 ];
-  //               }).toList(),
-  //               headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-  //               cellAlignment: pw.Alignment.centerLeft,
-  //               headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-  //               cellHeight: 22,
-  //               columnWidths: {
-  //                 0: pw.FlexColumnWidth(3),
-  //                 1: pw.FlexColumnWidth(1.5),
-  //                 2: pw.FlexColumnWidth(1),
-  //                 3: pw.FlexColumnWidth(1.5),
-  //                 4: pw.FlexColumnWidth(1.5),
-  //               },
-  //             ),
-  //             pw.SizedBox(height: 8),
-  //             pw.Row(
-  //               mainAxisAlignment: pw.MainAxisAlignment.end,
-  //               children: [
-  //                 pw.Column(
-  //                   crossAxisAlignment: pw.CrossAxisAlignment.end,
-  //                   children: [
-  //                     pw.Row(
-  //                       children: [
-  //                         pw.Text(
-  //                           'Total Value: ',
-  //                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-  //                         ),
-  //                         pw.SizedBox(width: 6),
-  //                         pw.Text(
-  //                           '₹$totalValue',
-  //                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-  //                         ),
-  //                       ],
-  //                     ),
-  //                   ],
-  //                 ),
-  //               ],
-  //             ),
-  //             pw.Spacer(),
-  //             pw.Align(
-  //               alignment: pw.Alignment.bottomRight,
-  //               child: pw.Text(
-  //                 'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
-  //                 style: pw.TextStyle(fontSize: 9, color: PdfColors.grey),
-  //               ),
-  //             ),
-  //           ],
-  //         );
-  //       },
-  //     ),
-  //   );
-
-  //   return pdf.save();
-  // }
-
-  // Future<void> _downloadChallanPdf(Map<String, dynamic> challan) async {
-  //   try {
-  //     ScaffoldMessenger.of(
-  //       context,
-  //     ).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
-
-  //     final bytes = await _buildChallanPdfData(challan);
-
-  //     // ask directory (works on Android with file_picker)
-  //     final dir = await FilePicker.platform.getDirectoryPath(
-  //       dialogTitle: 'Select folder to save PDF',
-  //     );
-  //     if (dir == null) {
-  //       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-  //       ScaffoldMessenger.of(
-  //         context,
-  //       ).showSnackBar(const SnackBar(content: Text('Save cancelled')));
-  //       return;
-  //     }
-
-  //     // final nameBase = (challan['challanNumber'] ?? 'challan')
-  //     //     .toString()
-  //     //     .replaceAll(RegExp(r'[^A-Za-z0-9\-_]'), '_');
-  //     // final filename = '$nameBase_${DateTime.now().millisecondsSinceEpoch}.pdf';
-  //     final nameBase = (challan['challanNumber'] ?? 'challan')
-  //         .toString()
-  //         .replaceAll(RegExp(r'[^A-Za-z0-9\-_]'), '_');
-  //     final filename =
-  //         '${nameBase}_${DateTime.now().millisecondsSinceEpoch}.pdf';
-
-  //     final pathFile = p.join(dir, filename);
-  //     final file = File(pathFile);
-  //     await file.writeAsBytes(bytes);
-
-  //     ScaffoldMessenger.of(context)
-  //       ..hideCurrentSnackBar()
-  //       ..showSnackBar(SnackBar(content: Text('Saved PDF: $pathFile')));
-  //   } catch (e, st) {
-  //     debugPrint('Error saving challan pdf: $e\n$st');
-  //     ScaffoldMessenger.of(context)
-  //       ..hideCurrentSnackBar()
-  //       ..showSnackBar(SnackBar(content: Text('Failed to save PDF: $e')));
-  //   }
-  // }
-  //
-  // Generate PDF, save to temp, then open share sheet
-  // Future<void> _shareChallanPdf(Map<String, dynamic> challan) async {
-  //   try {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(content: Text('Preparing PDF for sharing...')),
-  //     );
-
-  //     final bytes = await _buildChallanPdfData(challan);
-
-  //     final tmpDir = await getTemporaryDirectory();
-  //     final nameBase = (challan['challanNumber'] ?? 'challan')
-  //         .toString()
-  //         .replaceAll(RegExp(r'[^A-Za-z0-9\-_]'), '_');
-  //     final tmpPath = p.join(
-  //       tmpDir.path,
-  //       '${nameBase}_${DateTime.now().millisecondsSinceEpoch}.pdf',
-  //     );
-
-  //     final tmpFile = File(tmpPath);
-  //     await tmpFile.writeAsBytes(bytes);
-
-  //     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-  //     await Share.shareXFiles([
-  //       XFile(tmpFile.path),
-  //     ], text: 'Challan ${challan['challanNumber'] ?? ''}');
-  //   } catch (e, st) {
-  //     debugPrint('Error sharing challan pdf: $e\n$st');
-  //     ScaffoldMessenger.of(context)
-  //       ..hideCurrentSnackBar()
-  //       ..showSnackBar(SnackBar(content: Text('Failed to prepare share: $e')));
-  //   }
-  // }
 
   Future<Uint8List> _buildChallanPdfData(Map<String, dynamic> challan) async {
     final pdf = pw.Document();
 
-    // load a Unicode-capable font (Noto Sans) via printing package helper
+    // load a Unicode-capable font
     final pw.Font noto = await PdfGoogleFonts.notoSansRegular();
+
+    // load logo asset
+    Uint8List? logoBytes;
+    try {
+      final data = await rootBundle.load('assets/logowithText.png');
+      logoBytes = data.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Failed to load logo asset: $e');
+      logoBytes = null;
+    }
+    final logo = logoBytes != null ? pw.MemoryImage(logoBytes) : null;
 
     double _toDouble(dynamic v) {
       if (v == null) return 0.0;
@@ -395,188 +160,448 @@ class _ChallanScreenState extends State<ChallanScreen> {
     }
 
     final items = List<Map<String, dynamic>>.from(challan['items'] ?? []);
-    final customerName = challan['customer']?.toString() ?? '';
+    final customerName = challan['customer'] is Map
+        ? (challan['customer']['name'] ?? '').toString()
+        : (challan['customer']?.toString() ?? '');
     final orderNumber = challan['orderNumber']?.toString() ?? '';
     final challanNumber = challan['challanNumber']?.toString() ?? '';
     final dateStr = (challan['date'] ?? '').toString();
     final displayDate = dateStr.isNotEmpty ? dateStr.substring(0, 10) : '';
-    final vendor = challan['vendor']?.toString() ?? '';
     final totalValue = _toDouble(challan['totalValue'] ?? 0).round();
 
-    final baseTextStyle = pw.TextStyle(font: noto, fontSize: 11);
+    // prefetch first image for each item (if available) so table build is synchronous
+    final List<Uint8List?> itemImages = List<Uint8List?>.filled(
+      items.length,
+      null,
+    );
+    for (var i = 0; i < items.length; i++) {
+      try {
+        String? url;
+        final it = items[i];
+        // try common fields where image URL might be present
+        if (it['images'] is List && (it['images'] as List).isNotEmpty) {
+          url = (it['images'] as List)
+              .firstWhere(
+                (e) => e != null && e.toString().trim().isNotEmpty,
+                orElse: () => null,
+              )
+              ?.toString();
+        }
+        url ??= it['image']?.toString();
+        // also check nested productId.images
+        if ((url == null || url.isEmpty) && it['productId'] is Map) {
+          final prod = it['productId'] as Map;
+          if (prod['images'] is List && (prod['images'] as List).isNotEmpty) {
+            url = (prod['images'] as List)
+                .firstWhere(
+                  (e) => e != null && e.toString().trim().isNotEmpty,
+                  orElse: () => null,
+                )
+                ?.toString();
+          } else {
+            url ??= prod['image']?.toString();
+          }
+        }
+        if (url != null &&
+            url.isNotEmpty &&
+            (url.startsWith('http') || url.startsWith('https'))) {
+          final resp = await http
+              .get(Uri.parse(url))
+              .timeout(const Duration(seconds: 8));
+          if (resp.statusCode == 200) itemImages[i] = resp.bodyBytes;
+        }
+      } catch (e) {
+        debugPrint('Image fetch failed for item $i: $e');
+        itemImages[i] = null;
+      }
+    }
+
+    final baseTextStyle = pw.TextStyle(font: noto, fontSize: 10);
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(14),
         build: (context) {
-          return pw.DefaultTextStyle(
-            style: baseTextStyle,
-            child: pw.Column(
+          return <pw.Widget>[
+            // header
+            pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'DELIVERY CHALLAN',
-                          style: baseTextStyle.copyWith(
-                            fontSize: 18,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
+                if (logo != null)
+                  pw.Container(
+                    width: 120,
+                    child: pw.Image(logo, fit: pw.BoxFit.contain),
+                  )
+                else
+                  pw.Container(width: 120),
+                pw.SizedBox(width: 12),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(
+                        'Anibhavi Creations',
+                        style: baseTextStyle.copyWith(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
                         ),
-                        pw.SizedBox(height: 6),
-                        pw.Text(
-                          'Garments B2B & Offline Management Platform',
-                          style: baseTextStyle.copyWith(fontSize: 9),
-                        ),
-                      ],
-                    ),
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        pw.Text(
-                          'Challan Details',
-                          style: baseTextStyle.copyWith(
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text('Number: $challanNumber'),
-                        pw.Text('Date: $displayDate'),
-                        pw.Text('Vendor: $vendor'),
-                      ],
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 14),
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Expanded(
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(
-                            'Customer Details',
-                            style: baseTextStyle.copyWith(
-                              fontWeight: pw.FontWeight.bold,
-                            ),
-                          ),
-                          pw.SizedBox(height: 6),
-                          pw.Text('Name: $customerName'),
-                          pw.Text('Order Number: $orderNumber'),
-                        ],
                       ),
-                    ),
-                    pw.SizedBox(width: 10),
-                  ],
-                ),
-                pw.SizedBox(height: 14),
-                pw.Text(
-                  'Items:',
-                  style: baseTextStyle.copyWith(fontWeight: pw.FontWeight.bold),
-                ),
-                pw.SizedBox(height: 6),
-                pw.Table.fromTextArray(
-                  headers: [
-                    'Product Name',
-                    'Size',
-                    'Quantity',
-                    'Price',
-                    'Total',
-                  ],
-                  data: items.map((it) {
-                    final name = it['name']?.toString() ?? '';
-                    final size =
-                        (it['availableSizes'] is List &&
-                            (it['availableSizes'] as List).isNotEmpty)
-                        ? (it['availableSizes'] as List).join(', ')
-                        : '';
-                    final pcsInSet =
-                        int.tryParse(it['pcsInSet']?.toString() ?? '1') ?? 1;
-                    final qty =
-                        int.tryParse(
-                          (it['dispatchedQty'] ?? it['quantity'] ?? 0)
-                              .toString(),
-                        ) ??
-                        0;
-                    final unitPrice = _unitPriceForItem(it);
-                    final bool isPerSet =
-                        (it['filnalLotPrice'] ?? it['filnalPrice']) != null &&
-                        (it['filnalLotPrice']?.toString().trim().isNotEmpty ??
-                            false);
-                    final total = isPerSet
-                        ? unitPrice * qty
-                        : unitPrice * pcsInSet * qty;
-                    final priceDisplay = unitPrice.round();
-                    return [
-                      name,
-                      size,
-                      qty.toString(),
-                      '₹$priceDisplay',
-                      '₹${total.round()}',
-                    ];
-                  }).toList(),
-                  headerStyle: baseTextStyle.copyWith(
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                  cellStyle: baseTextStyle,
-                  cellAlignment: pw.Alignment.centerLeft,
-                  headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-                  cellHeight: 22,
-                  columnWidths: {
-                    0: pw.FlexColumnWidth(3),
-                    1: pw.FlexColumnWidth(1.5),
-                    2: pw.FlexColumnWidth(1),
-                    3: pw.FlexColumnWidth(1.5),
-                    4: pw.FlexColumnWidth(1.5),
-                  },
-                ),
-                pw.SizedBox(height: 8),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.end,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        pw.Row(
-                          children: [
-                            pw.Text(
-                              'Total Value: ',
-                              style: baseTextStyle.copyWith(
-                                fontWeight: pw.FontWeight.bold,
-                              ),
-                            ),
-                            pw.SizedBox(width: 6),
-                            pw.Text(
-                              '₹$totalValue',
-                              style: baseTextStyle.copyWith(
-                                fontWeight: pw.FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                pw.Spacer(),
-                pw.Align(
-                  alignment: pw.Alignment.bottomRight,
-                  child: pw.Text(
-                    'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
-                    style: baseTextStyle.copyWith(
-                      fontSize: 9,
-                      color: PdfColors.grey,
-                    ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        '9/7308 Guru Govind Singh Gali (Gandhinagar) Near sway guest house',
+                        textAlign: pw.TextAlign.right,
+                        style: baseTextStyle.copyWith(fontSize: 9),
+                      ),
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        '(O) 8506854624',
+                        textAlign: pw.TextAlign.right,
+                        style: baseTextStyle.copyWith(fontSize: 9),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          );
+            pw.SizedBox(height: 10),
+
+            // order/customer block
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'M/S: $customerName',
+                        style: baseTextStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Order No: $orderNumber',
+                        style: baseTextStyle.copyWith(fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('Challan No: $challanNumber', style: baseTextStyle),
+                    pw.SizedBox(height: 4),
+                    pw.Text('Date: $displayDate', style: baseTextStyle),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 12),
+
+            // items table header + rows
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(0.8), // sr
+                1: const pw.FlexColumnWidth(4.0), // photo + name
+                2: const pw.FlexColumnWidth(1.2), // qty
+                3: const pw.FlexColumnWidth(1.4), // rate
+                4: const pw.FlexColumnWidth(1.6), // amount
+              },
+              children: [
+                // header row
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Sr',
+                        style: baseTextStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Product (Name / Sub)',
+                        style: baseTextStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Qty',
+                        style: baseTextStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Rate',
+                        style: baseTextStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                        textAlign: pw.TextAlign.right,
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Amount',
+                        style: baseTextStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                        textAlign: pw.TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // item rows
+                ...List.generate(items.length, (i) {
+                  final it = items[i];
+                  final name = (it['name'] ?? '').toString();
+                  String sub = '';
+                  if (it['subProductName'] != null)
+                    sub = it['subProductName'].toString();
+                  else if (it['subProduct'] is String)
+                    sub = it['subProduct'].toString();
+                  else if (it['subProduct'] is Map &&
+                      it['subProduct']['name'] != null)
+                    sub = it['subProduct']['name'].toString();
+                  final displayName = (sub.trim().isNotEmpty)
+                      ? '$name/$sub'
+                      : name;
+
+                  final qty =
+                      int.tryParse(
+                        (it['dispatchedQty'] ?? it['quantity'] ?? 0).toString(),
+                      ) ??
+                      0;
+                  final pcsInSet =
+                      int.tryParse(it['pcsInSet']?.toString() ?? '1') ?? 1;
+                  final unitPrice = _unitPriceForItem(it);
+                  final bool isPerSet =
+                      (it['filnalLotPrice'] ?? it['filnalPrice']) != null &&
+                      (it['filnalLotPrice']?.toString().trim().isNotEmpty ??
+                          false);
+                  final amount = isPerSet
+                      ? unitPrice * qty
+                      : unitPrice * pcsInSet * qty;
+
+                  // image widget or placeholder
+                  pw.Widget imageWidget;
+                  final Uint8List? bytes = itemImages[i];
+                  if (bytes != null && bytes.isNotEmpty) {
+                    try {
+                      imageWidget = pw.Container(
+                        width: 50,
+                        height: 50,
+                        child: pw.Image(
+                          pw.MemoryImage(bytes),
+                          fit: pw.BoxFit.cover,
+                        ),
+                      );
+                    } catch (_) {
+                      imageWidget = pw.Container(
+                        width: 50,
+                        height: 50,
+                        color: PdfColors.grey300,
+                      );
+                    }
+                  } else {
+                    imageWidget = pw.Container(
+                      width: 50,
+                      height: 50,
+                      color: PdfColors.grey300,
+                    );
+                  }
+
+                  return pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(
+                        top: pw.BorderSide(color: PdfColors.grey200),
+                      ),
+                    ),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text('${i + 1}', style: baseTextStyle),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            imageWidget,
+                            pw.SizedBox(width: 6),
+                            pw.Expanded(
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                children: [
+                                  pw.Text(
+                                    displayName,
+                                    style: baseTextStyle.copyWith(
+                                      fontWeight: pw.FontWeight.bold,
+                                    ),
+                                  ),
+                                  pw.SizedBox(height: 4),
+                                  if ((it['availableSizes'] ?? []).isNotEmpty)
+                                    pw.Text(
+                                      'Sizes: ${(it['availableSizes'] as List).join(", ")}',
+                                      style: baseTextStyle.copyWith(
+                                        fontSize: 9,
+                                        color: PdfColors.grey700,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          qty.toString(),
+                          textAlign: pw.TextAlign.center,
+                          style: baseTextStyle,
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          '₹${unitPrice.round()}',
+                          textAlign: pw.TextAlign.right,
+                          style: baseTextStyle,
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          '₹${amount.round()}',
+                          textAlign: pw.TextAlign.right,
+                          style: baseTextStyle,
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+
+                // totals row
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Container(),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Container(),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Total',
+                        textAlign: pw.TextAlign.center,
+                        style: baseTextStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Container(),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        '₹${totalValue}',
+                        textAlign: pw.TextAlign.right,
+                        style: baseTextStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            pw.SizedBox(height: 12),
+
+            // footer totals / notes
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Container(
+                  width: 260,
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                    children: [
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text(
+                            'Net Total:',
+                            style: baseTextStyle.copyWith(
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.Text(
+                            '₹${totalValue}',
+                            style: baseTextStyle.copyWith(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            pw.SizedBox(height: 18),
+
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'Created by: ${challan['createdBy'] ?? ''}',
+                      style: baseTextStyle.copyWith(fontSize: 9),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'Our Exchange Policy',
+                      style: baseTextStyle.copyWith(fontSize: 9),
+                    ),
+                  ],
+                ),
+                pw.Text(
+                  'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
+                  style: baseTextStyle.copyWith(
+                    fontSize: 9,
+                    color: PdfColors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ];
         },
       ),
     );
@@ -1518,12 +1543,79 @@ class _ChallanScreenState extends State<ChallanScreen> {
 
                           const SizedBox(height: 12),
 
+                          // if (selectedOrder != null) ...[
+                          //   const Text(
+                          //     'Dispatch Quantities per Item',
+                          //     style: TextStyle(fontWeight: FontWeight.bold),
+                          //   ),
+                          //   const SizedBox(height: 8),
                           if (selectedOrder != null) ...[
-                            const Text(
-                              'Dispatch Quantities per Item',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                            // Title row with "Fill Max" button at the right
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Dispatch Quantities per Item',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Fill max quantities',
+                                  icon: const Icon(
+                                    Icons.playlist_add_check,
+                                    size: 20,
+                                    color: Colors.indigo,
+                                  ),
+                                  onPressed: () {
+                                    // Fill every item's qty to remaining (ordered - alreadyDispatched)
+                                    for (
+                                      var i = 0;
+                                      i < orderItems.length;
+                                      i++
+                                    ) {
+                                      final orderedSets =
+                                          int.tryParse(
+                                            orderItems[i]['quantity']
+                                                    ?.toString() ??
+                                                '0',
+                                          ) ??
+                                          0;
+                                      final already = _alreadyDispatchedForItem(
+                                        orderItems[i],
+                                      );
+                                      final remaining =
+                                          (orderedSets - already) > 0
+                                          ? (orderedSets - already)
+                                          : 0;
+
+                                      newDispatchMap[i] = remaining;
+
+                                      // ensure controller exists and update text/cursor
+                                      final ctrl = dispatchControllers
+                                          .putIfAbsent(
+                                            i,
+                                            () => TextEditingController(
+                                              text: remaining.toString(),
+                                            ),
+                                          );
+                                      if (ctrl.text != remaining.toString()) {
+                                        ctrl.value = TextEditingValue(
+                                          text: remaining.toString(),
+                                          selection: TextSelection.collapsed(
+                                            offset: remaining.toString().length,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                    setStateModal(() {});
+                                  },
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 8),
+
                             for (int i = 0; i < orderItems.length; i++)
                               Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -2651,14 +2743,110 @@ class _ChallanScreenState extends State<ChallanScreen> {
                           const SizedBox(height: 12),
 
                           // Return Items
+                          // if (withOrder && selectedOrder != null)
+                          //   Column(
+                          //     crossAxisAlignment: CrossAxisAlignment.start,
+                          //     children: [
+                          //       const Text(
+                          //         'Return Items',
+                          //         style: TextStyle(fontWeight: FontWeight.bold),
+                          //       ),
                           if (withOrder && selectedOrder != null)
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Return Items',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                // Title row with "Fill Max" button
+                                Row(
+                                  children: [
+                                    const Expanded(
+                                      child: Text(
+                                        'Return Items',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Fill max return qty',
+                                      icon: const Icon(
+                                        Icons.playlist_add_check,
+                                        size: 20,
+                                        color: Colors.orange,
+                                      ),
+                                      onPressed: () {
+                                        // Fill every item's return qty to remaining (delivered - alreadyReturned)
+                                        for (
+                                          var i = 0;
+                                          i < orderItems.length;
+                                          i++
+                                        ) {
+                                          final delivered =
+                                              _deliveredPcsForItem(
+                                                orderItems[i],
+                                              );
+                                          final already =
+                                              _alreadyReturnedForItem(
+                                                orderItems[i],
+                                              );
+                                          final remaining =
+                                              (delivered - already) > 0
+                                              ? (delivered - already)
+                                              : 0;
+
+                                          // set return qty controller
+                                          final rCtrl = returnQtyControllers
+                                              .putIfAbsent(
+                                                i,
+                                                () => TextEditingController(
+                                                  text: '0',
+                                                ),
+                                              );
+                                          final newText = remaining.toString();
+                                          if (rCtrl.text != newText) {
+                                            rCtrl.value = TextEditingValue(
+                                              text: newText,
+                                              selection:
+                                                  TextSelection.collapsed(
+                                                    offset: newText.length,
+                                                  ),
+                                            );
+                                          }
+
+                                          // update refund controller accordingly
+                                          final price =
+                                              double.tryParse(
+                                                (orderItems[i]['singlePicPrice'] ??
+                                                        orderItems[i]['price'] ??
+                                                        0)
+                                                    .toString(),
+                                              ) ??
+                                              0.0;
+                                          final pcs =
+                                              int.tryParse(
+                                                orderItems[i]['pcsInSet']
+                                                        ?.toString() ??
+                                                    '1',
+                                              ) ??
+                                              1;
+                                          final refundVal =
+                                              (price * pcs * remaining).round();
+                                          refundControllers
+                                              .putIfAbsent(
+                                                i,
+                                                () => TextEditingController(
+                                                  text: '0',
+                                                ),
+                                              )
+                                              .text = refundVal
+                                              .toString();
+                                        }
+                                        setModal(() {});
+                                      },
+                                    ),
+                                  ],
                                 ),
+                                const SizedBox(height: 8),
+
                                 const SizedBox(height: 8),
                                 for (int i = 0; i < orderItems.length; i++) ...[
                                   Card(
@@ -6077,9 +6265,142 @@ class _ChallanScreenState extends State<ChallanScreen> {
     }
   }
 
+  // Future<Uint8List> _buildReturnPdfData(Map<String, dynamic> ret) async {
+  //   final pdf = pw.Document();
+  //   final pw.Font noto = await PdfGoogleFonts.notoSansRegular();
+
+  //   double _toDouble(dynamic v) {
+  //     if (v == null) return 0.0;
+  //     if (v is num) return v.toDouble();
+  //     return double.tryParse(v.toString()) ?? 0.0;
+  //   }
+
+  //   final items = List<Map<String, dynamic>>.from(ret['items'] ?? []);
+  //   final customer = ret['customer'] is Map
+  //       ? (ret['customer']['name'] ?? '')
+  //       : (ret['customer']?.toString() ?? '');
+  //   final returnNumber = ret['returnNumber']?.toString() ?? '';
+  //   final dateStr = (ret['date'] ?? '').toString();
+  //   final displayDate = dateStr.isNotEmpty ? dateStr.substring(0, 10) : '';
+  //   final refundMethod = ret['refundMethod']?.toString() ?? '';
+  //   final totalRefund = _toDouble(ret['totalRefund'] ?? 0).round();
+
+  //   final baseStyle = pw.TextStyle(font: noto, fontSize: 11);
+
+  //   pdf.addPage(
+  //     pw.Page(
+  //       pageFormat: PdfPageFormat.a4,
+  //       build: (context) {
+  //         return pw.DefaultTextStyle(
+  //           style: baseStyle,
+  //           child: pw.Column(
+  //             crossAxisAlignment: pw.CrossAxisAlignment.start,
+  //             children: [
+  //               pw.Row(
+  //                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+  //                 children: [
+  //                   pw.Column(
+  //                     crossAxisAlignment: pw.CrossAxisAlignment.start,
+  //                     children: [
+  //                       pw.Text(
+  //                         'RETURN NOTE',
+  //                         style: baseStyle.copyWith(
+  //                           fontSize: 18,
+  //                           fontWeight: pw.FontWeight.bold,
+  //                         ),
+  //                       ),
+  //                       pw.SizedBox(height: 6),
+  //                       pw.Text('Return # $returnNumber', style: baseStyle),
+  //                     ],
+  //                   ),
+  //                   pw.Column(
+  //                     crossAxisAlignment: pw.CrossAxisAlignment.end,
+  //                     children: [
+  //                       pw.Text('Date: $displayDate'),
+  //                       pw.Text('Refund Method: $refundMethod'),
+  //                     ],
+  //                   ),
+  //                 ],
+  //               ),
+  //               pw.SizedBox(height: 12),
+  //               pw.Text(
+  //                 'Customer: $customer',
+  //                 style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+  //               ),
+  //               pw.SizedBox(height: 10),
+  //               pw.Text(
+  //                 'Items:',
+  //                 style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+  //               ),
+  //               pw.SizedBox(height: 6),
+  //               pw.Table.fromTextArray(
+  //                 headers: ['Name', 'Qty', 'PCS/SET', 'Refund'],
+  //                 data: items.map((it) {
+  //                   final name = it['name']?.toString() ?? '';
+  //                   final qty = (it['returnPcs'] ?? it['returnQty'] ?? 0)
+  //                       .toString();
+  //                   final pcs = it['pcsInSet']?.toString() ?? '';
+  //                   final refund = (it['refundAmount'] ?? '').toString();
+  //                   return [name, qty, pcs, '₹$refund'];
+  //                 }).toList(),
+  //                 headerStyle: baseStyle.copyWith(
+  //                   fontWeight: pw.FontWeight.bold,
+  //                 ),
+  //                 cellStyle: baseStyle,
+  //                 headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+  //                 cellAlignment: pw.Alignment.centerLeft,
+  //               ),
+  //               pw.Spacer(),
+  //               pw.Row(
+  //                 mainAxisAlignment: pw.MainAxisAlignment.end,
+  //                 children: [
+  //                   pw.Text(
+  //                     'Total Refund: ',
+  //                     style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+  //                   ),
+  //                   pw.SizedBox(width: 6),
+  //                   pw.Text(
+  //                     '₹$totalRefund',
+  //                     style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+  //                   ),
+  //                 ],
+  //               ),
+  //               pw.SizedBox(height: 8),
+  //               pw.Align(
+  //                 alignment: pw.Alignment.bottomRight,
+  //                 child: pw.Text(
+  //                   'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
+  //                   style: baseStyle.copyWith(
+  //                     fontSize: 9,
+  //                     color: PdfColors.grey,
+  //                   ),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         );
+  //       },
+  //     ),
+  //   );
+
+  //   return pdf.save();
+  // }
+
+  // ...existing code...
   Future<Uint8List> _buildReturnPdfData(Map<String, dynamic> ret) async {
     final pdf = pw.Document();
     final pw.Font noto = await PdfGoogleFonts.notoSansRegular();
+
+    // load logo asset (same as challan)
+    Uint8List? logoBytes;
+    try {
+      final data = await rootBundle.load('assets/logowithText.png');
+      logoBytes = data.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Failed to load logo asset: $e');
+      logoBytes = null;
+    }
+    final logo = logoBytes != null ? pw.MemoryImage(logoBytes) : null;
 
     double _toDouble(dynamic v) {
       if (v == null) return 0.0;
@@ -6097,100 +6418,380 @@ class _ChallanScreenState extends State<ChallanScreen> {
     final refundMethod = ret['refundMethod']?.toString() ?? '';
     final totalRefund = _toDouble(ret['totalRefund'] ?? 0).round();
 
-    final baseStyle = pw.TextStyle(font: noto, fontSize: 11);
+    // prefetch images for items
+    final List<Uint8List?> itemImages = List<Uint8List?>.filled(
+      items.length,
+      null,
+    );
+    for (var i = 0; i < items.length; i++) {
+      try {
+        String? url;
+        final it = items[i];
+        if (it['images'] is List && (it['images'] as List).isNotEmpty) {
+          url = (it['images'] as List)
+              .firstWhere(
+                (e) => e != null && e.toString().trim().isNotEmpty,
+                orElse: () => null,
+              )
+              ?.toString();
+        }
+        url ??= it['image']?.toString();
+        if ((url == null || url.isEmpty) && it['productId'] is Map) {
+          final prod = it['productId'] as Map;
+          if (prod['images'] is List && (prod['images'] as List).isNotEmpty) {
+            url = (prod['images'] as List)
+                .firstWhere(
+                  (e) => e != null && e.toString().trim().isNotEmpty,
+                  orElse: () => null,
+                )
+                ?.toString();
+          } else {
+            url ??= prod['image']?.toString();
+          }
+        }
+        if (url != null &&
+            url.isNotEmpty &&
+            (url.startsWith('http') || url.startsWith('https'))) {
+          final resp = await http
+              .get(Uri.parse(url))
+              .timeout(const Duration(seconds: 8));
+          if (resp.statusCode == 200) itemImages[i] = resp.bodyBytes;
+        }
+      } catch (e) {
+        debugPrint('Image fetch failed for return item $i: $e');
+        itemImages[i] = null;
+      }
+    }
+
+    final baseStyle = pw.TextStyle(font: noto, fontSize: 10);
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(14),
         build: (context) {
-          return pw.DefaultTextStyle(
-            style: baseStyle,
-            child: pw.Column(
+          return <pw.Widget>[
+            // header
+            pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'RETURN NOTE',
-                          style: baseStyle.copyWith(
-                            fontSize: 18,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
+                if (logo != null)
+                  pw.Container(
+                    width: 120,
+                    child: pw.Image(logo, fit: pw.BoxFit.contain),
+                  )
+                else
+                  pw.Container(width: 120),
+                pw.SizedBox(width: 12),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(
+                        'RETURN NOTE',
+                        style: baseStyle.copyWith(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
                         ),
-                        pw.SizedBox(height: 6),
-                        pw.Text('Return # $returnNumber', style: baseStyle),
-                      ],
-                    ),
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        pw.Text('Date: $displayDate'),
-                        pw.Text('Refund Method: $refundMethod'),
-                      ],
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 12),
-                pw.Text(
-                  'Customer: $customer',
-                  style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
-                ),
-                pw.SizedBox(height: 10),
-                pw.Text(
-                  'Items:',
-                  style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
-                ),
-                pw.SizedBox(height: 6),
-                pw.Table.fromTextArray(
-                  headers: ['Name', 'Qty', 'PCS/SET', 'Refund'],
-                  data: items.map((it) {
-                    final name = it['name']?.toString() ?? '';
-                    final qty = (it['returnPcs'] ?? it['returnQty'] ?? 0)
-                        .toString();
-                    final pcs = it['pcsInSet']?.toString() ?? '';
-                    final refund = (it['refundAmount'] ?? '').toString();
-                    return [name, qty, pcs, '₹$refund'];
-                  }).toList(),
-                  headerStyle: baseStyle.copyWith(
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                  cellStyle: baseStyle,
-                  headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-                  cellAlignment: pw.Alignment.centerLeft,
-                ),
-                pw.Spacer(),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.end,
-                  children: [
-                    pw.Text(
-                      'Total Refund: ',
-                      style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
-                    ),
-                    pw.SizedBox(width: 6),
-                    pw.Text(
-                      '₹$totalRefund',
-                      style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 8),
-                pw.Align(
-                  alignment: pw.Alignment.bottomRight,
-                  child: pw.Text(
-                    'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
-                    style: baseStyle.copyWith(
-                      fontSize: 9,
-                      color: PdfColors.grey,
-                    ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Anibhavi Creations',
+                        textAlign: pw.TextAlign.right,
+                        style: baseStyle.copyWith(fontSize: 9),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          );
+            pw.SizedBox(height: 10),
+
+            // customer / meta
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Customer: $customer',
+                        style: baseStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Refund Method: $refundMethod',
+                        style: baseStyle.copyWith(fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('Return No: $returnNumber', style: baseStyle),
+                    pw.SizedBox(height: 4),
+                    pw.Text('Date: $displayDate', style: baseStyle),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 12),
+
+            // items table
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(0.8), // sr
+                1: const pw.FlexColumnWidth(4.0), // photo + name
+                2: const pw.FlexColumnWidth(1.2), // qty
+                3: const pw.FlexColumnWidth(1.4), // pcs/set
+                4: const pw.FlexColumnWidth(1.6), // refund
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Sr',
+                        style: baseStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Product (Name / Sub)',
+                        style: baseStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Qty',
+                        style: baseStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'PCS/SET',
+                        style: baseStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Refund',
+                        style: baseStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                        textAlign: pw.TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // rows
+                ...List.generate(items.length, (i) {
+                  final it = items[i];
+                  final name = (it['name'] ?? '').toString();
+                  String sub = '';
+                  if (it['subProductName'] != null)
+                    sub = it['subProductName'].toString();
+                  else if (it['subProduct'] is String)
+                    sub = it['subProduct'].toString();
+                  else if (it['subProduct'] is Map &&
+                      it['subProduct']['name'] != null)
+                    sub = it['subProduct']['name'].toString();
+                  final displayName = (sub.trim().isNotEmpty)
+                      ? '$name/$sub'
+                      : name;
+
+                  final qty =
+                      int.tryParse(
+                        (it['returnPcs'] ?? it['returnQty'] ?? 0).toString(),
+                      ) ??
+                      0;
+                  final pcsInSet = it['pcsInSet'] != null
+                      ? int.tryParse(it['pcsInSet'].toString()) ?? 1
+                      : 1;
+                  final refund = _toDouble(
+                    it['refundAmount'] ?? it['refund'] ?? 0,
+                  ).round();
+
+                  // image or placeholder
+                  pw.Widget imageWidget;
+                  final Uint8List? bytes = itemImages[i];
+                  if (bytes != null && bytes.isNotEmpty) {
+                    imageWidget = pw.Container(
+                      width: 50,
+                      height: 50,
+                      child: pw.Image(
+                        pw.MemoryImage(bytes),
+                        fit: pw.BoxFit.cover,
+                      ),
+                    );
+                  } else {
+                    imageWidget = pw.Container(
+                      width: 50,
+                      height: 50,
+                      color: PdfColors.grey300,
+                    );
+                  }
+
+                  return pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(
+                        top: pw.BorderSide(color: PdfColors.grey200),
+                      ),
+                    ),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text('${i + 1}', style: baseStyle),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            imageWidget,
+                            pw.SizedBox(width: 6),
+                            pw.Expanded(
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                children: [
+                                  pw.Text(
+                                    displayName,
+                                    style: baseStyle.copyWith(
+                                      fontWeight: pw.FontWeight.bold,
+                                    ),
+                                  ),
+                                  if ((it['availableSizes'] ?? []).isNotEmpty)
+                                    pw.Text(
+                                      'Sizes: ${(it['availableSizes'] as List).join(", ")}',
+                                      style: baseStyle.copyWith(
+                                        fontSize: 9,
+                                        color: PdfColors.grey700,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          qty.toString(),
+                          textAlign: pw.TextAlign.center,
+                          style: baseStyle,
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          pcsInSet.toString(),
+                          textAlign: pw.TextAlign.center,
+                          style: baseStyle,
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          '${refund}',
+                          textAlign: pw.TextAlign.right,
+                          style: baseStyle,
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+
+                // totals row
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Container(),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Container(),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Total',
+                        textAlign: pw.TextAlign.center,
+                        style: baseStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Container(),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        '${totalRefund}',
+                        textAlign: pw.TextAlign.right,
+                        style: baseStyle.copyWith(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            pw.SizedBox(height: 12),
+
+            // footer
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'Created by: ${ret['createdBy'] ?? ''}',
+                      style: baseStyle.copyWith(fontSize: 9),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'Return policy applies',
+                      style: baseStyle.copyWith(fontSize: 9),
+                    ),
+                  ],
+                ),
+                pw.Text(
+                  'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
+                  style: baseStyle.copyWith(fontSize: 9, color: PdfColors.grey),
+                ),
+              ],
+            ),
+          ];
         },
       ),
     );

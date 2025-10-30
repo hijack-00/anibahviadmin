@@ -376,19 +376,100 @@ class _AddProductFormState extends State<AddProductForm> {
         ElevatedButton.icon(
           onPressed: () async {
             if (imageFiles.length >= 8) return;
+
             final picker = ImagePicker();
-            final picked = await picker.pickMultiImage();
-            if (picked != null) {
-              setState(() {
-                imageFiles.addAll(picked.map((x) => File(x.path)));
-                if (imageFiles.length > 8)
-                  imageFiles = imageFiles.sublist(0, 8);
-              });
+
+            // Ask user to choose between camera or gallery
+            final source = await showDialog<ImageSource>(
+              context: context,
+              builder: (context) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                title: const Text('Select Image Source'),
+                content: const Text(
+                  'Choose how you want to upload your images.',
+                ),
+                actions: [
+                  TextButton.icon(
+                    icon: const Icon(
+                      Icons.camera_alt_outlined,
+                      color: Colors.indigo,
+                    ),
+                    label: const Text('Camera'),
+                    onPressed: () => Navigator.pop(context, ImageSource.camera),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(
+                      Icons.photo_library_outlined,
+                      color: Colors.indigo,
+                    ),
+                    label: const Text('Gallery'),
+                    onPressed: () =>
+                        Navigator.pop(context, ImageSource.gallery),
+                  ),
+                ],
+              ),
+            );
+
+            if (source == null) return; // user cancelled
+
+            if (source == ImageSource.camera) {
+              final captured = await picker.pickImage(
+                source: ImageSource.camera,
+              );
+              if (captured != null) {
+                setState(() {
+                  imageFiles.add(File(captured.path));
+                  if (imageFiles.length > 8) {
+                    imageFiles = imageFiles.sublist(0, 8);
+                  }
+                });
+              }
+            } else {
+              final picked = await picker.pickMultiImage();
+              if (picked != null && picked.isNotEmpty) {
+                setState(() {
+                  imageFiles.addAll(picked.map((x) => File(x.path)));
+                  if (imageFiles.length > 8) {
+                    imageFiles = imageFiles.sublist(0, 8);
+                  }
+                });
+              }
             }
           },
-          icon: Icon(Icons.upload),
-          label: Text('Upload Images (3-8)'),
+          icon: const Icon(Icons.upload_rounded),
+          label: const Text('Upload Images (3–8)'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.indigo.shade400,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            textStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
+
+        // ElevatedButton.icon(
+        //   onPressed: () async {
+        //     if (imageFiles.length >= 8) return;
+        //     final picker = ImagePicker();
+        //     final picked = await picker.pickMultiImage();
+        //     if (picked != null) {
+        //       setState(() {
+        //         imageFiles.addAll(picked.map((x) => File(x.path)));
+        //         if (imageFiles.length > 8)
+        //           imageFiles = imageFiles.sublist(0, 8);
+        //       });
+        //     }
+        //   },
+        //   icon: Icon(Icons.upload),
+        //   label: Text('Upload Images (3-8)'),
+        // ),
         if (imageFiles.length < 3)
           Padding(
             padding: const EdgeInsets.only(top: 4.0),

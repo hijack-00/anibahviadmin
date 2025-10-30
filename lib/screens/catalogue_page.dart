@@ -532,68 +532,155 @@ class _CataloguePageState extends State<CataloguePage> {
                   horizontal: 16,
                   vertical: 12,
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ChoiceChip(
-                        label: Text(
-                          'Catalogue',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _currentPage == 0
-                                ? Colors.white
-                                : Colors.black87,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.indigo.shade100),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _currentPage = 0;
+                              _pageController.jumpToPage(0);
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _currentPage == 0
+                                  ? Colors.indigo.shade400
+                                  : Colors.transparent,
+                              borderRadius: const BorderRadius.horizontal(
+                                left: Radius.circular(10),
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'Catalogue',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _currentPage == 0
+                                    ? Colors.white
+                                    : Colors.black87,
+                              ),
+                            ),
                           ),
                         ),
-                        selected: _currentPage == 0,
-                        onSelected: (_) {
-                          setState(() {
-                            _currentPage = 0;
-                            _pageController.jumpToPage(0);
-                          });
-                        },
-                        selectedColor: Colors.indigo.shade400,
-                        backgroundColor: Colors.white,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ChoiceChip(
-                        label: Text(
-                          'Products',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _currentPage == 1
-                                ? Colors.white
-                                : Colors.black87,
-                          ),
-                        ),
-                        selected: _currentPage == 1,
-                        onSelected: (_) {
-                          setState(() {
-                            _currentPage = 1;
-                            _pageController.jumpToPage(1);
-                            // trigger fetch for products page if not yet loaded
-                            if (_allProductsPage.isEmpty) {
-                              _productsPageFuture = AppDataRepo()
-                                  .fetchAllProductsCatalog();
-                              _productsPageFuture.then((data) {
-                                setState(() {
-                                  _allProductsPage = data.reversed.toList();
-                                  _filteredProductsPage = List.from(
-                                    _allProductsPage,
-                                  );
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _currentPage = 1;
+                              _pageController.jumpToPage(1);
+                              if (_allProductsPage.isEmpty) {
+                                _productsPageFuture = AppDataRepo()
+                                    .fetchAllProductsCatalog();
+                                _productsPageFuture.then((data) {
+                                  setState(() {
+                                    _allProductsPage = data.reversed.toList();
+                                    _filteredProductsPage = List.from(
+                                      _allProductsPage,
+                                    );
+                                  });
                                 });
-                              });
-                            }
-                          });
-                        },
-                        selectedColor: Colors.indigo.shade400,
-                        backgroundColor: Colors.white,
+                              }
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _currentPage == 1
+                                  ? Colors.indigo.shade400
+                                  : Colors.transparent,
+                              borderRadius: const BorderRadius.horizontal(
+                                right: Radius.circular(10),
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'Products',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _currentPage == 1
+                                    ? Colors.white
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                // child: Row(
+                //   children: [
+                //     Expanded(
+                //       child: ChoiceChip(
+                //         label: Text(
+                //           'Catalogue',
+                //           style: TextStyle(
+                //             fontSize: 13,
+                //             color: _currentPage == 0
+                //                 ? Colors.white
+                //                 : Colors.black87,
+                //           ),
+                //         ),
+                //         selected: _currentPage == 0,
+                //         onSelected: (_) {
+                //           setState(() {
+                //             _currentPage = 0;
+                //             _pageController.jumpToPage(0);
+                //           });
+                //         },
+                //         selectedColor: Colors.indigo.shade400,
+                //         backgroundColor: Colors.white,
+                //       ),
+                //     ),
+                //     const SizedBox(width: 8),
+                //     Expanded(
+                //       child: ChoiceChip(
+                //         label: Text(
+                //           'Products',
+                //           style: TextStyle(
+                //             fontSize: 13,
+                //             color: _currentPage == 1
+                //                 ? Colors.white
+                //                 : Colors.black87,
+                //           ),
+                //         ),
+                //         selected: _currentPage == 1,
+                //         onSelected: (_) {
+                //           setState(() {
+                //             _currentPage = 1;
+                //             _pageController.jumpToPage(1);
+                //             // trigger fetch for products page if not yet loaded
+                //             if (_allProductsPage.isEmpty) {
+                //               _productsPageFuture = AppDataRepo()
+                //                   .fetchAllProductsCatalog();
+                //               _productsPageFuture.then((data) {
+                //                 setState(() {
+                //                   _allProductsPage = data.reversed.toList();
+                //                   _filteredProductsPage = List.from(
+                //                     _allProductsPage,
+                //                   );
+                //                 });
+                //               });
+                //             }
+                //           });
+                //         },
+                //         selectedColor: Colors.indigo.shade400,
+                //         backgroundColor: Colors.white,
+                //       ),
+                //     ),
+                //   ],
+                // ),
               ),
 
               // Search bar (shared, filters current page)

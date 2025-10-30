@@ -14,6 +14,8 @@ import '../dialogs/create_return_dialog.dart';
 import 'users_page.dart';
 import 'universal_navbar.dart';
 import 'package:intl/intl.dart';
+import 'package:anibhaviadmin/screens/all_orders_page.dart';
+import 'package:anibhaviadmin/screens/challan_screen.dart';
 
 String formatCurrency(num amount) {
   if (amount >= 1000000) {
@@ -329,11 +331,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      // onPressed: () {
+                      //   Navigator.pop(context);
+                      //   Future.microtask(
+                      //     () => showCreateOrderBottomSheet(context),
+                      //   );
+                      // },
                       onPressed: () {
                         Navigator.pop(context);
-                        Future.microtask(
-                          () => showCreateOrderBottomSheet(context),
-                        );
+                        // Open AllOrdersPage and auto-open the same Create Order sheet
+                        Future.microtask(() {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AllOrdersPage(openCreateOrderOnStart: true),
+                            ),
+                          );
+                        });
                       },
                     ),
                     ElevatedButton.icon(
@@ -383,11 +398,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      // onPressed: () {
+                      //   Navigator.pop(context);
+                      //   Future.microtask(
+                      //     () => showCreateChallanDialog(context),
+                      //   );
+                      // },
                       onPressed: () {
                         Navigator.pop(context);
-                        Future.microtask(
-                          () => showCreateChallanDialog(context),
-                        );
+                        Future.microtask(() {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ChallanScreen(
+                                openCreateChallanOnStart: true,
+                              ),
+                            ),
+                          );
+                        });
                       },
                     ),
                     ElevatedButton.icon(
@@ -404,9 +432,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      // onPressed: () {
+                      //   Navigator.pop(context);
+                      //   Future.microtask(() => showCreateReturnDialog(context));
+                      // },
                       onPressed: () {
                         Navigator.pop(context);
-                        Future.microtask(() => showCreateReturnDialog(context));
+                        Future.microtask(() {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ChallanScreen(
+                                openCreateReturnOnStart: true,
+                              ),
+                            ),
+                          );
+                        });
                       },
                     ),
                   ],
@@ -1610,23 +1651,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 24),
 
                     // --- User Stats ---
+                    // Row(
+                    //   children: [
+                    //     Expanded(
+                    //       child: _buildUserStatCard(
+                    //         'Active Users',
+                    //         userOverview['active'] as int,
+                    //         Icons.person_rounded,
+                    //         Colors.indigo.shade400,
+                    //       ),
+                    //     ),
+                    //     SizedBox(width: 10),
+                    //     Expanded(
+                    //       child: _buildUserStatCard(
+                    //         'Inactive Users',
+                    //         userOverview['inactive'] as int,
+                    //         Icons.person_off_rounded,
+                    //         Colors.grey.shade500,
+                    //       ),
+                    //     ),
+                    //   ],
+                    // ),
                     Row(
                       children: [
                         Expanded(
-                          child: _buildUserStatCard(
-                            'Active Users',
-                            userOverview['active'] as int,
-                            Icons.person_rounded,
-                            Colors.indigo.shade400,
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => UsersPage(showActive: true),
+                                ),
+                              );
+                            },
+                            child: _buildUserStatCard(
+                              'Active Users',
+                              userOverview['active'] as int,
+                              Icons.person_rounded,
+                              Colors.indigo.shade400,
+                            ),
                           ),
                         ),
                         SizedBox(width: 10),
                         Expanded(
-                          child: _buildUserStatCard(
-                            'Inactive Users',
-                            userOverview['inactive'] as int,
-                            Icons.person_off_rounded,
-                            Colors.grey.shade500,
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => UsersPage(showActive: false),
+                                ),
+                              );
+                            },
+                            child: _buildUserStatCard(
+                              'Inactive Users',
+                              userOverview['inactive'] as int,
+                              Icons.person_off_rounded,
+                              Colors.grey.shade500,
+                            ),
                           ),
                         ),
                       ],

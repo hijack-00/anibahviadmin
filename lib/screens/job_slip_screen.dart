@@ -1,3 +1,4 @@
+import 'package:anibhaviadmin/widgets/universal_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
 
@@ -8,16 +9,8 @@ class JobSlipScreen extends StatefulWidget {
 
 class _JobSlipScreenState extends State<JobSlipScreen> {
   final List<Map<String, dynamic>> jobSlips = [
-    {
-      'id': 'JS101',
-      'karigar': 'Karigar 1',
-      'status': 'In Progress',
-    },
-    {
-      'id': 'JS102',
-      'karigar': 'Karigar 2',
-      'status': 'Completed',
-    },
+    {'id': 'JS101', 'karigar': 'Karigar 1', 'status': 'In Progress'},
+    {'id': 'JS102', 'karigar': 'Karigar 2', 'status': 'Completed'},
   ];
 
   String searchText = '';
@@ -25,16 +18,24 @@ class _JobSlipScreenState extends State<JobSlipScreen> {
 
   List<Map<String, dynamic>> get filteredJobSlips {
     return jobSlips.where((s) {
-      final matchesSearch = s['karigar'].toLowerCase().contains(searchText.toLowerCase()) || s['id'].toString().contains(searchText);
-      final matchesStatus = selectedStatus == 'All' || s['status'] == selectedStatus;
+      final matchesSearch =
+          s['karigar'].toLowerCase().contains(searchText.toLowerCase()) ||
+          s['id'].toString().contains(searchText);
+      final matchesStatus =
+          selectedStatus == 'All' || s['status'] == selectedStatus;
       return matchesSearch && matchesStatus;
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final statuses = ['All', ...{for (var s in jobSlips) s['status']}];
+    final statuses = [
+      'All',
+      ...{for (var s in jobSlips) s['status']},
+    ];
     return UniversalScaffold(
+      title: 'Job Slips',
+      appIcon: Icons.assignment,
       selectedIndex: 0,
       body: Stack(
         children: [
@@ -54,14 +55,21 @@ class _JobSlipScreenState extends State<JobSlipScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: statuses.map((status) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                      child: ChoiceChip(
-                        label: Text(status),
-                        selected: selectedStatus == status,
-                        onSelected: (_) => setState(() => selectedStatus = status),
-                      ),
-                    )).toList(),
+                    children: statuses
+                        .map(
+                          (status) => Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4.0,
+                            ),
+                            child: ChoiceChip(
+                              label: Text(status),
+                              selected: selectedStatus == status,
+                              onSelected: (_) =>
+                                  setState(() => selectedStatus = status),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
                 SizedBox(height: 12),
@@ -73,17 +81,28 @@ class _JobSlipScreenState extends State<JobSlipScreen> {
                       final slip = filteredJobSlips[i];
                       return Card(
                         elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: Colors.indigo[100],
                             child: Icon(Icons.assignment, color: Colors.indigo),
                           ),
-                          title: Text('Job Slip #${slip['id']}', style: TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Assigned to: ${slip['karigar']}\nStatus: ${slip['status']}'),
+                          title: Text(
+                            'Job Slip #${slip['id']}',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            'Assigned to: ${slip['karigar']}\nStatus: ${slip['status']}',
+                          ),
                           trailing: Icon(Icons.qr_code),
                           onTap: () {
-                            Navigator.pushNamed(context, '/job_slip_detail', arguments: slip['id']);
+                            Navigator.pushNamed(
+                              context,
+                              '/job_slip_detail',
+                              arguments: slip['id'],
+                            );
                           },
                         ),
                       );
@@ -103,7 +122,12 @@ class _JobSlipScreenState extends State<JobSlipScreen> {
                   builder: (context) => AlertDialog(
                     title: Text('Add Job Slip'),
                     content: Text('Create new job slip (dummy action).'),
-                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('OK'))],
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text('OK'),
+                      ),
+                    ],
                   ),
                 );
               },

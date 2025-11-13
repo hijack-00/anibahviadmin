@@ -1,18 +1,23 @@
 import 'dart:io';
 
+import 'package:anibhaviadmin/widgets/universal_scaffold.dart';
+import 'package:anibhaviadmin/widgets/universal_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shimmer/shimmer.dart';
 import '../services/app_data_repo.dart';
-import 'universal_navbar.dart';
+import '../widgets/universal_navbar.dart';
 import '../widgets/add_product_form.dart';
+import 'package:anibhaviadmin/permissions/permission_helper.dart';
+import 'package:anibhaviadmin/permissions/navigateIfAllowed.dart';
+import 'package:anibhaviadmin/services/app_data_repo.dart';
 
 class CataloguePage extends StatefulWidget {
   @override
   State<CataloguePage> createState() => _CataloguePageState();
 }
 
-class _CataloguePageState extends State<CataloguePage> {
+class _CataloguePageState extends State<CataloguePage> with PermissionHelper {
   late Future<List<Map<String, dynamic>>> _productsFuture;
   List<Map<String, dynamic>> _allProducts = [];
   List<Map<String, dynamic>> _filteredProducts = [];
@@ -27,6 +32,8 @@ class _CataloguePageState extends State<CataloguePage> {
 
   final PageController _pageController = PageController();
   int _currentPage = 0;
+
+  bool _permissionsInit = false;
 
   // helper to apply search depending on current page
   void _applySearch(String val) {
@@ -441,6 +448,13 @@ class _CataloguePageState extends State<CataloguePage> {
     super.initState();
     _productsFuture = AppDataRepo().fetchCatalogueProducts();
     _productsPageFuture = AppDataRepo().fetchAllProductsCatalog();
+
+    // initialize permissions for catalogue and products
+    initPermissions('/catalogue').then((_) {
+      setState(() {
+        _permissionsInit = true;
+      });
+    });
   }
 
   void _onNavTap(int index) {
@@ -473,39 +487,31 @@ class _CataloguePageState extends State<CataloguePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.indigo.shade500, Colors.teal.shade400],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.shopping_bag, color: Colors.white, size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Catalogue',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    // show catalogue skeleton while permissions check not ready
+    if (!permissionsReady()) {
+      return UniversalScaffold(
+        selectedIndex: 3,
+        appIcon: Icons.shopping_bag,
+        title: 'Catalogue',
+        body: const _CatalogueSkeleton(),
+      );
+    }
+
+    if (!canRead) {
+      return UniversalScaffold(
+        selectedIndex: 3,
+        appIcon: Icons.shopping_bag,
+        title: 'Catalogue',
+        body: Center(
+          child: Text('You do not have permission to view Catalogue'),
         ),
-      ),
+      );
+    }
+
+    return UniversalScaffold(
+      selectedIndex: 3,
+      appIcon: Icons.shopping_bag,
+      title: 'Catalogue',
 
       body: FutureBuilder<List<Map<String, dynamic>>>(
         // use the first future to avoid quick blank flashes; second page has its own future below
@@ -574,7 +580,20 @@ class _CataloguePageState extends State<CataloguePage> {
                       ),
                       Expanded(
                         child: GestureDetector(
+                          // onTap: () {
                           onTap: () {
+                            // Check if user has read permission for products before switching
+                            if (!canRead) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'You do not have permission to view Products',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
                             setState(() {
                               _currentPage = 1;
                               _pageController.jumpToPage(1);
@@ -857,17 +876,45 @@ class _CataloguePageState extends State<CataloguePage> {
                                         ? images.first
                                         : null;
 
+                                    // return GestureDetector(
+                                    //   onTap: () {
+                                    //     final id =
+                                    //         product['_id'] ?? productId['_id'];
+                                    //     if (id != null)
+                                    //       Navigator.pushNamed(
+                                    //         context,
+                                    //         '/product-detail',
+                                    //         arguments: id,
+                                    //       );
+                                    //   },
                                     return GestureDetector(
-                                      onTap: () {
+                                      onTap: () async {
                                         final id =
                                             product['_id'] ?? productId['_id'];
-                                        if (id != null)
+                                        if (id == null) return;
+                                        // ensure user has read access to products before opening detail
+                                        final allowed = await AppDataRepo()
+                                            .currentUserHasPermission(
+                                              '/products',
+                                              'read',
+                                            );
+                                        if (allowed) {
                                           Navigator.pushNamed(
                                             context,
                                             '/product-detail',
                                             arguments: id,
                                           );
+                                        } else {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Access denied'),
+                                            ),
+                                          );
+                                        }
                                       },
+
                                       child: AnimatedContainer(
                                         duration: const Duration(
                                           milliseconds: 150,
@@ -1108,14 +1155,41 @@ class _CataloguePageState extends State<CataloguePage> {
                                             : null;
 
                                         return GestureDetector(
-                                          onTap: () {
+                                          // onTap: () {
+                                          //   final id = product['_id'];
+                                          //   if (id != null)
+                                          //     Navigator.pushNamed(
+                                          //       context,
+                                          //       '/product-detail',
+                                          //       arguments: id,
+                                          //     );
+                                          // },
+                                          onTap: () async {
                                             final id = product['_id'];
-                                            if (id != null)
+                                            if (id == null) return;
+                                            // ensure user has read access to products before opening detail
+                                            final allowed = await AppDataRepo()
+                                                .currentUserHasPermission(
+                                                  '/products',
+                                                  'read',
+                                                );
+                                            if (allowed) {
                                               Navigator.pushNamed(
                                                 context,
                                                 '/product-detail',
                                                 arguments: id,
                                               );
+                                            } else {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Access denied',
+                                                  ),
+                                                ),
+                                              );
+                                            }
                                           },
                                           child: AnimatedContainer(
                                             duration: const Duration(
@@ -1272,57 +1346,72 @@ class _CataloguePageState extends State<CataloguePage> {
         },
       ),
 
+      // Show Add Catalogue FAB only if user has write permission for catalogue
       floatingActionButton: _currentPage == 0
-          // Catalogue page: "Add Catalogue" (existing behavior)
-          ? FloatingActionButton.extended(
-              backgroundColor: Colors.indigo.shade500,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.add_rounded, size: 20),
-              label: const Text(
-                'Add Catalogue',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-              ),
-              onPressed: () async {
-                final result = await showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(24),
+          ? (canWrite
+                ? FloatingActionButton.extended(
+                    backgroundColor: Colors.indigo.shade500,
+                    foregroundColor: Colors.white,
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                    label: const Text('Add Catalogue'),
+                    // onPressed: () async {
+                    //   final result = await showModalBottomSheet(
+                    onPressed: () async {
+                      final ok = await AppDataRepo().currentUserHasPermission(
+                        '/catalogue',
+                        'write',
+                      );
+                      if (!ok) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Access denied')),
+                        );
+                        return;
+                      }
+                      final result = await showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.white,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(24),
+                          ),
+                        ),
+                        builder: (context) => Padding(
+                          padding: EdgeInsets.only(
+                            bottom: MediaQuery.of(context).viewInsets.bottom,
+                          ),
+                          child: const AddProductForm(),
+                        ),
+                      );
+                      if (result == true) {
+                        setState(() {
+                          _productsFuture = AppDataRepo()
+                              .fetchCatalogueProducts();
+                          _allProducts = [];
+                          _filteredProducts = [];
+                        });
+                      }
+                    },
+                  )
+                : null)
+          : (canWrite
+                ? FloatingActionButton.extended(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                    icon: const Icon(Icons.add_box_rounded, size: 20),
+                    label: const Text(
+                      'Add Product',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  builder: (context) => Padding(
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).viewInsets.bottom,
-                    ),
-                    child: const AddProductForm(),
-                  ),
-                );
-                if (result == true) {
-                  setState(() {
-                    _productsFuture = AppDataRepo().fetchCatalogueProducts();
-                    _allProducts = [];
-                    _filteredProducts = [];
-                  });
-                }
-              },
-            )
-          // Products page: "Add Product" (new form & API call)
-          : FloatingActionButton.extended(
-              backgroundColor: Colors.indigo,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.add_box_rounded, size: 20),
-              label: const Text(
-                'Add Product',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-              ),
-              onPressed: () async {
-                final created = await _showAddProductForm();
-                // _showAddProductForm already refreshes on success; nothing else needed
-              },
-            ),
-      bottomNavigationBar: UniversalNavBar(selectedIndex: 3, onTap: _onNavTap),
+                    onPressed: () async {
+                      final created = await _showAddProductForm();
+                      // _showAddProductForm already refreshes on success; nothing else needed
+                    },
+                  )
+                : null),
     );
   }
 }

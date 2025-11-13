@@ -1,3 +1,4 @@
+import 'package:anibhaviadmin/permissions/permission_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../services/app_data_repo.dart';
@@ -11,15 +12,25 @@ class UserDetailsPage extends StatefulWidget {
   _UserDetailsPageState createState() => _UserDetailsPageState();
 }
 
-class _UserDetailsPageState extends State<UserDetailsPage> {
+class _UserDetailsPageState extends State<UserDetailsPage>
+    with PermissionHelper {
   Map<String, dynamic>? _user;
   bool _loading = true;
+
   bool _toggleLoading = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    // Load permissions for /users (update/delete user)
+    initPermissions('/users').then((_) {
+      if (!mounted) return;
+      debugPrint(
+        'UserDetailsPage permissions: canUpdate=$canUpdate canDelete=$canDelete',
+      );
+    });
+
     _fetchUserDetails();
   }
 
@@ -634,17 +645,18 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                     ],
                   ),
                   SizedBox(height: 12),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('Active', style: TextStyle(fontSize: 12)),
-                    value: _user!['isActive'] ?? false,
-                    onChanged: _toggleLoading
-                        ? null
-                        : (val) => _toggleUserStatus(),
-                    subtitle: _toggleLoading
-                        ? Text('Updating...', style: TextStyle(fontSize: 10))
-                        : null,
-                  ),
+                  if (canUpdate)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Active', style: TextStyle(fontSize: 12)),
+                      value: _user!['isActive'] ?? false,
+                      onChanged: _toggleLoading
+                          ? null
+                          : (val) => _toggleUserStatus(),
+                      subtitle: _toggleLoading
+                          ? Text('Updating...', style: TextStyle(fontSize: 10))
+                          : null,
+                    ),
                   Divider(),
                   ListTile(
                     title: Text('Address', style: TextStyle(fontSize: 12)),
@@ -691,16 +703,17 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                     ),
                   ),
                   SizedBox(height: 6),
-                  ElevatedButton(
-                    style: ButtonStyle(
-                      backgroundColor: MaterialStateProperty.all(Colors.red),
+                  if (canDelete)
+                    ElevatedButton(
+                      style: ButtonStyle(
+                        backgroundColor: MaterialStateProperty.all(Colors.red),
+                      ),
+                      onPressed: _deleteUser,
+                      child: Text(
+                        'Delete User',
+                        style: TextStyle(fontSize: 10, color: Colors.white),
+                      ),
                     ),
-                    onPressed: _deleteUser,
-                    child: Text(
-                      'Delete User',
-                      style: TextStyle(fontSize: 10, color: Colors.white),
-                    ),
-                  ),
                 ],
               ),
             ),

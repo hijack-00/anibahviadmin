@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:anibhaviadmin/widgets/universal_scaffold.dart';
+import 'package:anibhaviadmin/widgets/universal_drawer.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
-import 'universal_navbar.dart';
+import '../widgets/universal_navbar.dart';
 import 'package:flutter/material.dart';
 import '../widgets/searchable_dropdown.dart';
 import 'package:fl_chart/fl_chart.dart'; // For graph view
@@ -21,6 +23,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:printing/printing.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:anibhaviadmin/widgets/universal_drawer.dart';
+import 'package:anibhaviadmin/permissions/permission_helper.dart';
+import 'package:anibhaviadmin/services/app_data_repo.dart';
 
 class ChallanScreen extends StatefulWidget {
   final bool openCreateChallanOnStart;
@@ -35,7 +40,8 @@ class ChallanScreen extends StatefulWidget {
   State<ChallanScreen> createState() => _ChallanScreenState();
 }
 
-class _ChallanScreenState extends State<ChallanScreen> {
+// class _ChallanScreenState extends State<ChallanScreen> {
+class _ChallanScreenState extends State<ChallanScreen> with PermissionHelper {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
@@ -110,11 +116,31 @@ class _ChallanScreenState extends State<ChallanScreen> {
 
   List<String> reportTypes = ['Daily', 'Monthly', 'Yearly'];
 
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   fetchChallans();
+  //   fetchReturns();
   @override
   void initState() {
     super.initState();
-    fetchChallans();
-    fetchReturns();
+    // load permissions first, then fetch data only if read permitted
+    initPermissions('/challan').then((_) {
+      // <-- This now correctly maps to 'returns'
+      if (!mounted) return;
+      debugPrint(
+        'Challan screen permissions: canRead=$canRead canWrite=$canWrite canUpdate=$canUpdate canDelete=$canDelete',
+      );
+      if (canRead) {
+        fetchChallans();
+        fetchReturns();
+      } else {
+        setState(() {
+          challans = [];
+          returns = [];
+        });
+      }
+    });
 
     // If caller requested to immediately open a sheet (from Dashboard),
     // run after first frame so `context` and scaffolds are ready.
@@ -4747,6 +4773,8 @@ class _ChallanScreenState extends State<ChallanScreen> {
               ),
             ),
             SizedBox(height: 16),
+
+            // Inside _buildGraphSection method, modify the ListView.separated part:
             filteredLabels.isEmpty
                 ? Center(child: Text('No data available for this month'))
                 : Column(
@@ -4754,6 +4782,65 @@ class _ChallanScreenState extends State<ChallanScreen> {
                       final count = counts[label] ?? 0;
                       final value = values[label] ?? 0;
                       final percent = maxX > 0 ? count / maxX : 0;
+
+                      // Calculate total pieces for this date
+                      int totalPieces = 0;
+                      if (isChallan) {
+                        final dateChallans = data.where((c) {
+                          final date = c['date'] != null
+                              ? DateTime.tryParse(c['date'].toString())
+                              : null;
+                          return date != null &&
+                              date.toString().substring(0, 10) == label;
+                        });
+                        for (var challan in dateChallans) {
+                          final items = List<Map<String, dynamic>>.from(
+                            challan['items'] ?? [],
+                          );
+                          for (var it in items) {
+                            final qty =
+                                int.tryParse(
+                                  (it['dispatchedQty'] ?? it['quantity'] ?? 0)
+                                      .toString(),
+                                ) ??
+                                0;
+                            final pcsInSet =
+                                int.tryParse(
+                                  it['pcsInSet']?.toString() ?? '1',
+                                ) ??
+                                1;
+                            totalPieces += qty * pcsInSet;
+                          }
+                        }
+                      } else {
+                        final dateReturns = data.where((r) {
+                          final date = r['date'] != null
+                              ? DateTime.tryParse(r['date'].toString())
+                              : null;
+                          return date != null &&
+                              date.toString().substring(0, 10) == label;
+                        });
+                        for (var ret in dateReturns) {
+                          final items = List<Map<String, dynamic>>.from(
+                            ret['items'] ?? [],
+                          );
+                          for (var it in items) {
+                            final qty =
+                                int.tryParse(
+                                  (it['returnPcs'] ?? it['returnQty'] ?? 0)
+                                      .toString(),
+                                ) ??
+                                0;
+                            final pcsInSet =
+                                int.tryParse(
+                                  it['pcsInSet']?.toString() ?? '1',
+                                ) ??
+                                1;
+                            totalPieces += qty * pcsInSet;
+                          }
+                        }
+                      }
+
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8.0),
                         child: Row(
@@ -4792,7 +4879,9 @@ class _ChallanScreenState extends State<ChallanScreen> {
                                   Positioned(
                                     left: 8,
                                     child: Text(
-                                      count > 0 ? count.toString() : '',
+                                      count > 0
+                                          ? '$count ($totalPieces pcs)'
+                                          : '',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -4819,6 +4908,78 @@ class _ChallanScreenState extends State<ChallanScreen> {
                       );
                     }).toList(),
                   ),
+            // filteredLabels.isEmpty
+            //     ? Center(child: Text('No data available for this month'))
+            //     : Column(
+            //         children: filteredLabels.map((label) {
+            //           final count = counts[label] ?? 0;
+            //           final value = values[label] ?? 0;
+            //           final percent = maxX > 0 ? count / maxX : 0;
+            //           return Padding(
+            //             padding: const EdgeInsets.symmetric(vertical: 8.0),
+            //             child: Row(
+            //               children: [
+            //                 SizedBox(
+            //                   width: 80,
+            //                   child: Text(
+            //                     formatLabel(label),
+            //                     style: TextStyle(fontWeight: FontWeight.w500),
+            //                   ),
+            //                 ),
+            //                 Expanded(
+            //                   child: Stack(
+            //                     alignment: Alignment.centerLeft,
+            //                     children: [
+            //                       Container(
+            //                         height: 18,
+            //                         decoration: BoxDecoration(
+            //                           color: Colors.grey.shade300,
+            //                           borderRadius: BorderRadius.circular(9),
+            //                         ),
+            //                       ),
+            //                       FractionallySizedBox(
+            //                         widthFactor:
+            //                             200 *
+            //                             percent /
+            //                             MediaQuery.of(context).size.width,
+            //                         child: Container(
+            //                           height: 18,
+            //                           decoration: BoxDecoration(
+            //                             color: barColor,
+            //                             borderRadius: BorderRadius.circular(9),
+            //                           ),
+            //                         ),
+            //                       ),
+            //                       Positioned(
+            //                         left: 8,
+            //                         child: Text(
+            //                           count > 0 ? count.toString() : '',
+            //                           style: TextStyle(
+            //                             color: Colors.white,
+            //                             fontWeight: FontWeight.bold,
+            //                           ),
+            //                         ),
+            //                       ),
+            //                     ],
+            //                   ),
+            //                 ),
+            //                 SizedBox(width: 12),
+            //                 SizedBox(
+            //                   width: 80,
+            //                   child: Text(
+            //                     '₹${value.toStringAsFixed(0)}',
+            //                     style: TextStyle(
+            //                       color: barColor,
+            //                       fontWeight: FontWeight.bold,
+            //                     ),
+            //                     textAlign: TextAlign.right,
+            //                   ),
+            //                 ),
+            //               ],
+            //             ),
+            //           );
+            //         }).toList(),
+            //       ),
             Divider(height: 32),
             Column(
               children: [
@@ -5395,47 +5556,42 @@ class _ChallanScreenState extends State<ChallanScreen> {
     );
   }
 
+  // @override
+  // Widget build(BuildContext context) {
+  //   return UniversalScaffold(
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
+    // while permission check runs show skeleton inside scaffold
+    debugPrint(
+      'DEBUG challan_screen build: permissionsReady=${permissionsReady()} canRead=$canRead canUpdate=$canUpdate canDelete=$canDelete',
+    );
 
-      // Replace your appBar property in Scaffold with this:
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.indigo.shade500, Colors.teal.shade400],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.receipt_long_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Challan & Return',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    // show skeleton while permission check runs
+    if (!permissionsReady()) {
+      return UniversalScaffold(
+        selectedIndex: 4,
+        appIcon: Icons.receipt_long_rounded,
+        title: 'Challan & Return',
+        body: const _ChallanSkeleton(),
+      );
+    }
+
+    // after permissions loaded, deny view if no read right
+    if (!canRead) {
+      return UniversalScaffold(
+        selectedIndex: 4,
+        appIcon: Icons.receipt_long_rounded,
+        title: 'Challan & Return',
+        body: Center(
+          child: Text('You do not have permission to view Challan & Return'),
         ),
-      ),
+      );
+    }
+
+    return UniversalScaffold(
+      selectedIndex: 4,
+      appIcon: Icons.receipt_long_rounded,
+      title: 'Challan & Return',
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -5672,41 +5828,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
                               ? _buildReportSectionChallan()
                               : _buildReportSectionReturn(),
                         );
-
-                        // showModalBottomSheet(
-                        //   context: context,
-                        //   backgroundColor: Colors.white,
-                        //   shape: const RoundedRectangleBorder(
-                        //     borderRadius: BorderRadius.vertical(
-                        //       top: Radius.circular(24),
-                        //     ),
-                        //   ),
-                        //   isScrollControlled: true,
-                        //   builder: (context) => pageIndex == 0
-                        //       ? _buildReportSectionChallan()
-                        //       : _buildReportSectionReturn(),
-                        // );
-
-                        // // ensure data for the selected page is loaded
-                        // if (pageIndex == 1) {
-                        //   await fetchReturns();
-                        // } else {
-                        //   await fetchChallans();
-                        // }
-
-                        // showModalBottomSheet(
-                        //   context: context,
-                        //   backgroundColor: Colors.white,
-                        //   shape: const RoundedRectangleBorder(
-                        //     borderRadius: BorderRadius.vertical(
-                        //       top: Radius.circular(24),
-                        //     ),
-                        //   ),
-                        //   isScrollControlled: true,
-                        //   builder: (context) => pageIndex == 0
-                        //       ? _buildReportSectionChallan()
-                        //       : _buildReportSectionReturn(),
-                        // );
                       },
                     ),
                   ),
@@ -5810,112 +5931,116 @@ class _ChallanScreenState extends State<ChallanScreen> {
           ),
         ),
       ),
-      // --- Floating Action Button ---
-      floatingActionButton: Padding(
-        // raised higher so it doesn't overlap the bottom navigation
-        padding: const EdgeInsets.only(bottom: 10.0),
-        child: FloatingActionButton(
-          backgroundColor: Colors.indigo.shade500,
-          foregroundColor: Colors.white,
-          elevation: 3,
-          tooltip: 'Create Challan / Return',
-          onPressed: () {
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true, // allow custom bottom padding
-              backgroundColor: Colors.white,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              builder: (context) {
-                final bottomPadding =
-                    MediaQuery.of(context).viewInsets.bottom +
-                    24 +
-                    10; // extra space
-                return SafeArea(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.max,
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.add_rounded, size: 18),
-                            label: const Text('Create Challan'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.indigo.shade500,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              minimumSize: const Size(double.infinity, 44),
-                            ),
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                              _showCreateChallanDialog();
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12), // horizontal gap
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.undo_rounded, size: 18),
-                            label: const Text('Create Return'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade100,
-                              foregroundColor: Colors.indigo.shade600,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              minimumSize: const Size(double.infinity, 44),
-                            ),
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                              _showCreateReturnDialog();
-                            },
-                          ),
-                        ),
-                      ],
+
+      // floatingActionButton: FloatingActionButton(
+      floatingActionButton: permissionsReady() && canWrite
+          ? FloatingActionButton(
+              backgroundColor: Colors.indigo.shade500,
+              foregroundColor: Colors.white,
+              elevation: 3,
+              tooltip: 'Create Challan / Return',
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true, // allow custom bottom padding
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
                     ),
                   ),
+                  builder: (context) {
+                    final bottomPadding =
+                        MediaQuery.of(context).viewInsets.bottom +
+                        24 +
+                        10; // extra space
+                    return SafeArea(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('Create Challan'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.indigo.shade500,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  minimumSize: const Size(double.infinity, 44),
+                                ),
+                                // onPressed: () {
+                                //   Navigator.of(context).pop();
+                                //   _showCreateChallanDialog();
+                                // },
+                                onPressed: () async {
+                                  Navigator.of(context).pop();
+                                  final ok = await AppDataRepo()
+                                      .currentUserHasPermission(
+                                        '/challan',
+                                        'write',
+                                      );
+                                  if (!ok) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Access denied'),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  _showCreateChallanDialog();
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12), // horizontal gap
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.undo_rounded, size: 18),
+                                label: const Text('Create Return'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey.shade100,
+                                  foregroundColor: Colors.indigo.shade600,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  minimumSize: const Size(double.infinity, 44),
+                                ),
+                                // onPressed: () {
+                                //   Navigator.of(context).pop();
+                                //   _showCreateReturnDialog();
+                                // },
+                                onPressed: () async {
+                                  Navigator.of(context).pop();
+                                  final ok = await AppDataRepo()
+                                      .currentUserHasPermission(
+                                        '/challan',
+                                        'write',
+                                      );
+                                  if (!ok) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Access denied'),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  _showCreateReturnDialog();
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
-            );
-          },
-          child: const Icon(Icons.add_rounded, size: 28),
-        ),
-      ),
-
-      bottomNavigationBar: UniversalNavBar(
-        selectedIndex: 4,
-        onTap: (index) {
-          String? route;
-          switch (index) {
-            case 0:
-              route = '/dashboard';
-              break;
-            case 1:
-              route = '/orders';
-              break;
-            case 2:
-              route = '/users';
-              break;
-            case 3:
-              route = '/catalogue';
-              break;
-            case 4:
-              route = '/challan';
-              break;
-          }
-          if (route != null && ModalRoute.of(context)?.settings.name != route) {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              route,
-              (r) => r.settings.name == '/dashboard',
-            );
-          }
-        },
-      ),
+              child: const Icon(Icons.add_rounded, size: 28),
+            )
+          : null,
     );
   }
 
@@ -6265,128 +6390,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
     }
   }
 
-  // Future<Uint8List> _buildReturnPdfData(Map<String, dynamic> ret) async {
-  //   final pdf = pw.Document();
-  //   final pw.Font noto = await PdfGoogleFonts.notoSansRegular();
-
-  //   double _toDouble(dynamic v) {
-  //     if (v == null) return 0.0;
-  //     if (v is num) return v.toDouble();
-  //     return double.tryParse(v.toString()) ?? 0.0;
-  //   }
-
-  //   final items = List<Map<String, dynamic>>.from(ret['items'] ?? []);
-  //   final customer = ret['customer'] is Map
-  //       ? (ret['customer']['name'] ?? '')
-  //       : (ret['customer']?.toString() ?? '');
-  //   final returnNumber = ret['returnNumber']?.toString() ?? '';
-  //   final dateStr = (ret['date'] ?? '').toString();
-  //   final displayDate = dateStr.isNotEmpty ? dateStr.substring(0, 10) : '';
-  //   final refundMethod = ret['refundMethod']?.toString() ?? '';
-  //   final totalRefund = _toDouble(ret['totalRefund'] ?? 0).round();
-
-  //   final baseStyle = pw.TextStyle(font: noto, fontSize: 11);
-
-  //   pdf.addPage(
-  //     pw.Page(
-  //       pageFormat: PdfPageFormat.a4,
-  //       build: (context) {
-  //         return pw.DefaultTextStyle(
-  //           style: baseStyle,
-  //           child: pw.Column(
-  //             crossAxisAlignment: pw.CrossAxisAlignment.start,
-  //             children: [
-  //               pw.Row(
-  //                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-  //                 children: [
-  //                   pw.Column(
-  //                     crossAxisAlignment: pw.CrossAxisAlignment.start,
-  //                     children: [
-  //                       pw.Text(
-  //                         'RETURN NOTE',
-  //                         style: baseStyle.copyWith(
-  //                           fontSize: 18,
-  //                           fontWeight: pw.FontWeight.bold,
-  //                         ),
-  //                       ),
-  //                       pw.SizedBox(height: 6),
-  //                       pw.Text('Return # $returnNumber', style: baseStyle),
-  //                     ],
-  //                   ),
-  //                   pw.Column(
-  //                     crossAxisAlignment: pw.CrossAxisAlignment.end,
-  //                     children: [
-  //                       pw.Text('Date: $displayDate'),
-  //                       pw.Text('Refund Method: $refundMethod'),
-  //                     ],
-  //                   ),
-  //                 ],
-  //               ),
-  //               pw.SizedBox(height: 12),
-  //               pw.Text(
-  //                 'Customer: $customer',
-  //                 style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
-  //               ),
-  //               pw.SizedBox(height: 10),
-  //               pw.Text(
-  //                 'Items:',
-  //                 style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
-  //               ),
-  //               pw.SizedBox(height: 6),
-  //               pw.Table.fromTextArray(
-  //                 headers: ['Name', 'Qty', 'PCS/SET', 'Refund'],
-  //                 data: items.map((it) {
-  //                   final name = it['name']?.toString() ?? '';
-  //                   final qty = (it['returnPcs'] ?? it['returnQty'] ?? 0)
-  //                       .toString();
-  //                   final pcs = it['pcsInSet']?.toString() ?? '';
-  //                   final refund = (it['refundAmount'] ?? '').toString();
-  //                   return [name, qty, pcs, '₹$refund'];
-  //                 }).toList(),
-  //                 headerStyle: baseStyle.copyWith(
-  //                   fontWeight: pw.FontWeight.bold,
-  //                 ),
-  //                 cellStyle: baseStyle,
-  //                 headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-  //                 cellAlignment: pw.Alignment.centerLeft,
-  //               ),
-  //               pw.Spacer(),
-  //               pw.Row(
-  //                 mainAxisAlignment: pw.MainAxisAlignment.end,
-  //                 children: [
-  //                   pw.Text(
-  //                     'Total Refund: ',
-  //                     style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
-  //                   ),
-  //                   pw.SizedBox(width: 6),
-  //                   pw.Text(
-  //                     '₹$totalRefund',
-  //                     style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
-  //                   ),
-  //                 ],
-  //               ),
-  //               pw.SizedBox(height: 8),
-  //               pw.Align(
-  //                 alignment: pw.Alignment.bottomRight,
-  //                 child: pw.Text(
-  //                   'Generated on: ${DateTime.now().toIso8601String().substring(0, 10)}',
-  //                   style: baseStyle.copyWith(
-  //                     fontSize: 9,
-  //                     color: PdfColors.grey,
-  //                   ),
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         );
-  //       },
-  //     ),
-  //   );
-
-  //   return pdf.save();
-  // }
-
-  // ...existing code...
   Future<Uint8List> _buildReturnPdfData(Map<String, dynamic> ret) async {
     final pdf = pw.Document();
     final pw.Font noto = await PdfGoogleFonts.notoSansRegular();
@@ -6928,6 +6931,51 @@ class _ChallanScreenState extends State<ChallanScreen> {
     }
   }
 
+  Future<void> _shareLrImage(String url) async {
+    if (url.isEmpty) return;
+
+    try {
+      // Show loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preparing LR for sharing...')),
+      );
+
+      // Download image to temp directory first
+      final http.Response response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        throw Exception('Failed to download LR image');
+      }
+
+      // Save to temp file
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'lr_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final tempFile = File('${tempDir.path}/$fileName');
+      await tempFile.writeAsBytes(response.bodyBytes);
+
+      // Hide loading
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // Share the file
+      try {
+        await Share.shareXFiles([
+          XFile(tempFile.path),
+        ], text: 'Delivery Challan LR');
+      } on MissingPluginException catch (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Share plugin not registered. Do a full rebuild (flutter clean && flutter pub get && flutter run)',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Failed to share LR: $e')));
+    }
+  }
+
   Widget _buildChallanCard(Map<String, dynamic> c) {
     final id = (c['_id'] ?? c['challanNumber']?.toString() ?? '').toString();
     final isExpanded = expandedChallanIds.contains(id);
@@ -7093,64 +7141,72 @@ class _ChallanScreenState extends State<ChallanScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 // LR actions (single chip + popup menu). If no LR -> LR chip uploads.
-                if (lrUrl != null && lrUrl.isNotEmpty) ...[
+                // if (lrUrl != null && lrUrl.isNotEmpty) ...[
+                if (canUpdate && lrUrl != null && lrUrl.isNotEmpty) ...[
                   PopupMenuButton<String>(
                     onSelected: (val) {
                       if (val == 'view') {
                         _showLrPreview(lrUrl);
                       } else if (val == 'download') {
                         _downloadLr(lrUrl);
+                      } else if (val == 'share') {
+                        _shareLrImage(lrUrl); // Add new share function
                       } else if (val == 'remove') {
                         _removeLr(c);
                       }
                     },
                     itemBuilder: (ctx) => [
-                      PopupMenuItem(
+                      const PopupMenuItem(
                         value: 'view',
                         child: Row(
-                          children: const [
-                            Icon(
-                              Icons.visibility,
-                              size: 18,
-                              color: Colors.black54,
-                            ),
+                          children: [
+                            Icon(Icons.visibility_outlined, size: 20),
                             SizedBox(width: 8),
-                            Text('View'),
+                            Text('View LR'),
                           ],
                         ),
                       ),
-                      PopupMenuItem(
+                      const PopupMenuItem(
                         value: 'download',
                         child: Row(
-                          children: const [
-                            Icon(
-                              Icons.download,
-                              size: 18,
-                              color: Colors.black54,
-                            ),
+                          children: [
+                            Icon(Icons.download_outlined, size: 20),
                             SizedBox(width: 8),
-                            Text('Download'),
+                            Text('Download LR'),
                           ],
                         ),
                       ),
-                      PopupMenuItem(
+                      const PopupMenuItem(
+                        value: 'share',
+                        child: Row(
+                          children: [
+                            Icon(Icons.share_outlined, size: 20),
+                            SizedBox(width: 8),
+                            Text('Share LR'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
                         value: 'remove',
                         child: Row(
-                          children: const [
+                          children: [
                             Icon(
-                              Icons.delete,
-                              size: 18,
-                              color: Colors.redAccent,
+                              Icons.delete_outline,
+                              size: 20,
+                              color: Colors.red,
                             ),
                             SizedBox(width: 8),
-                            Text('Remove'),
+                            Text(
+                              'Remove LR',
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ],
                         ),
                       ),
                     ],
                     child: Chip(
                       avatar: const Icon(
-                        Icons.attach_file,
+                        Icons.receipt,
                         size: 18,
                         color: Colors.indigo,
                       ),
@@ -7158,7 +7214,72 @@ class _ChallanScreenState extends State<ChallanScreen> {
                       backgroundColor: Colors.indigo.shade50,
                     ),
                   ),
-                ] else ...[
+                  // PopupMenuButton<String>(
+                  //   onSelected: (val) {
+                  //     if (val == 'view') {
+                  //       _showLrPreview(lrUrl);
+                  //     } else if (val == 'download') {
+                  //       _downloadLr(lrUrl);
+                  //     } else if (val == 'remove') {
+                  //       _removeLr(c);
+                  //     }
+                  //   },
+                  //   itemBuilder: (ctx) => [
+                  //     PopupMenuItem(
+                  //       value: 'view',
+                  //       child: Row(
+                  //         children: const [
+                  //           Icon(
+                  //             Icons.visibility,
+                  //             size: 18,
+                  //             color: Colors.black54,
+                  //           ),
+                  //           SizedBox(width: 8),
+                  //           Text('View'),
+                  //         ],
+                  //       ),
+                  //     ),
+                  //     PopupMenuItem(
+                  //       value: 'download',
+                  //       child: Row(
+                  //         children: const [
+                  //           Icon(
+                  //             Icons.download,
+                  //             size: 18,
+                  //             color: Colors.black54,
+                  //           ),
+                  //           SizedBox(width: 8),
+                  //           Text('Download'),
+                  //         ],
+                  //       ),
+                  //     ),
+                  //     PopupMenuItem(
+                  //       value: 'remove',
+                  //       child: Row(
+                  //         children: const [
+                  //           Icon(
+                  //             Icons.delete,
+                  //             size: 18,
+                  //             color: Colors.redAccent,
+                  //           ),
+                  //           SizedBox(width: 8),
+                  //           Text('Remove'),
+                  //         ],
+                  //       ),
+                  //     ),
+                  //   ],
+                  //   child: Chip(
+                  //     avatar: const Icon(
+                  //       Icons.attach_file,
+                  //       size: 18,
+                  //       color: Colors.indigo,
+                  //     ),
+                  //     label: const Text('LR'),
+                  //     backgroundColor: Colors.indigo.shade50,
+                  //   ),
+                  // ),
+                  // ] else ...[
+                ] else if (canUpdate) ...[
                   ActionChip(
                     avatar: const Icon(Icons.upload_file, size: 18),
                     label: const Text('LR'),
@@ -7168,122 +7289,146 @@ class _ChallanScreenState extends State<ChallanScreen> {
                 ],
 
                 const SizedBox(width: 8),
-                ActionChip(
-                  avatar: const Icon(Icons.edit, size: 18),
-                  label: const Text('Edit'),
-                  onPressed: () => _editChallan(c),
-                  backgroundColor: Colors.green.shade50,
-                ),
-                const SizedBox(width: 8),
-                PopupMenuButton<String>(
-                  onSelected: (val) async {
-                    if (val == 'download') {
-                      await _downloadChallanPdf(c);
-                    } else if (val == 'share') {
-                      await _shareChallanPdf(c);
-                    }
-                  },
-                  itemBuilder: (ctx) => const [
-                    PopupMenuItem(
-                      value: 'download',
-                      child: Text('Download PDF'),
-                    ),
-                    PopupMenuItem(value: 'share', child: Text('Share PDF')),
-                  ],
-                  child: Chip(
-                    avatar: const Icon(Icons.picture_as_pdf, size: 18),
-                    label: const Text('PDF'),
-                    backgroundColor: Colors.orange.shade50,
+                // ActionChip(
+                if (canUpdate)
+                  ActionChip(
+                    avatar: const Icon(Icons.edit, size: 18),
+                    label: const Text('Edit'),
+                    onPressed: canUpdate
+                        ? () => _editChallan(c)
+                        : () => ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Access denied')),
+                          ),
+                    backgroundColor: Colors.green.shade50,
+
+                    // avatar: const Icon(Icons.edit, size: 18),
+                    // label: const Text('Edit'),
+                    // onPressed: () => _editChallan(c),
+                    // backgroundColor: Colors.green.shade50,
                   ),
-                ),
+                const SizedBox(width: 8),
+
+                if (canUpdate)
+                  PopupMenuButton<String>(
+                    onSelected: (val) async {
+                      if (val == 'download') {
+                        await _downloadChallanPdf(c);
+                      } else if (val == 'share') {
+                        await _shareChallanPdf(c);
+                      }
+                    },
+                    itemBuilder: (ctx) => const [
+                      PopupMenuItem(
+                        value: 'download',
+                        child: Text('Download PDF'),
+                      ),
+                      PopupMenuItem(value: 'share', child: Text('Share PDF')),
+                    ],
+                    child: Chip(
+                      avatar: const Icon(Icons.picture_as_pdf, size: 18),
+                      label: const Text('PDF'),
+                      backgroundColor: Colors.orange.shade50,
+                    ),
+                  ),
 
                 const SizedBox(width: 8),
                 // Delete challan button (confirmation + API call)
-                IconButton(
-                  icon: const Icon(
-                    Icons.delete_forever,
-                    color: Colors.redAccent,
-                  ),
-                  tooltip: 'Delete Challan',
-                  onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (dctx) => AlertDialog(
-                        title: const Text('Delete Challan'),
-                        content: Text(
-                          'Are you sure you want to delete challan #${c['challanNumber'] ?? c['_id'] ?? ''}?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(dctx).pop(false),
-                            child: const Text('Cancel'),
+                // IconButton(
+                if (canDelete)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_forever,
+                      color: Colors.redAccent,
+                    ),
+                    tooltip: 'Delete Challan',
+                    // onPressed: () async {
+                    // onPressed: canDelete
+                    //     ? () async {
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (dctx) => AlertDialog(
+                          title: const Text('Delete Challan'),
+                          content: Text(
+                            'Are you sure you want to delete challan #${c['challanNumber'] ?? c['_id'] ?? ''}?',
                           ),
-                          TextButton(
-                            onPressed: () => Navigator.of(dctx).pop(true),
-                            child: const Text(
-                              'Delete',
-                              style: TextStyle(color: Colors.red),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(dctx).pop(false),
+                              child: const Text('Cancel'),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirm != true) return;
+                            TextButton(
+                              onPressed: () => Navigator.of(dctx).pop(true),
+                              child: const Text(
+                                'Delete',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm != true) return;
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Deleting challan...')),
-                    );
-                    try {
-                      final idToDelete = (c['_id'] ?? '').toString();
-                      final resp = await AppDataRepo().deleteChallan(
-                        id: idToDelete,
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Deleting challan...')),
                       );
                       try {
-                        debugPrint(
-                          'deleteChallan response: ${jsonEncode(resp)}',
+                        final idToDelete = (c['_id'] ?? '').toString();
+                        final resp = await AppDataRepo().deleteChallan(
+                          id: idToDelete,
                         );
-                      } catch (_) {}
-                      if (resp['success'] == true) {
-                        setState(() {
-                          challans.removeWhere(
-                            (el) => (el['_id'] ?? '') == idToDelete,
+                        try {
+                          debugPrint(
+                            'deleteChallan response: ${jsonEncode(resp)}',
                           );
-                        });
+                        } catch (_) {}
+                        if (resp['success'] == true) {
+                          setState(() {
+                            challans.removeWhere(
+                              (el) => (el['_id'] ?? '') == idToDelete,
+                            );
+                          });
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  resp['message']?.toString() ??
+                                      'Challan deleted',
+                                ),
+                              ),
+                            );
+                        } else {
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  resp['message']?.toString() ??
+                                      'Failed to delete challan',
+                                ),
+                              ),
+                            );
+                          // Optionally refresh
+                          await fetchChallans();
+                        }
+                      } catch (e, st) {
+                        debugPrint('Error deleting challan: $e\n$st');
                         ScaffoldMessenger.of(context)
                           ..hideCurrentSnackBar()
                           ..showSnackBar(
                             SnackBar(
-                              content: Text(
-                                resp['message']?.toString() ??
-                                    'Challan deleted',
-                              ),
+                              content: Text('Error deleting challan: $e'),
                             ),
                           );
-                      } else {
-                        ScaffoldMessenger.of(context)
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                resp['message']?.toString() ??
-                                    'Failed to delete challan',
-                              ),
-                            ),
-                          );
-                        // Optionally refresh
                         await fetchChallans();
                       }
-                    } catch (e, st) {
-                      debugPrint('Error deleting challan: $e\n$st');
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          SnackBar(content: Text('Error deleting challan: $e')),
-                        );
-                      await fetchChallans();
-                    }
-                  },
-                ),
+                    },
+                    //   }
+                    // : () => ScaffoldMessenger.of(context).showSnackBar(
+                    //     const SnackBar(content: Text('Access denied')),
+                    //   ),
+                  ),
               ],
             ),
           ],
@@ -7471,12 +7616,18 @@ class _ChallanScreenState extends State<ChallanScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                ActionChip(
-                  label: const Text('Edit', style: TextStyle(fontSize: 11)),
-                  backgroundColor: Colors.blue.shade50,
-                  onPressed: () => _editReturn(r),
-                  avatar: const Icon(Icons.edit, size: 14, color: Colors.blue),
-                ),
+                // ActionChip(
+                if (canUpdate)
+                  ActionChip(
+                    label: const Text('Edit', style: TextStyle(fontSize: 11)),
+                    backgroundColor: Colors.blue.shade50,
+                    onPressed: () => _editReturn(r),
+                    avatar: const Icon(
+                      Icons.edit,
+                      size: 14,
+                      color: Colors.blue,
+                    ),
+                  ),
                 const SizedBox(width: 8),
                 // ActionChip(
                 //   label: const Text('Print', style: TextStyle(fontSize: 11)),
@@ -7510,89 +7661,94 @@ class _ChallanScreenState extends State<ChallanScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(
-                    Icons.delete_forever,
-                    color: Colors.redAccent,
-                  ),
-                  tooltip: 'Delete Return',
-                  onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (dctx) => AlertDialog(
-                        title: const Text('Delete Return'),
-                        content: Text(
-                          'Are you sure you want to delete return #${r['returnNumber'] ?? r['_id'] ?? ''}?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(dctx).pop(false),
-                            child: const Text('Cancel'),
+                // IconButton(
+                if (canDelete)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_forever,
+                      color: Colors.redAccent,
+                    ),
+                    tooltip: 'Delete Return',
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (dctx) => AlertDialog(
+                          title: const Text('Delete Return'),
+                          content: Text(
+                            'Are you sure you want to delete return #${r['returnNumber'] ?? r['_id'] ?? ''}?',
                           ),
-                          TextButton(
-                            onPressed: () => Navigator.of(dctx).pop(true),
-                            child: const Text(
-                              'Delete',
-                              style: TextStyle(color: Colors.red),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(dctx).pop(false),
+                              child: const Text('Cancel'),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirm != true) return;
+                            TextButton(
+                              onPressed: () => Navigator.of(dctx).pop(true),
+                              child: const Text(
+                                'Delete',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm != true) return;
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Deleting return...')),
-                    );
-                    try {
-                      final idToDelete = (r['_id'] ?? '').toString();
-                      final resp = await AppDataRepo().deleteReturn(
-                        id: idToDelete,
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Deleting return...')),
                       );
                       try {
-                        debugPrint(
-                          'deleteReturn response: ${jsonEncode(resp)}',
+                        final idToDelete = (r['_id'] ?? '').toString();
+                        final resp = await AppDataRepo().deleteReturn(
+                          id: idToDelete,
                         );
-                      } catch (_) {}
-                      if (resp['success'] == true) {
-                        setState(() {
-                          returns.removeWhere(
-                            (el) => (el['_id'] ?? '') == idToDelete,
+                        try {
+                          debugPrint(
+                            'deleteReturn response: ${jsonEncode(resp)}',
                           );
-                        });
+                        } catch (_) {}
+                        if (resp['success'] == true) {
+                          setState(() {
+                            returns.removeWhere(
+                              (el) => (el['_id'] ?? '') == idToDelete,
+                            );
+                          });
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  resp['message']?.toString() ??
+                                      'Return deleted',
+                                ),
+                              ),
+                            );
+                        } else {
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  resp['message']?.toString() ??
+                                      'Failed to delete return',
+                                ),
+                              ),
+                            );
+                          await fetchReturns();
+                        }
+                      } catch (e, st) {
+                        debugPrint('Error deleting return: $e\n$st');
                         ScaffoldMessenger.of(context)
                           ..hideCurrentSnackBar()
                           ..showSnackBar(
                             SnackBar(
-                              content: Text(
-                                resp['message']?.toString() ?? 'Return deleted',
-                              ),
-                            ),
-                          );
-                      } else {
-                        ScaffoldMessenger.of(context)
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                resp['message']?.toString() ??
-                                    'Failed to delete return',
-                              ),
+                              content: Text('Error deleting return: $e'),
                             ),
                           );
                         await fetchReturns();
                       }
-                    } catch (e, st) {
-                      debugPrint('Error deleting return: $e\n$st');
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          SnackBar(content: Text('Error deleting return: $e')),
-                        );
-                      await fetchReturns();
-                    }
-                  },
-                ),
+                    },
+                  ),
               ],
             ),
           ],

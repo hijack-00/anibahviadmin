@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/product.dart';
 import 'package:path/path.dart' as p;
@@ -183,6 +184,101 @@ class ApiService {
     } catch (e) {
       print('fetchProductByProductId ERROR: $e');
       rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getAdminUsersByAdminWithPagination({
+    int page = 1,
+    int limit = 100,
+  }) async {
+    final url =
+        "$baseUrl/admin/getAdminUsersByAdminwithPagination?page=$page&limit=$limit";
+    try {
+      final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateAdminUserByAdmin({
+    required String userId,
+    required Map<String, dynamic> userForm,
+  }) async {
+    final url = '$baseUrl/admin/update-admin-by-admin/$userId';
+    final body = jsonEncode({'userForm': userForm});
+
+    print('API Request URL: $url'); // Log the URL
+    print('Request Body: $body'); // Log the request body
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: defaultHeaders,
+      body: body,
+    );
+
+    print('Response Status: ${response.statusCode}'); // Log the response status
+    print('Response Body: ${response.body}'); // Log the response body
+
+    return jsonDecode(response.body);
+  }
+
+  /// Create admin/staff user by admin
+  Future<Map<String, dynamic>> createAdminByAdmin({
+    required Map<String, dynamic> userForm,
+  }) async {
+    final url = "$baseUrl/admin/create-admin-by-admin";
+    final body = jsonEncode({'userForm': userForm});
+    print('API: POST $url');
+    print('Request body: $body');
+    try {
+      final resp = await http.post(
+        Uri.parse(url),
+        headers: {...defaultHeaders, 'Content-Type': 'application/json'},
+        body: body,
+      );
+      print('Response status: ${resp.statusCode}');
+      print('Response body: ${resp.body}');
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      print('createAdminByAdmin ERROR: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteAdminUserByAdmin({
+    required String userId,
+  }) async {
+    final url = "$baseUrl/admin/delete-admin-user-by-admin/$userId";
+    try {
+      final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 
@@ -1049,5 +1145,59 @@ class ApiService {
     } else {
       throw Exception('Failed to toggle user status: ${response.statusCode}');
     }
+  }
+
+  // Future<Map<String, dynamic>> fetchAllRoles() async {
+  //   // Returns the raw API response as Map
+  //   final response = await get('/adminRole/get-all-roles');
+  //   if (response.statusCode == 200) {
+  //     return json.decode(response.body) as Map<String, dynamic>;
+  //   } else {
+  //     throw Exception('Failed to fetch roles: ${response.statusCode}');
+  //   }
+  // }
+
+  // /// Convenience: fetch single role by id (calls fetchAllRoles and searches)
+  // Future<Map<String, dynamic>?> getRoleById(String roleId) async {
+  //   try {
+  //     final resp = await fetchAllRoles();
+  //     if (resp['data'] is List) {
+  //       for (var r in resp['data']) {
+  //         if (r is Map && (r['_id'] == roleId || r['id'] == roleId)) {
+  //           return Map<String, dynamic>.from(r);
+  //         }
+  //       }
+  //     }
+  //     return null;
+  //   } catch (e) {
+  //     print('getRoleById error: $e');
+  //     rethrow;
+  //   }
+  // }
+
+  Future<Map<String, dynamic>> fetchAllRoles() async {
+    final url = '$baseUrl/adminRole/get-all-roles';
+    final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+    if (resp.statusCode == 200) {
+      return json.decode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to fetch roles: ${resp.statusCode}');
+  }
+
+  Future<Map<String, dynamic>?> getRoleById(String roleId) async {
+    try {
+      final resp = await fetchAllRoles();
+      final data = resp['data'];
+      if (data is List) {
+        for (final r in data) {
+          if (r is Map && (r['_id'] == roleId || r['id'] == roleId)) {
+            return Map<String, dynamic>.from(r);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('getRoleById error: $e');
+    }
+    return null;
   }
 }

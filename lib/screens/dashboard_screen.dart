@@ -1,9 +1,11 @@
 import 'package:anibhaviadmin/screens/all_orders_page.dart';
 import 'package:anibhaviadmin/screens/order_details_page.dart';
 import 'package:anibhaviadmin/screens/sales_reports_page.dart';
+import 'package:anibhaviadmin/widgets/universal_scaffold.dart';
 import 'package:anibhaviadmin/services/app_data_repo.dart';
 import 'package:anibhaviadmin/screens/login_screen.dart';
 import 'package:anibhaviadmin/widgets/add_product_form.dart';
+import 'package:anibhaviadmin/widgets/universal_drawer.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -12,10 +14,13 @@ import '../dialogs/create_order_bottom_sheet.dart';
 import '../dialogs/create_challan_dialog.dart';
 import '../dialogs/create_return_dialog.dart';
 import 'users_page.dart';
-import 'universal_navbar.dart';
+import '../widgets/universal_navbar.dart';
 import 'package:intl/intl.dart';
 import 'package:anibhaviadmin/screens/all_orders_page.dart';
 import 'package:anibhaviadmin/screens/challan_screen.dart';
+import 'package:anibhaviadmin/permissions/permission_helper.dart';
+import 'package:anibhaviadmin/services/app_data_repo.dart';
+import 'package:anibhaviadmin/permissions/navigateIfAllowed.dart';
 
 String formatCurrency(num amount) {
   if (amount >= 1000000) {
@@ -81,176 +86,6 @@ class _SalesSummaryCard extends StatelessWidget {
             // Text(subtitle, style: TextStyle(color: Colors.white, fontSize: 12)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class UniversalScaffold extends StatefulWidget {
-  final int selectedIndex;
-  final Widget body;
-  UniversalScaffold({required this.selectedIndex, required this.body});
-
-  @override
-  State<UniversalScaffold> createState() => _UniversalScaffoldState();
-}
-
-class _UniversalScaffoldState extends State<UniversalScaffold> {
-  // Drawer button with arrow icon at right
-  Widget _drawerButton(String title, String route) {
-    return ListTile(
-      title: Text(title),
-      trailing: Icon(Icons.arrow_forward_ios, size: 18, color: Colors.indigo),
-      onTap: () => Navigator.pushNamed(context, route),
-    );
-  }
-
-  void _onItemTapped(int index) {
-    String? route;
-    switch (index) {
-      case 0:
-        route = '/dashboard';
-        break;
-      case 1:
-        route = '/orders';
-        break;
-      case 2:
-        route = '/users';
-        break;
-      case 3:
-        route = '/catalogue';
-        break;
-      case 4:
-        route = '/challan';
-        break;
-    }
-    if (route != null && ModalRoute.of(context)?.settings.name != route) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        route,
-        (r) => r.settings.name == '/dashboard',
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-
-      // Replace your appBar property in Scaffold (inside UniversalScaffold) with this:
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.indigo.shade500, Colors.teal.shade400],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.dashboard_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Dashboard',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (widget.selectedIndex == 0)
-                    IconButton(
-                      icon: Icon(Icons.logout, color: Colors.white),
-                      tooltip: 'Logout',
-                      onPressed: () async {
-                        final repo = AppDataRepo();
-                        await repo.clearUserData();
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => LoginScreen(),
-                          ),
-                          (route) => false,
-                        );
-                      },
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: Colors.indigo),
-              child: Text(
-                'Menu',
-                style: TextStyle(color: Colors.white, fontSize: 24),
-              ),
-            ),
-            // _drawerButton('Sales Order', '/sales-order'),
-            // Divider(),
-            // _drawerButton('Notes', '/notes'),
-            // Divider(),
-            // _drawerButton('LR Upload', '/lr-upload'),
-            // Divider(),
-            // _drawerButton('Transport Name Entry', '/transport-entry'),
-            // Divider(),
-            // _drawerButton('PDF Share', '/pdf-share'),
-            // Divider(),
-            // _drawerButton('Barcode Scan/Manual', '/barcode'),
-            // Divider(),
-            // _drawerButton('Franchisee Selection', '/franchisee-select'),
-            // Divider(),
-            _drawerButton('Sales Return', '/sales-return'),
-            Divider(),
-            _drawerButton('Stock Adjustment', '/stock-adjustment'),
-            Divider(),
-            // _drawerButton('Refund/Credit Note', '/refund-credit'),
-            // Divider(),
-            // _drawerButton('Return Challan', '/return-challan'),
-            // Divider(),
-            // _drawerButton('Reports Graph', '/reports-graph'),
-            // Divider(),
-            _drawerButton('Notifications', '/notifications'),
-            Divider(),
-            _drawerButton('Stock Management', '/stock-management'),
-            Divider(),
-            _drawerButton('Customer Ledger', '/customer-ledger'),
-            Divider(),
-            // _drawerButton('WhatsApp Notifications', '/whatsapp-notifications'),
-            // Divider(),
-            _drawerButton('Backend User Data', '/user-data'),
-            // Divider(),
-            // _drawerButton('Push Notifications', '/push-notifications'),
-            Divider(),
-            _drawerButton('Catalogue Upload', '/catalogue-upload'),
-            Divider(),
-          ],
-        ),
-      ),
-      body: widget.body,
-      bottomNavigationBar: UniversalNavBar(
-        selectedIndex: widget.selectedIndex,
-        onTap: _onItemTapped,
       ),
     );
   }
@@ -490,6 +325,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'route': '/reports',
       // 'color': Colors.green.shade50,
     },
+    {
+      'label': 'Recycle Bin',
+      'icon': Icons.delete_forever_rounded,
+      'route': '/recycleBin',
+      // 'color': Colors.green.shade50,
+    },
+    {
+      'label': 'Admin & Staffs',
+      'icon': Icons.admin_panel_settings,
+      'route': '/admin-users',
+      // 'color': Colors.green.shade50,
+    },
   ];
 
   final Map<String, Color> statusColors = {
@@ -667,6 +514,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Stack(
         children: [
           UniversalScaffold(
+            title: 'Dashboard', // Set the title
+            appIcon: Icons.dashboard_rounded, // Set the app icon
+            // showLogoutButton: true, // Show logout buttons
             selectedIndex: 0,
             body: RefreshIndicator(
               onRefresh: () async {
@@ -1501,177 +1351,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
 
-                    // Container(
-                    //   decoration: BoxDecoration(
-                    //     gradient: LinearGradient(
-                    //       colors: [Colors.indigo.shade50, Colors.white],
-                    //       begin: Alignment.topLeft,
-                    //       end: Alignment.bottomRight,
-                    //     ),
-                    //     borderRadius: BorderRadius.circular(20),
-                    //     boxShadow: [
-                    //       BoxShadow(
-                    //         color: Colors.indigo.shade100.withOpacity(0.3),
-                    //         blurRadius: 6,
-                    //         offset: Offset(0, 3),
-                    //       ),
-                    //     ],
-                    //   ),
-                    //   padding: const EdgeInsets.all(16),
-                    //   child: FutureBuilder<Map<String, dynamic>>(
-                    //     future: _ordersFuture,
-                    //     builder: (context, snapshot) {
-                    //       if (snapshot.connectionState ==
-                    //           ConnectionState.waiting) {
-                    //         return Column(
-                    //           children: List.generate(
-                    //             4,
-                    //             (i) => Padding(
-                    //               padding: const EdgeInsets.symmetric(
-                    //                 vertical: 8.0,
-                    //               ),
-                    //               child: Container(
-                    //                 height: 60,
-                    //                 decoration: BoxDecoration(
-                    //                   color: Colors.grey.shade200,
-                    //                   borderRadius: BorderRadius.circular(12),
-                    //                 ),
-                    //               ),
-                    //             ),
-                    //           ),
-                    //         );
-                    //       }
-
-                    //       if (snapshot.hasError ||
-                    //           snapshot.data == null ||
-                    //           snapshot.data!['orders'] == null) {
-                    //         return Center(
-                    //           child: Text(
-                    //             'Error loading order stats',
-                    //             style: TextStyle(
-                    //               color: Colors.red.shade300,
-                    //               fontSize: 13,
-                    //             ),
-                    //           ),
-                    //         );
-                    //       }
-
-                    //       final orders = List<Map<String, dynamic>>.from(
-                    //         snapshot.data!['orders'],
-                    //       );
-                    //       final statusCounts = {
-                    //         'pending': 0,
-                    //         'shipped': 0,
-                    //         'delivered': 0,
-                    //         'cancelled': 0,
-                    //       };
-                    //       for (var order in orders) {
-                    //         final status = (order['orderStatus'] ?? '')
-                    //             .toString()
-                    //             .trim()
-                    //             .toLowerCase();
-                    //         if (statusCounts.containsKey(status)) {
-                    //           statusCounts[status] = statusCounts[status]! + 1;
-                    //         }
-                    //       }
-
-                    //       final statusColors = {
-                    //         'pending': Colors.orange.shade400,
-                    //         'shipped': Colors.blue.shade400,
-                    //         'delivered': Colors.green.shade400,
-                    //         'cancelled': Colors.red.shade400,
-                    //       };
-
-                    //       return Column(
-                    //         children: statusCounts.entries.map((entry) {
-                    //           return Padding(
-                    //             padding: const EdgeInsets.symmetric(
-                    //               vertical: 6.0,
-                    //             ),
-                    //             child: Material(
-                    //               color: statusColors[entry.key]!.withOpacity(
-                    //                 0.1,
-                    //               ),
-                    //               borderRadius: BorderRadius.circular(14),
-                    //               child: InkWell(
-                    //                 borderRadius: BorderRadius.circular(14),
-                    //                 onTap: () {},
-                    //                 child: Container(
-                    //                   height: 56,
-                    //                   padding: const EdgeInsets.symmetric(
-                    //                     horizontal: 18,
-                    //                   ),
-                    //                   child: Row(
-                    //                     children: [
-                    //                       Icon(
-                    //                         _getStatusIcon(entry.key),
-                    //                         color: statusColors[entry.key],
-                    //                         size: 24,
-                    //                       ),
-                    //                       const SizedBox(width: 16),
-                    //                       Expanded(
-                    //                         child: Text(
-                    //                           _capitalize(
-                    //                             entry.key,
-                    //                           ), // Show status as text, not icon
-                    //                           style: TextStyle(
-                    //                             fontWeight: FontWeight.w600,
-                    //                             fontSize: 14,
-                    //                             color: statusColors[entry.key],
-                    //                           ),
-                    //                         ),
-                    //                       ),
-                    //                       Text(
-                    //                         '${entry.value}',
-                    //                         style: TextStyle(
-                    //                           fontWeight: FontWeight.bold,
-                    //                           fontSize: 18,
-                    //                           color: Colors.black87,
-                    //                         ),
-                    //                       ),
-                    //                       const SizedBox(width: 4),
-                    //                       Text(
-                    //                         'Orders',
-                    //                         style: TextStyle(
-                    //                           fontSize: 13,
-                    //                           color: Colors.grey.shade700,
-                    //                         ),
-                    //                       ),
-                    //                     ],
-                    //                   ),
-                    //                 ),
-                    //               ),
-                    //             ),
-                    //           );
-                    //         }).toList(),
-                    //       );
-                    //     },
-                    //   ),
-                    // ),
                     const SizedBox(height: 24),
 
-                    // --- User Stats ---
-                    // Row(
-                    //   children: [
-                    //     Expanded(
-                    //       child: _buildUserStatCard(
-                    //         'Active Users',
-                    //         userOverview['active'] as int,
-                    //         Icons.person_rounded,
-                    //         Colors.indigo.shade400,
-                    //       ),
-                    //     ),
-                    //     SizedBox(width: 10),
-                    //     Expanded(
-                    //       child: _buildUserStatCard(
-                    //         'Inactive Users',
-                    //         userOverview['inactive'] as int,
-                    //         Icons.person_off_rounded,
-                    //         Colors.grey.shade500,
-                    //       ),
-                    //     ),
-                    //   ],
-                    // ),
                     Row(
                       children: [
                         Expanded(
@@ -1757,11 +1438,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 14),
+
+                    // Align(
+                    //   alignment: Alignment.center,
+                    //   child: ElevatedButton.icon(
+                    //     icon: Icon(Icons.delete_forever_outlined, size: 18),
+                    //     label: Text("Bin", style: TextStyle(fontSize: 13)),
+                    //     style: ElevatedButton.styleFrom(
+                    //       backgroundColor: Colors.indigo[50],
+                    //       foregroundColor: Colors.indigo.shade600,
+                    //       elevation: 1,
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(12),
+                    //       ),
+                    //       padding: const EdgeInsets.symmetric(
+                    //         vertical: 18,
+                    //         horizontal: 20,
+                    //       ),
+                    //     ),
+                    //     onPressed: () {
+                    //       Navigator.push(
+                    //         context,
+                    //         MaterialPageRoute(
+                    //           builder: (context) => RecycleBinPage(),
+                    //         ),
+                    //       );
+                    //     },
+                    //   ),
+                    // ),
                     const SizedBox(height: 24),
 
                     // --- Recent Orders ---
-
-                    // ...existing code...
                     Text(
                       'Recent Orders',
                       style: Theme.of(context).textTheme.titleMedium!.copyWith(

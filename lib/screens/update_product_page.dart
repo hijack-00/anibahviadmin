@@ -309,6 +309,7 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        foregroundColor: Colors.white,
         title: Text('Update Product'),
         backgroundColor: Colors.indigo,
       ),

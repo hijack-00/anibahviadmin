@@ -26,6 +26,127 @@ class AppDataRepo {
 
   final ApiService _api = ApiService();
 
+  // roles cache + mapping
+  static List<Map<String, dynamic>> roles = [];
+  static const String _currentRoleKey = 'current_role_id';
+
+  static const Map<String, String> routeToPermissionKey = {
+    '/dashboard': 'dashboard',
+    '/catalogue': 'catalogueUpload',
+    '/products': 'products',
+    '/product-detail': 'products',
+    '/orders': 'orders',
+    '/order_detail': 'orders',
+    '/sales': 'sales',
+    '/returns': 'returns',
+    '/catalogue-upload': 'catalogueUpload',
+    '/users': 'userManagement',
+    '/admin-users': 'admins',
+    '/notifications': 'notifications',
+    '/challan': 'returns', // adjust if your API uses a different key
+  };
+
+  Future<void> loadRolesFromApi() async {
+    try {
+      final resp = await _api.fetchAllRoles();
+      final d = resp['data'];
+      if (d is List)
+        roles = List<Map<String, dynamic>>.from(d);
+      else
+        roles = [];
+      debugPrint('Roles loaded: ${roles.length}');
+    } catch (e) {
+      roles = [];
+      debugPrint('loadRolesFromApi error: $e');
+    }
+  }
+
+  Future<void> saveCurrentRoleId(String roleId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_currentRoleKey, roleId);
+    debugPrint('Saved current role id: $roleId');
+  }
+
+  Future<String?> getCurrentRoleId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_currentRoleKey);
+  }
+
+  Map<String, dynamic>? getRoleByIdCached(String id) {
+    final sid = id?.toString() ?? '';
+    for (final r in roles) {
+      // match by common id fields and name fields (case-insensitive)
+      final rid = r['_id']?.toString() ?? r['id']?.toString() ?? '';
+      final rname = (r['name'] ?? r['role'] ?? r['roleName'])?.toString() ?? '';
+      if (rid == sid) return r;
+      if (rname.toLowerCase() == sid.toLowerCase()) return r;
+    }
+    return null;
+  }
+
+  bool _hasPermissionInRoleMap(
+    Map<String, dynamic> role,
+    String permissionKey,
+    String action,
+  ) {
+    if (role == null) return false;
+    final perms = role['permissions'];
+    if (perms is Map && perms[permissionKey] is Map) {
+      final p = perms[permissionKey];
+      return p[action] == true;
+    }
+    return false;
+  }
+
+  Future<bool> currentUserHasPermission(
+    String permissionOrRoute,
+    String action, {
+    bool forceReload = false,
+  }) async {
+    final permissionKey =
+        routeToPermissionKey[permissionOrRoute] ?? permissionOrRoute;
+    debugPrint(
+      'Checking permission for key="$permissionKey" action="$action" forceReload=$forceReload',
+    );
+
+    // Always reload roles when forceReload requested
+    if (forceReload || roles.isEmpty) {
+      await loadRolesFromApi();
+    }
+
+    final roleId = await getCurrentRoleId();
+    debugPrint(
+      'currentUserHasPermission: roleId="$roleId" roles=${roles.length}',
+    );
+
+    if (roleId == null || roleId.isEmpty) {
+      debugPrint('No saved role id -> deny');
+      return false;
+    }
+
+    final role = getRoleByIdCached(roleId);
+    if (role != null) {
+      final ok = _hasPermissionInRoleMap(role, permissionKey, action);
+      debugPrint('perm result (cached) for $permissionKey/$action -> $ok');
+      return ok;
+    }
+
+    // fallback: try to find role in freshly loaded list (already tried), or query API for single role
+    try {
+      final remote = await _api.getRoleById(roleId);
+      if (remote != null) {
+        final ok = _hasPermissionInRoleMap(remote, permissionKey, action);
+        debugPrint('perm result (remote) for $permissionKey/$action -> $ok');
+        return ok;
+      }
+    } catch (e) {
+      debugPrint('perm check error: $e');
+    }
+
+    return false;
+  }
+  // ----------------- end helpers -----------------
+
   Future<Map<String, dynamic>> fetchProductDetailById(String productId) async {
     return await _api.fetchProductDetailById(productId);
   }
@@ -318,6 +439,66 @@ class AppDataRepo {
     );
   }
 
+  Future<Map<String, dynamic>> updateAdminUserByAdmin({
+    required String userId,
+    required Map<String, dynamic> userForm,
+  }) async {
+    final response = await _api.updateAdminUserByAdmin(
+      userId: userId,
+      userForm: userForm,
+    );
+
+    print('Update Admin User Response: $response'); // Log the response
+
+    return response;
+  }
+
+  /// Create admin/staff user (wrapper)
+  Future<Map<String, dynamic>> createAdminUser({
+    required Map<String, dynamic> userForm,
+  }) async {
+    try {
+      final resp = await _api.createAdminByAdmin(userForm: userForm);
+      debugPrint('createAdminUser response: $resp');
+      return resp;
+    } catch (e) {
+      debugPrint('createAdminUser error: $e');
+      return {'status': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteAdminUserByAdmin(String userId) async {
+    try {
+      final resp = await _api.deleteAdminUserByAdmin(userId: userId);
+      return resp;
+    } catch (e) {
+      debugPrint('deleteAdminUserByAdmin error: $e');
+      return {'status': false, 'message': e.toString()};
+    }
+  }
+
+  /// Fetch admin/staff users (wrapper for admin/getAdminUsersByAdminwithPagination)
+  Future<List<Map<String, dynamic>>> fetchAdminUsers({
+    int page = 1,
+    int limit = 100,
+  }) async {
+    try {
+      final resp = await _api.getAdminUsersByAdminWithPagination(
+        page: page,
+        limit: limit,
+      );
+      // API returns { status: true, message: ..., data: [ ... ], pagination: {...} }
+      if ((resp['status'] == true || resp['success'] == true) &&
+          resp['data'] is List) {
+        return List<Map<String, dynamic>>.from(resp['data']);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('fetchAdminUsers error: $e');
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> createChallan(
     Map<String, dynamic> challanBody,
   ) async {
@@ -492,6 +673,21 @@ class AppDataRepo {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, jsonEncode(user));
     await prefs.setString(_tokenKey, token);
+
+    // if user object contains role id (field names may vary), persist it
+    try {
+      String? roleId;
+      if (user.containsKey('role') && user['role'] is String) {
+        roleId = user['role'] as String;
+      } else if (user.containsKey('roleId') && user['roleId'] is String) {
+        roleId = user['roleId'] as String;
+      } else if (user['role'] is Map && user['role']['_id'] != null) {
+        roleId = user['role']['_id'] as String?;
+      }
+      if (roleId != null && roleId.isNotEmpty) {
+        await prefs.setString(_currentRoleKey, roleId);
+      }
+    } catch (_) {}
   }
 
   Future<List<Map<String, dynamic>>> fetchAllSizes() async {
@@ -518,4 +714,110 @@ class AppDataRepo {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_tokenKey) != null;
   }
+
+  // Cached roles fetched from API
+  // static List<Map<String, dynamic>> roles = [];
+  // static const String _currentRoleKey = 'current_role_id';
+
+  // /// Map routes or logical page keys to permission keys used by the API.
+  // /// Extend as needed.
+  // static const Map<String, String> routeToPermissionKey = {
+  //   '/dashboard': 'dashboard',
+  //   '/catalogue': 'catalogueUpload',
+  //   '/catalogue-upload': 'catalogueUpload',
+  //   '/products': 'products',
+  //   '/product-detail': 'products',
+  //   '/orders': 'orders',
+  //   '/order_detail': 'orders',
+  //   '/sales': 'sales',
+  //   '/sales-return': 'returns',
+  //   '/returns': 'returns',
+  //   '/users': 'userManagement',
+  //   '/admin-users': 'admins',
+  //   '/notifications': 'notifications',
+  //   '/stock-management': 'stock', // example - adjust if API uses different key
+  //   '/customer-ledger': 'sales',
+  // };
+
+  /// Fetch roles from API and cache locally
+  // Future<void> loadRolesFromApi() async {
+  //   try {
+  //     final resp = await _api.fetchAllRoles();
+  //     if ((resp['status'] == true || resp['success'] == true) &&
+  //         resp['data'] is List) {
+  //       roles = List<Map<String, dynamic>>.from(resp['data']);
+  //     } else {
+  //       roles = [];
+  //     }
+  //   } catch (e) {
+  //     debugPrint('loadRolesFromApi error: $e');
+  //     roles = [];
+  //   }
+  // }
+
+  List<Map<String, dynamic>> getRoles() => roles;
+
+  Map<String, dynamic>? getRoleById(String id) {
+    try {
+      final sid = id?.toString() ?? '';
+      for (var r in roles) {
+        final rid = r['_id']?.toString() ?? r['id']?.toString() ?? '';
+        final rname =
+            (r['name'] ?? r['role'] ?? r['roleName'])?.toString() ?? '';
+        if (rid == sid) return r;
+        if (rname.toLowerCase() == sid.toLowerCase()) return r;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Future<void> saveCurrentRoleId(String roleId) async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   await prefs.setString(_currentRoleKey, roleId);
+  // }
+
+  // Future<String?> getCurrentRoleId() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   return prefs.getString(_currentRoleKey);
+  // }
+
+  /// Check permission by role id (action: 'read' | 'write' | 'update' | 'delete')
+  bool hasPermissionForRole(
+    Map<String, dynamic> role,
+    String permissionKey,
+    String action,
+  ) {
+    if (role == null) return false;
+    final perms = role['permissions'];
+    if (perms is Map && perms[permissionKey] is Map) {
+      final p = perms[permissionKey];
+      final v = p[action];
+      return v == true;
+    }
+    return false;
+  }
+
+  /// Checks current user's saved role for permission. If permissionKey is a route,
+  /// it will map it to the API permission key via routeToPermissionKey.
+  // Future<bool> currentUserHasPermission(
+  //   String permissionOrRoute,
+  //   String action,
+  // ) async {
+  //   final roleId = await getCurrentRoleId();
+  //   if (roleId == null) return false;
+  //   final role = getRoleById(roleId);
+  //   final permissionKey =
+  //       routeToPermissionKey[permissionOrRoute] ?? permissionOrRoute;
+  //   if (role != null) {
+  //     return hasPermissionForRole(role, permissionKey, action);
+  //   }
+  //   // As fallback attempt to fetch role from API
+  //   try {
+  //     final remote = await _api.getRoleById(roleId);
+  //     if (remote != null) {
+  //       return hasPermissionForRole(remote, permissionKey, action);
+  //     }
+  //   } catch (_) {}
+  //   return false;
+  // }
 }

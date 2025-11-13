@@ -162,16 +162,83 @@ class _AddProductFormState extends State<AddProductForm> {
     }
   }
 
+  // Widget numberField({
+  //   required String label,
+  //   required int value,
+  //   required void Function(int) onChanged,
+  //   required TextEditingController controller,
+  // }) {
+  //   // use the passed controller (do not recreate it)
+  //   controller.text = controller.text.isEmpty
+  //       ? value.toString()
+  //       : controller.text;
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+  //       SizedBox(height: 4),
+  //       Row(
+  //         children: [
+  //           Expanded(
+  //             child: TextField(
+  //               controller: controller,
+  //               keyboardType: TextInputType.number,
+  //               decoration: InputDecoration(
+  //                 border: OutlineInputBorder(),
+  //                 contentPadding: EdgeInsets.only(left: 12, right: 12),
+  //               ),
+  //               onChanged: (val) {
+  //                 final num = int.tryParse(val) ?? value;
+  //                 onChanged(num);
+  //               },
+  //             ),
+  //           ),
+  //           SizedBox(width: 4),
+  //           Column(
+  //             mainAxisSize: MainAxisSize.min,
+  //             children: [
+  //               SizedBox(
+  //                 height: 24,
+  //                 width: 32,
+  //                 child: IconButton(
+  //                   padding: EdgeInsets.zero,
+  //                   icon: Icon(Icons.arrow_drop_up),
+  //                   onPressed: () {
+  //                     final newVal = value + 1;
+  //                     controller.text = newVal.toString();
+  //                     onChanged(newVal);
+  //                   },
+  //                 ),
+  //               ),
+  //               SizedBox(
+  //                 height: 24,
+  //                 width: 32,
+  //                 child: IconButton(
+  //                   padding: EdgeInsets.zero,
+  //                   icon: Icon(Icons.arrow_drop_down),
+  //                   onPressed: () {
+  //                     if (value > 1) {
+  //                       final newVal = value - 1;
+  //                       controller.text = newVal.toString();
+  //                       onChanged(newVal);
+  //                     }
+  //                   },
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ],
+  //       ),
+  //     ],
+  //   );
+  // }
+
   Widget numberField({
     required String label,
     required int value,
     required void Function(int) onChanged,
     required TextEditingController controller,
   }) {
-    // use the passed controller (do not recreate it)
-    controller.text = controller.text.isEmpty
-        ? value.toString()
-        : controller.text;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -188,8 +255,18 @@ class _AddProductFormState extends State<AddProductForm> {
                   contentPadding: EdgeInsets.only(left: 12, right: 12),
                 ),
                 onChanged: (val) {
-                  final num = int.tryParse(val) ?? value;
-                  onChanged(num);
+                  // Allow empty value
+                  if (val.isEmpty) {
+                    controller.text = '';
+                    onChanged(0); // Set to 0 when empty
+                    return;
+                  }
+
+                  // Try to parse the number
+                  final num = int.tryParse(val);
+                  if (num != null) {
+                    onChanged(num);
+                  }
                 },
               ),
             ),
@@ -204,7 +281,8 @@ class _AddProductFormState extends State<AddProductForm> {
                     padding: EdgeInsets.zero,
                     icon: Icon(Icons.arrow_drop_up),
                     onPressed: () {
-                      final newVal = value + 1;
+                      final current = int.tryParse(controller.text) ?? 0;
+                      final newVal = current + 1;
                       controller.text = newVal.toString();
                       onChanged(newVal);
                     },
@@ -217,8 +295,9 @@ class _AddProductFormState extends State<AddProductForm> {
                     padding: EdgeInsets.zero,
                     icon: Icon(Icons.arrow_drop_down),
                     onPressed: () {
-                      if (value > 1) {
-                        final newVal = value - 1;
+                      final current = int.tryParse(controller.text) ?? 0;
+                      if (current > 0) {
+                        final newVal = current - 1;
                         controller.text = newVal.toString();
                         onChanged(newVal);
                       }

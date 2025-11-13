@@ -1,13 +1,16 @@
 import 'dart:convert';
 
+import 'package:anibhaviadmin/widgets/universal_scaffold.dart';
 import 'package:anibhaviadmin/services/api_service.dart';
 import 'package:anibhaviadmin/widgets/barcode_scanner_page.dart';
+import 'package:anibhaviadmin/widgets/universal_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/app_data_repo.dart';
 import 'order_details_page.dart';
-import 'universal_navbar.dart';
+import '../widgets/universal_navbar.dart';
 import 'package:intl/intl.dart';
+import 'package:anibhaviadmin/permissions/permission_helper.dart';
 
 // import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
 
@@ -24,7 +27,8 @@ class AllOrdersPage extends StatefulWidget {
   State<AllOrdersPage> createState() => _AllOrdersPageState();
 }
 
-class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
+class _AllOrdersPageState extends State<AllOrdersPage>
+    with RouteAware, PermissionHelper {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _orders = [];
@@ -53,7 +57,71 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
   @override
   void initState() {
     super.initState();
-    _fetchOrders();
+
+    initPermissions('/orders').then((_) async {
+      if (!mounted) return;
+      debugPrint(
+        'After initPermissions: canRead=$canRead canWrite=$canWrite roles=${AppDataRepo.roles.length} roleId=${await AppDataRepo().getCurrentRoleId()}',
+      );
+      if (canRead) {
+        await _fetchOrders();
+      } else {
+        setState(() {
+          _loading = false;
+          _orders = [];
+          _error = null;
+        });
+      }
+
+      // if (!mounted) return;
+
+      // if (canRead) {
+      //   await _fetchOrders();
+      // } else {
+      //   setState(() {
+      //     _loading = false;
+      //     _orders = [];
+      //     _error = null;
+      //   });
+      // }
+
+      // If caller wanted to open the Create Order sheet on start,
+      // only open it after the first frame and only when user has write access.
+      if (widget.openCreateOrderOnStart) {
+        final hasWrite = await AppDataRepo().currentUserHasPermission(
+          '/orders',
+          'write',
+        );
+        if (!mounted) return;
+        if (hasWrite) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (!mounted) return;
+            // small delay to let build settle
+            await Future.delayed(const Duration(milliseconds: 150));
+            final result = await showModalBottomSheet<bool>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.white,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              builder: (context) => Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                  left: 16,
+                  right: 16,
+                  top: 24,
+                ),
+                child: _CreateOrderSheet(),
+              ),
+            );
+            if (result == true && mounted) await _fetchOrders();
+          });
+        }
+      }
+    });
+
+    // _fetchOrders();
 
     // If caller requested, automatically open the Create Order sheet once
     // the page has rendered.
@@ -198,86 +266,87 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
           shipPhone.contains(q) ||
           shipAddr.contains(q);
     }).toList();
-    // if (_searchQuery.isEmpty) return _orders;
-    // final q = _searchQuery;
-    // return _orders.where((order) {
-    //   // order-level identifiers
-    //   final orderStatus = (order['status'] ?? '').toString().toLowerCase();
-    //   if (_selectedFilterStatus != 'All' && _selectedFilterStatus.isNotEmpty) {
-    //     if (orderStatus != _selectedFilterStatus.toLowerCase()) return false;
-    //   }
+  }
 
-    //   final orderNumber = (order['orderNumber'] ?? '').toString().toLowerCase();
-    //   final orderUniqueId = (order['orderUniqueId'] ?? '')
-    //       .toString()
-    //       .toLowerCase();
-    //   final trackingId = (order['trackingId'] ?? '').toString().toLowerCase();
-
-    //   // customer and nested user info
-    //   final customer = order['customer'] ?? {};
-    //   final custName = (customer['name'] ?? '').toString().toLowerCase();
-    //   final custPhone = (customer['phone'] ?? '').toString().toLowerCase();
-    //   final custEmail = (customer['email'] ?? '').toString().toLowerCase();
-
-    //   // possible shipping / delivery address fields
-    //   final shipping = (order['shippingAddress'] ?? {}) as Map? ?? {};
-    //   final shipName = (shipping['name'] ?? '').toString().toLowerCase();
-    //   final shipPhone = (shipping['phone'] ?? '').toString().toLowerCase();
-    //   final shipAddr =
-    //       ((shipping['address'] ?? shipping['deliveryAddress'] ?? ''))
-    //           .toString()
-    //           .toLowerCase();
-
-    //   // aggregate check
-    //   return orderNumber.contains(q) ||
-    //       orderUniqueId.contains(q) ||
-    //       trackingId.contains(q) ||
-    //       custName.contains(q) ||
-    //       custPhone.contains(q) ||
-    //       custEmail.contains(q) ||
-    //       shipName.contains(q) ||
-    //       shipPhone.contains(q) ||
-    //       shipAddr.contains(q);
-    // }).toList();
+  void _deleteOrder(Map<String, dynamic> order) {
+    Navigator.pushNamed(context, '/recycleBin');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+    // if (!permissionsReady()) {
+    //   return UniversalScaffold(
+    //     selectedIndex: 1,
+    //     title: 'Orders',
+    //     appIcon: Icons.list_alt,
+    //     body: ListView(
+    //       // reuse your existing loading skeleton
+    //       children: [
+    //         SizedBox(height: 8),
+    //         ...List.generate(
+    //           3,
+    //           (_) =>
+    //               Card(/* small skeleton card similar to your _loading UI */),
+    //         ),
+    //       ],
+    //     ),
+    //   );
+    // }
 
-      // Replace your appBar property in Scaffold with this:
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.indigo.shade500, Colors.teal.shade400],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.list_alt, color: Colors.white, size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    'All Orders',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+    if (!permissionsReady()) {
+      // show the same visible skeleton used while _loading to avoid a black/empty screen
+      return UniversalScaffold(
+        selectedIndex: 1,
+        title: 'Orders',
+        appIcon: Icons.list_alt,
+        body: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: 3,
+          itemBuilder: (context, idx) {
+            return Card(
+              color: Colors.white,
+              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: List.generate(
+                    4,
+                    (i) => Container(
+                      height: 14,
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(vertical: 6.0),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
-      ),
+      );
+    }
+
+    // If no read permission, show access denied inside scaffold
+    if (!canRead) {
+      return UniversalScaffold(
+        selectedIndex: 1,
+        title: 'Orders',
+        appIcon: Icons.list_alt,
+        body: Center(child: Text('You do not have permission to view Orders')),
+      );
+    }
+
+    return UniversalScaffold(
+      selectedIndex: 1,
+      title: 'Orders',
+      appIcon: Icons.list_alt,
       body: RefreshIndicator(
         onRefresh: _fetchOrders,
         color: Colors.indigo,
@@ -350,7 +419,7 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Filter dropdown (sleek small)
+
                       Container(
                         height: 36,
                         decoration: BoxDecoration(
@@ -834,138 +903,147 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
-                                      _OrderActionButton(
-                                        icon: Icons.note_alt_outlined,
-                                        label: 'Note',
-                                        color: Colors.orange.shade600,
-                                        onPressed: () async {
-                                          final orderId =
-                                              order['_id'] ?? order['id'] ?? '';
-                                          String currentNote =
-                                              order['orderNote'] ?? '';
-                                          final TextEditingController
-                                          noteController =
-                                              TextEditingController(
-                                                text: currentNote,
-                                              );
+                                      if (canUpdate)
+                                        _OrderActionButton(
+                                          icon: Icons.note_alt_outlined,
+                                          label: 'Note',
+                                          color: Colors.orange.shade600,
+                                          onPressed: () async {
+                                            final orderId =
+                                                order['_id'] ??
+                                                order['id'] ??
+                                                '';
+                                            String currentNote =
+                                                order['orderNote'] ?? '';
+                                            final TextEditingController
+                                            noteController =
+                                                TextEditingController(
+                                                  text: currentNote,
+                                                );
 
-                                          final result = await showDialog<String>(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: Text(
-                                                'Edit Order Note',
-                                                style: TextStyle(fontSize: 14),
-                                              ),
-                                              content: TextField(
-                                                controller: noteController,
-                                                maxLines: 3,
-                                                style: TextStyle(fontSize: 13),
-                                                decoration: InputDecoration(
-                                                  hintText:
-                                                      'Enter order note...',
-                                                  border: OutlineInputBorder(),
-                                                ),
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  child: Text(
-                                                    'Cancel',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                  onPressed: () =>
-                                                      Navigator.of(ctx).pop(),
-                                                ),
-                                                ElevatedButton(
-                                                  child: Text(
-                                                    'Submit',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                        backgroundColor:
-                                                            Colors.indigo,
-                                                        foregroundColor:
-                                                            Colors.white,
-                                                      ),
-                                                  onPressed: () async {
-                                                    final newNote =
-                                                        noteController.text
-                                                            .trim();
-                                                    if (newNote.isEmpty) return;
-                                                    Navigator.of(
-                                                      ctx,
-                                                    ).pop(newNote);
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          );
-
-                                          if (result != null &&
-                                              result != currentNote) {
-                                            // Call update note API
-                                            showDialog(
+                                            final result = await showDialog<String>(
                                               context: context,
-                                              barrierDismissible: false,
-                                              builder: (ctx) => Center(
-                                                child:
-                                                    CircularProgressIndicator(),
+                                              builder: (ctx) => AlertDialog(
+                                                title: Text(
+                                                  'Edit Order Note',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                                content: TextField(
+                                                  controller: noteController,
+                                                  maxLines: 3,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                  ),
+                                                  decoration: InputDecoration(
+                                                    hintText:
+                                                        'Enter order note...',
+                                                    border:
+                                                        OutlineInputBorder(),
+                                                  ),
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    child: Text(
+                                                      'Cancel',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                    onPressed: () =>
+                                                        Navigator.of(ctx).pop(),
+                                                  ),
+                                                  ElevatedButton(
+                                                    child: Text(
+                                                      'Submit',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                    style:
+                                                        ElevatedButton.styleFrom(
+                                                          backgroundColor:
+                                                              Colors.indigo,
+                                                          foregroundColor:
+                                                              Colors.white,
+                                                        ),
+                                                    onPressed: () async {
+                                                      final newNote =
+                                                          noteController.text
+                                                              .trim();
+                                                      if (newNote.isEmpty)
+                                                        return;
+                                                      Navigator.of(
+                                                        ctx,
+                                                      ).pop(newNote);
+                                                    },
+                                                  ),
+                                                ],
                                               ),
                                             );
-                                            try {
-                                              final resp = await AppDataRepo()
-                                                  .updateOrderNoteByAdmin(
-                                                    orderId,
-                                                    result,
+
+                                            if (result != null &&
+                                                result != currentNote) {
+                                              // Call update note API
+                                              showDialog(
+                                                context: context,
+                                                barrierDismissible: false,
+                                                builder: (ctx) => Center(
+                                                  child:
+                                                      CircularProgressIndicator(),
+                                                ),
+                                              );
+                                              try {
+                                                final resp = await AppDataRepo()
+                                                    .updateOrderNoteByAdmin(
+                                                      orderId,
+                                                      result,
+                                                    );
+                                                Navigator.of(
+                                                  context,
+                                                ).pop(); // Remove loading dialog
+                                                if (resp['success'] == true) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        'Order note updated successfully.',
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.green,
+                                                    ),
                                                   );
-                                              Navigator.of(
-                                                context,
-                                              ).pop(); // Remove loading dialog
-                                              if (resp['success'] == true) {
+                                                  await _fetchOrders();
+                                                } else {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        resp['message'] ??
+                                                            'Failed to update note',
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.red,
+                                                    ),
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                Navigator.of(context).pop();
                                                 ScaffoldMessenger.of(
                                                   context,
                                                 ).showSnackBar(
                                                   SnackBar(
-                                                    content: Text(
-                                                      'Order note updated successfully.',
-                                                    ),
-                                                    backgroundColor:
-                                                        Colors.green,
-                                                  ),
-                                                );
-                                                await _fetchOrders();
-                                              } else {
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      resp['message'] ??
-                                                          'Failed to update note',
-                                                    ),
+                                                    content: Text('Error: $e'),
                                                     backgroundColor: Colors.red,
                                                   ),
                                                 );
                                               }
-                                            } catch (e) {
-                                              Navigator.of(context).pop();
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
                                             }
-                                          }
-                                        },
-                                      ),
-
+                                          },
+                                        ),
                                       SizedBox(width: 6),
                                       if (!(status.toString().toLowerCase() ==
                                               'cancelled' ||
@@ -973,80 +1051,429 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                                               'delivered' ||
                                           status.toString().toLowerCase() ==
                                               'returned'))
-                                        _OrderActionButton(
-                                          icon: Icons.info_outline,
-                                          label: 'Status',
-                                          color: Colors.indigo.shade600,
-                                          // ...inside your Status button onPressed...
-                                          onPressed: () async {
-                                            final orderId =
-                                                order['_id'] ??
-                                                order['id'] ??
-                                                '';
-                                            final currentStatus =
-                                                (order['status'] ?? '')
-                                                    .toString()
-                                                    .toLowerCase();
-                                            final orderNumber =
-                                                order['orderNumber'] ?? '';
+                                        if (canUpdate)
+                                          _OrderActionButton(
+                                            icon: Icons.info_outline,
+                                            label: 'Status',
+                                            color: Colors.indigo.shade600,
+                                            // ...inside your Status button onPressed...
+                                            onPressed: () async {
+                                              final orderId =
+                                                  order['_id'] ??
+                                                  order['id'] ??
+                                                  '';
+                                              final currentStatus =
+                                                  (order['status'] ?? '')
+                                                      .toString()
+                                                      .toLowerCase();
+                                              final orderNumber =
+                                                  order['orderNumber'] ?? '';
 
-                                            if (currentStatus == 'packed') {
-                                              await showDialog(
-                                                context: context,
-                                                builder: (ctx) => AlertDialog(
-                                                  title: Text(
-                                                    'Status Update',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                  content: Text(
-                                                    'Please Create Delivery Challan!',
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                  actions: [
-                                                    TextButton(
-                                                      child: Text(
-                                                        'OK',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                        ),
+                                              if (currentStatus == 'packed') {
+                                                await showDialog(
+                                                  context: context,
+                                                  builder: (ctx) => AlertDialog(
+                                                    title: Text(
+                                                      'Status Update',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
                                                       ),
-                                                      onPressed: () =>
-                                                          Navigator.of(
-                                                            ctx,
-                                                          ).pop(),
                                                     ),
-                                                  ],
-                                                ),
-                                              );
-                                              return;
-                                            }
+                                                    content: Text(
+                                                      'Please Create Delivery Challan!',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        child: Text(
+                                                          'OK',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                        onPressed: () =>
+                                                            Navigator.of(
+                                                              ctx,
+                                                            ).pop(),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                                return;
+                                              }
 
-                                            List<String> statusOptions = [];
-                                            if (currentStatus == 'pending') {
-                                              statusOptions = [
-                                                'Packed',
-                                                'Cancelled',
+                                              List<String> statusOptions = [];
+                                              if (currentStatus == 'pending') {
+                                                statusOptions = [
+                                                  'Packed',
+                                                  'Cancelled',
+                                                ];
+                                              } else if (currentStatus ==
+                                                  'shipped') {
+                                                statusOptions = [
+                                                  'Delivered',
+                                                  'Cancelled',
+                                                ];
+                                              }
+
+                                              String selectedStatus =
+                                                  statusOptions.isNotEmpty
+                                                  ? statusOptions.first
+                                                  : '';
+                                              String trackingId = '';
+                                              String deliveryVendor = '';
+
+                                              if (statusOptions.isNotEmpty) {
+                                                final result = await showDialog<Map<String, dynamic>>(
+                                                  context: context,
+                                                  builder: (ctx) => Dialog(
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            12,
+                                                          ),
+                                                    ),
+                                                    child: Padding(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                            20.0,
+                                                          ),
+                                                      child: Column(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Expanded(
+                                                                child: Text(
+                                                                  'Update Order Status',
+                                                                  style: TextStyle(
+                                                                    fontSize:
+                                                                        15,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              IconButton(
+                                                                icon: Icon(
+                                                                  Icons.close,
+                                                                  size: 18,
+                                                                ),
+                                                                onPressed: () =>
+                                                                    Navigator.of(
+                                                                      ctx,
+                                                                    ).pop(),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          SizedBox(height: 8),
+                                                          Text(
+                                                            'Order: $orderNumber',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 6),
+                                                          Row(
+                                                            children: [
+                                                              Text(
+                                                                'Current Status: ',
+                                                                style:
+                                                                    TextStyle(
+                                                                      fontSize:
+                                                                          12,
+                                                                    ),
+                                                              ),
+                                                              Container(
+                                                                padding:
+                                                                    EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          2,
+                                                                    ),
+                                                                decoration: BoxDecoration(
+                                                                  color: Colors
+                                                                      .yellow
+                                                                      .shade100,
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        8,
+                                                                      ),
+                                                                ),
+                                                                child: Text(
+                                                                  (order['status'] ??
+                                                                          '')
+                                                                      .toString(),
+                                                                  style: TextStyle(
+                                                                    color: Colors
+                                                                        .orange
+                                                                        .shade800,
+                                                                    fontSize:
+                                                                        12,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w500,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          SizedBox(height: 16),
+                                                          Text(
+                                                            'New Status',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 6),
+                                                          DropdownButtonFormField<
+                                                            String
+                                                          >(
+                                                            value:
+                                                                selectedStatus,
+                                                            items: statusOptions
+                                                                .map(
+                                                                  (
+                                                                    s,
+                                                                  ) => DropdownMenuItem(
+                                                                    value: s,
+                                                                    child: Text(
+                                                                      s,
+                                                                      style: TextStyle(
+                                                                        fontSize:
+                                                                            13,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                )
+                                                                .toList(),
+                                                            onChanged: (val) {
+                                                              if (val != null)
+                                                                selectedStatus =
+                                                                    val;
+                                                            },
+                                                            decoration: InputDecoration(
+                                                              border:
+                                                                  OutlineInputBorder(),
+                                                              contentPadding:
+                                                                  EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                    vertical: 4,
+                                                                  ),
+                                                              isDense: true,
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 18),
+                                                          Row(
+                                                            children: [
+                                                              Expanded(
+                                                                child: ElevatedButton(
+                                                                  style: ElevatedButton.styleFrom(
+                                                                    backgroundColor:
+                                                                        Colors
+                                                                            .black,
+                                                                    foregroundColor:
+                                                                        Colors
+                                                                            .white,
+                                                                    minimumSize:
+                                                                        Size(
+                                                                          0,
+                                                                          38,
+                                                                        ),
+                                                                    shape: RoundedRectangleBorder(
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            8,
+                                                                          ),
+                                                                    ),
+                                                                    textStyle:
+                                                                        TextStyle(
+                                                                          fontSize:
+                                                                              13,
+                                                                        ),
+                                                                  ),
+                                                                  child: Text(
+                                                                    'Cancel',
+                                                                  ),
+                                                                  onPressed: () =>
+                                                                      Navigator.of(
+                                                                        ctx,
+                                                                      ).pop(),
+                                                                ),
+                                                              ),
+                                                              SizedBox(
+                                                                width: 12,
+                                                              ),
+                                                              Expanded(
+                                                                child: ElevatedButton(
+                                                                  style: ElevatedButton.styleFrom(
+                                                                    backgroundColor:
+                                                                        Colors
+                                                                            .blue
+                                                                            .shade700,
+                                                                    foregroundColor:
+                                                                        Colors
+                                                                            .white,
+                                                                    minimumSize:
+                                                                        Size(
+                                                                          0,
+                                                                          38,
+                                                                        ),
+                                                                    shape: RoundedRectangleBorder(
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            8,
+                                                                          ),
+                                                                    ),
+                                                                    textStyle:
+                                                                        TextStyle(
+                                                                          fontSize:
+                                                                              13,
+                                                                        ),
+                                                                  ),
+                                                                  child: Text(
+                                                                    'Update Status',
+                                                                  ),
+                                                                  onPressed: () {
+                                                                    Navigator.of(
+                                                                      ctx,
+                                                                    ).pop({
+                                                                      'newStatus':
+                                                                          selectedStatus,
+                                                                      'trackingId':
+                                                                          trackingId,
+                                                                      'deliveryVendor':
+                                                                          deliveryVendor,
+                                                                    });
+                                                                  },
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+
+                                                if (result != null &&
+                                                    result['newStatus'] !=
+                                                        null) {
+                                                  showDialog(
+                                                    context: context,
+                                                    barrierDismissible: false,
+                                                    builder: (ctx) => Center(
+                                                      child:
+                                                          CircularProgressIndicator(),
+                                                    ),
+                                                  );
+                                                  try {
+                                                    final resp = await AppDataRepo()
+                                                        .changeOrderStatusByAdmin(
+                                                          orderId: orderId,
+                                                          newStatus:
+                                                              result['newStatus'],
+                                                          trackingId:
+                                                              result['trackingId'] ??
+                                                              '',
+                                                          deliveryVendor:
+                                                              result['deliveryVendor'] ??
+                                                              '',
+                                                        );
+                                                    Navigator.of(
+                                                      context,
+                                                    ).pop(); // Remove loading
+                                                    if (resp['success'] ==
+                                                        true) {
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(
+                                                            resp['message'] ??
+                                                                'Order status updated.',
+                                                          ),
+                                                          backgroundColor:
+                                                              Colors.green,
+                                                        ),
+                                                      );
+                                                      await _fetchOrders();
+                                                    } else {
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(
+                                                            resp['message'] ??
+                                                                'Failed to update status',
+                                                          ),
+                                                          backgroundColor:
+                                                              Colors.red,
+                                                        ),
+                                                      );
+                                                    }
+                                                  } catch (e) {
+                                                    Navigator.of(context).pop();
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          'Error: $e',
+                                                        ),
+                                                        backgroundColor:
+                                                            Colors.red,
+                                                      ),
+                                                    );
+                                                  }
+                                                }
+                                              }
+                                            },
+                                          ),
+                                      SizedBox(width: 6),
+
+                                      if (canUpdate)
+                                        if (balanceAmount is num &&
+                                            balanceAmount != 0)
+                                          _OrderActionButton(
+                                            icon: Icons.payments_outlined,
+                                            label: 'Payment',
+                                            color: Colors.green.shade600,
+                                            onPressed: () async {
+                                              final orderId =
+                                                  order['_id'] ??
+                                                  order['id'] ??
+                                                  '';
+                                              final orderNumber =
+                                                  order['orderNumber'] ?? '';
+                                              final totalAmount =
+                                                  order['total'] ?? 0;
+                                              final alreadyPaid =
+                                                  order['paidAmount'] ?? 0;
+                                              final balanceDue =
+                                                  order['balanceAmount'] ?? 0;
+
+                                              String paymentMethod = 'Cash';
+                                              final paymentMethods = [
+                                                'Cash',
+                                                'UPI',
+                                                'Credit Card',
+                                                'Bank Transfer',
                                               ];
-                                            } else if (currentStatus ==
-                                                'shipped') {
-                                              statusOptions = [
-                                                'Delivered',
-                                                'Cancelled',
-                                              ];
-                                            }
+                                              final paymentNotesController =
+                                                  TextEditingController();
+                                              final paymentAmountController =
+                                                  TextEditingController();
 
-                                            String selectedStatus =
-                                                statusOptions.isNotEmpty
-                                                ? statusOptions.first
-                                                : '';
-                                            String trackingId = '';
-                                            String deliveryVendor = '';
-
-                                            if (statusOptions.isNotEmpty) {
                                               final result = await showDialog<Map<String, dynamic>>(
                                                 context: context,
                                                 builder: (ctx) => Dialog(
@@ -1061,224 +1488,337 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                                                         const EdgeInsets.all(
                                                           20.0,
                                                         ),
-                                                    child: Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Row(
-                                                          children: [
-                                                            Expanded(
-                                                              child: Text(
-                                                                'Update Order Status',
-                                                                style: TextStyle(
-                                                                  fontSize: 15,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IconButton(
-                                                              icon: Icon(
-                                                                Icons.close,
-                                                                size: 18,
-                                                              ),
-                                                              onPressed: () =>
-                                                                  Navigator.of(
-                                                                    ctx,
-                                                                  ).pop(),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        SizedBox(height: 8),
-                                                        Text(
-                                                          'Order: $orderNumber',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 6),
-                                                        Row(
-                                                          children: [
-                                                            Text(
-                                                              'Current Status: ',
-                                                              style: TextStyle(
-                                                                fontSize: 12,
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              padding:
-                                                                  EdgeInsets.symmetric(
-                                                                    horizontal:
-                                                                        8,
-                                                                    vertical: 2,
-                                                                  ),
-                                                              decoration: BoxDecoration(
-                                                                color: Colors
-                                                                    .yellow
-                                                                    .shade100,
-                                                                borderRadius:
-                                                                    BorderRadius.circular(
-                                                                      8,
-                                                                    ),
-                                                              ),
-                                                              child: Text(
-                                                                (order['status'] ??
-                                                                        '')
-                                                                    .toString(),
-                                                                style: TextStyle(
-                                                                  color: Colors
-                                                                      .orange
-                                                                      .shade800,
-                                                                  fontSize: 12,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        SizedBox(height: 16),
-                                                        Text(
-                                                          'New Status',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 6),
-                                                        DropdownButtonFormField<
-                                                          String
-                                                        >(
-                                                          value: selectedStatus,
-                                                          items: statusOptions
-                                                              .map(
-                                                                (
-                                                                  s,
-                                                                ) => DropdownMenuItem(
-                                                                  value: s,
-                                                                  child: Text(
-                                                                    s,
-                                                                    style: TextStyle(
-                                                                      fontSize:
-                                                                          13,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              )
-                                                              .toList(),
-                                                          onChanged: (val) {
-                                                            if (val != null)
-                                                              selectedStatus =
-                                                                  val;
-                                                          },
-                                                          decoration: InputDecoration(
-                                                            border:
-                                                                OutlineInputBorder(),
-                                                            contentPadding:
-                                                                EdgeInsets.symmetric(
-                                                                  horizontal: 8,
-                                                                  vertical: 4,
-                                                                ),
-                                                            isDense: true,
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 18),
-                                                        Row(
-                                                          children: [
-                                                            Expanded(
-                                                              child: ElevatedButton(
-                                                                style: ElevatedButton.styleFrom(
-                                                                  backgroundColor:
-                                                                      Colors
-                                                                          .black,
-                                                                  foregroundColor:
-                                                                      Colors
-                                                                          .white,
-                                                                  minimumSize:
-                                                                      Size(
-                                                                        0,
-                                                                        38,
-                                                                      ),
-                                                                  shape: RoundedRectangleBorder(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          8,
-                                                                        ),
-                                                                  ),
-                                                                  textStyle:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            13,
-                                                                      ),
-                                                                ),
+                                                    child: SingleChildScrollView(
+                                                      child: Column(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Expanded(
                                                                 child: Text(
-                                                                  'Cancel',
+                                                                  'Update Payment',
+                                                                  style: TextStyle(
+                                                                    fontSize:
+                                                                        14,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              IconButton(
+                                                                icon: Icon(
+                                                                  Icons.close,
+                                                                  size: 18,
                                                                 ),
                                                                 onPressed: () =>
                                                                     Navigator.of(
                                                                       ctx,
                                                                     ).pop(),
                                                               ),
+                                                            ],
+                                                          ),
+                                                          SizedBox(height: 8),
+                                                          Text(
+                                                            'Order: $orderNumber',
+                                                            style: TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              fontSize: 12,
                                                             ),
-                                                            SizedBox(width: 12),
-                                                            Expanded(
-                                                              child: ElevatedButton(
-                                                                style: ElevatedButton.styleFrom(
-                                                                  backgroundColor:
-                                                                      Colors
-                                                                          .blue
-                                                                          .shade700,
-                                                                  foregroundColor:
-                                                                      Colors
-                                                                          .white,
-                                                                  minimumSize:
-                                                                      Size(
-                                                                        0,
-                                                                        38,
-                                                                      ),
-                                                                  shape: RoundedRectangleBorder(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          8,
-                                                                        ),
+                                                          ),
+                                                          SizedBox(height: 10),
+                                                          Column(
+                                                            children: [
+                                                              Row(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .spaceBetween,
+                                                                children: [
+                                                                  Text(
+                                                                    'Total Amount:',
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          12,
+                                                                    ),
                                                                   ),
-                                                                  textStyle:
-                                                                      TextStyle(
+                                                                  Text(
+                                                                    '₹${totalAmount.toStringAsFixed(2)}',
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          12,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .bold,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              Row(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .spaceBetween,
+                                                                children: [
+                                                                  Text(
+                                                                    'Already Paid:',
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          12,
+                                                                    ),
+                                                                  ),
+                                                                  Text(
+                                                                    '₹${alreadyPaid.toStringAsFixed(2)}',
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          12,
+                                                                      color: Colors
+                                                                          .green,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .bold,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              Row(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .spaceBetween,
+                                                                children: [
+                                                                  Text(
+                                                                    'Balance Due:',
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          12,
+                                                                    ),
+                                                                  ),
+                                                                  Text(
+                                                                    '₹${balanceDue.toStringAsFixed(2)}',
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          12,
+                                                                      color: Colors
+                                                                          .red,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .bold,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          SizedBox(height: 16),
+                                                          Text(
+                                                            'Additional Payment Amount (₹)',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 6),
+                                                          TextField(
+                                                            controller:
+                                                                paymentAmountController,
+                                                            keyboardType:
+                                                                TextInputType
+                                                                    .number,
+                                                            decoration: InputDecoration(
+                                                              hintText:
+                                                                  'Enter payment amount',
+                                                              border:
+                                                                  OutlineInputBorder(),
+                                                              isDense: true,
+                                                            ),
+                                                            style: TextStyle(
+                                                              fontSize: 13,
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 12),
+                                                          Text(
+                                                            'Payment Method',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 6),
+                                                          DropdownButtonFormField<
+                                                            String
+                                                          >(
+                                                            value:
+                                                                paymentMethod,
+                                                            items: paymentMethods
+                                                                .map(
+                                                                  (
+                                                                    m,
+                                                                  ) => DropdownMenuItem(
+                                                                    value: m,
+                                                                    child: Text(
+                                                                      m,
+                                                                      style: TextStyle(
                                                                         fontSize:
                                                                             13,
                                                                       ),
+                                                                    ),
+                                                                  ),
+                                                                )
+                                                                .toList(),
+                                                            onChanged: (val) {
+                                                              if (val != null)
+                                                                paymentMethod =
+                                                                    val;
+                                                            },
+                                                            decoration:
+                                                                InputDecoration(
+                                                                  border:
+                                                                      OutlineInputBorder(),
+                                                                  isDense: true,
                                                                 ),
-                                                                child: Text(
-                                                                  'Update Status',
-                                                                ),
-                                                                onPressed: () {
-                                                                  Navigator.of(
-                                                                    ctx,
-                                                                  ).pop({
-                                                                    'newStatus':
-                                                                        selectedStatus,
-                                                                    'trackingId':
-                                                                        trackingId,
-                                                                    'deliveryVendor':
-                                                                        deliveryVendor,
-                                                                  });
-                                                                },
-                                                              ),
+                                                          ),
+                                                          SizedBox(height: 12),
+                                                          Text(
+                                                            'Notes (Optional)',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
                                                             ),
-                                                          ],
-                                                        ),
-                                                      ],
+                                                          ),
+                                                          SizedBox(height: 6),
+                                                          TextField(
+                                                            controller:
+                                                                paymentNotesController,
+                                                            decoration: InputDecoration(
+                                                              hintText:
+                                                                  'Payment notes...',
+                                                              border:
+                                                                  OutlineInputBorder(),
+                                                              isDense: true,
+                                                            ),
+                                                            style: TextStyle(
+                                                              fontSize: 13,
+                                                            ),
+                                                            maxLines: 2,
+                                                          ),
+                                                          SizedBox(height: 18),
+                                                          Row(
+                                                            children: [
+                                                              Expanded(
+                                                                child: ElevatedButton(
+                                                                  style: ElevatedButton.styleFrom(
+                                                                    backgroundColor:
+                                                                        Colors
+                                                                            .black,
+                                                                    foregroundColor:
+                                                                        Colors
+                                                                            .white,
+                                                                    minimumSize:
+                                                                        Size(
+                                                                          0,
+                                                                          38,
+                                                                        ),
+                                                                    shape: RoundedRectangleBorder(
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            8,
+                                                                          ),
+                                                                    ),
+                                                                    textStyle:
+                                                                        TextStyle(
+                                                                          fontSize:
+                                                                              13,
+                                                                        ),
+                                                                  ),
+                                                                  child: Text(
+                                                                    'Cancel',
+                                                                  ),
+                                                                  onPressed: () =>
+                                                                      Navigator.of(
+                                                                        ctx,
+                                                                      ).pop(),
+                                                                ),
+                                                              ),
+                                                              SizedBox(
+                                                                width: 12,
+                                                              ),
+                                                              Expanded(
+                                                                child: ElevatedButton(
+                                                                  style: ElevatedButton.styleFrom(
+                                                                    backgroundColor:
+                                                                        Colors
+                                                                            .green
+                                                                            .shade700,
+                                                                    foregroundColor:
+                                                                        Colors
+                                                                            .white,
+                                                                    minimumSize:
+                                                                        Size(
+                                                                          0,
+                                                                          38,
+                                                                        ),
+                                                                    shape: RoundedRectangleBorder(
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            8,
+                                                                          ),
+                                                                    ),
+                                                                    textStyle:
+                                                                        TextStyle(
+                                                                          fontSize:
+                                                                              13,
+                                                                        ),
+                                                                  ),
+                                                                  child: Text(
+                                                                    'Update Payment',
+                                                                  ),
+                                                                  onPressed: () {
+                                                                    final amt =
+                                                                        double.tryParse(
+                                                                          paymentAmountController
+                                                                              .text,
+                                                                        ) ??
+                                                                        0.0;
+                                                                    if (amt <=
+                                                                        0) {
+                                                                      ScaffoldMessenger.of(
+                                                                        context,
+                                                                      ).showSnackBar(
+                                                                        SnackBar(
+                                                                          content: Text(
+                                                                            'Enter a valid payment amount',
+                                                                          ),
+                                                                        ),
+                                                                      );
+                                                                      return;
+                                                                    }
+                                                                    Navigator.of(
+                                                                      ctx,
+                                                                    ).pop({
+                                                                      'additionalPayment':
+                                                                          amt,
+                                                                      'paymentMethod':
+                                                                          paymentMethod,
+                                                                      'notes': paymentNotesController
+                                                                          .text
+                                                                          .trim(),
+                                                                    });
+                                                                  },
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
                                               );
 
                                               if (result != null &&
-                                                  result['newStatus'] != null) {
+                                                  result['additionalPayment'] !=
+                                                      null) {
                                                 showDialog(
                                                   context: context,
                                                   barrierDismissible: false,
@@ -1289,16 +1829,13 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                                                 );
                                                 try {
                                                   final resp = await AppDataRepo()
-                                                      .changeOrderStatusByAdmin(
+                                                      .updateOrderPaymentByAdmin(
                                                         orderId: orderId,
-                                                        newStatus:
-                                                            result['newStatus'],
-                                                        trackingId:
-                                                            result['trackingId'] ??
-                                                            '',
-                                                        deliveryVendor:
-                                                            result['deliveryVendor'] ??
-                                                            '',
+                                                        additionalPayment:
+                                                            result['additionalPayment'],
+                                                        paymentMethod:
+                                                            result['paymentMethod'],
+                                                        notes: result['notes'],
                                                       );
                                                   Navigator.of(
                                                     context,
@@ -1310,7 +1847,7 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                                                       SnackBar(
                                                         content: Text(
                                                           resp['message'] ??
-                                                              'Order status updated.',
+                                                              'Payment updated.',
                                                         ),
                                                         backgroundColor:
                                                             Colors.green,
@@ -1324,7 +1861,7 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                                                       SnackBar(
                                                         content: Text(
                                                           resp['message'] ??
-                                                              'Failed to update status',
+                                                              'Failed to update payment',
                                                         ),
                                                         backgroundColor:
                                                             Colors.red,
@@ -1346,444 +1883,21 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
                                                   );
                                                 }
                                               }
-                                            }
-                                          },
-                                        ),
-                                      SizedBox(width: 6),
-                                      if (balanceAmount is num &&
-                                          balanceAmount != 0)
-                                        _OrderActionButton(
-                                          icon: Icons.payments_outlined,
-                                          label: 'Payment',
-                                          color: Colors.green.shade600,
-                                          onPressed: () async {
-                                            final orderId =
-                                                order['_id'] ??
-                                                order['id'] ??
-                                                '';
-                                            final orderNumber =
-                                                order['orderNumber'] ?? '';
-                                            final totalAmount =
-                                                order['total'] ?? 0;
-                                            final alreadyPaid =
-                                                order['paidAmount'] ?? 0;
-                                            final balanceDue =
-                                                order['balanceAmount'] ?? 0;
+                                            },
+                                          ),
 
-                                            String paymentMethod = 'Cash';
-                                            final paymentMethods = [
-                                              'Cash',
-                                              'UPI',
-                                              'Credit Card',
-                                              'Bank Transfer',
-                                            ];
-                                            final paymentNotesController =
-                                                TextEditingController();
-                                            final paymentAmountController =
-                                                TextEditingController();
-
-                                            final result = await showDialog<Map<String, dynamic>>(
-                                              context: context,
-                                              builder: (ctx) => Dialog(
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                ),
-                                                child: Padding(
-                                                  padding: const EdgeInsets.all(
-                                                    20.0,
-                                                  ),
-                                                  child: SingleChildScrollView(
-                                                    child: Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Row(
-                                                          children: [
-                                                            Expanded(
-                                                              child: Text(
-                                                                'Update Payment',
-                                                                style: TextStyle(
-                                                                  fontSize: 14,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IconButton(
-                                                              icon: Icon(
-                                                                Icons.close,
-                                                                size: 18,
-                                                              ),
-                                                              onPressed: () =>
-                                                                  Navigator.of(
-                                                                    ctx,
-                                                                  ).pop(),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        SizedBox(height: 8),
-                                                        Text(
-                                                          'Order: $orderNumber',
-                                                          style: TextStyle(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                            fontSize: 12,
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 10),
-                                                        Column(
-                                                          children: [
-                                                            Row(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .spaceBetween,
-                                                              children: [
-                                                                Text(
-                                                                  'Total Amount:',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            12,
-                                                                      ),
-                                                                ),
-                                                                Text(
-                                                                  '₹${totalAmount.toStringAsFixed(2)}',
-                                                                  style: TextStyle(
-                                                                    fontSize:
-                                                                        12,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                            Row(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .spaceBetween,
-                                                              children: [
-                                                                Text(
-                                                                  'Already Paid:',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            12,
-                                                                      ),
-                                                                ),
-                                                                Text(
-                                                                  '₹${alreadyPaid.toStringAsFixed(2)}',
-                                                                  style: TextStyle(
-                                                                    fontSize:
-                                                                        12,
-                                                                    color: Colors
-                                                                        .green,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                            Row(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .spaceBetween,
-                                                              children: [
-                                                                Text(
-                                                                  'Balance Due:',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            12,
-                                                                      ),
-                                                                ),
-                                                                Text(
-                                                                  '₹${balanceDue.toStringAsFixed(2)}',
-                                                                  style: TextStyle(
-                                                                    fontSize:
-                                                                        12,
-                                                                    color: Colors
-                                                                        .red,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        SizedBox(height: 16),
-                                                        Text(
-                                                          'Additional Payment Amount (₹)',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 6),
-                                                        TextField(
-                                                          controller:
-                                                              paymentAmountController,
-                                                          keyboardType:
-                                                              TextInputType
-                                                                  .number,
-                                                          decoration: InputDecoration(
-                                                            hintText:
-                                                                'Enter payment amount',
-                                                            border:
-                                                                OutlineInputBorder(),
-                                                            isDense: true,
-                                                          ),
-                                                          style: TextStyle(
-                                                            fontSize: 13,
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 12),
-                                                        Text(
-                                                          'Payment Method',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 6),
-                                                        DropdownButtonFormField<
-                                                          String
-                                                        >(
-                                                          value: paymentMethod,
-                                                          items: paymentMethods
-                                                              .map(
-                                                                (
-                                                                  m,
-                                                                ) => DropdownMenuItem(
-                                                                  value: m,
-                                                                  child: Text(
-                                                                    m,
-                                                                    style: TextStyle(
-                                                                      fontSize:
-                                                                          13,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              )
-                                                              .toList(),
-                                                          onChanged: (val) {
-                                                            if (val != null)
-                                                              paymentMethod =
-                                                                  val;
-                                                          },
-                                                          decoration:
-                                                              InputDecoration(
-                                                                border:
-                                                                    OutlineInputBorder(),
-                                                                isDense: true,
-                                                              ),
-                                                        ),
-                                                        SizedBox(height: 12),
-                                                        Text(
-                                                          'Notes (Optional)',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 6),
-                                                        TextField(
-                                                          controller:
-                                                              paymentNotesController,
-                                                          decoration: InputDecoration(
-                                                            hintText:
-                                                                'Payment notes...',
-                                                            border:
-                                                                OutlineInputBorder(),
-                                                            isDense: true,
-                                                          ),
-                                                          style: TextStyle(
-                                                            fontSize: 13,
-                                                          ),
-                                                          maxLines: 2,
-                                                        ),
-                                                        SizedBox(height: 18),
-                                                        Row(
-                                                          children: [
-                                                            Expanded(
-                                                              child: ElevatedButton(
-                                                                style: ElevatedButton.styleFrom(
-                                                                  backgroundColor:
-                                                                      Colors
-                                                                          .black,
-                                                                  foregroundColor:
-                                                                      Colors
-                                                                          .white,
-                                                                  minimumSize:
-                                                                      Size(
-                                                                        0,
-                                                                        38,
-                                                                      ),
-                                                                  shape: RoundedRectangleBorder(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          8,
-                                                                        ),
-                                                                  ),
-                                                                  textStyle:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            13,
-                                                                      ),
-                                                                ),
-                                                                child: Text(
-                                                                  'Cancel',
-                                                                ),
-                                                                onPressed: () =>
-                                                                    Navigator.of(
-                                                                      ctx,
-                                                                    ).pop(),
-                                                              ),
-                                                            ),
-                                                            SizedBox(width: 12),
-                                                            Expanded(
-                                                              child: ElevatedButton(
-                                                                style: ElevatedButton.styleFrom(
-                                                                  backgroundColor:
-                                                                      Colors
-                                                                          .green
-                                                                          .shade700,
-                                                                  foregroundColor:
-                                                                      Colors
-                                                                          .white,
-                                                                  minimumSize:
-                                                                      Size(
-                                                                        0,
-                                                                        38,
-                                                                      ),
-                                                                  shape: RoundedRectangleBorder(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          8,
-                                                                        ),
-                                                                  ),
-                                                                  textStyle:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            13,
-                                                                      ),
-                                                                ),
-                                                                child: Text(
-                                                                  'Update Payment',
-                                                                ),
-                                                                onPressed: () {
-                                                                  final amt =
-                                                                      double.tryParse(
-                                                                        paymentAmountController
-                                                                            .text,
-                                                                      ) ??
-                                                                      0.0;
-                                                                  if (amt <=
-                                                                      0) {
-                                                                    ScaffoldMessenger.of(
-                                                                      context,
-                                                                    ).showSnackBar(
-                                                                      SnackBar(
-                                                                        content:
-                                                                            Text(
-                                                                              'Enter a valid payment amount',
-                                                                            ),
-                                                                      ),
-                                                                    );
-                                                                    return;
-                                                                  }
-                                                                  Navigator.of(
-                                                                    ctx,
-                                                                  ).pop({
-                                                                    'additionalPayment':
-                                                                        amt,
-                                                                    'paymentMethod':
-                                                                        paymentMethod,
-                                                                    'notes': paymentNotesController
-                                                                        .text
-                                                                        .trim(),
-                                                                  });
-                                                                },
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-
-                                            if (result != null &&
-                                                result['additionalPayment'] !=
-                                                    null) {
-                                              showDialog(
-                                                context: context,
-                                                barrierDismissible: false,
-                                                builder: (ctx) => Center(
-                                                  child:
-                                                      CircularProgressIndicator(),
-                                                ),
-                                              );
-                                              try {
-                                                final resp = await AppDataRepo()
-                                                    .updateOrderPaymentByAdmin(
-                                                      orderId: orderId,
-                                                      additionalPayment:
-                                                          result['additionalPayment'],
-                                                      paymentMethod:
-                                                          result['paymentMethod'],
-                                                      notes: result['notes'],
-                                                    );
-                                                Navigator.of(
-                                                  context,
-                                                ).pop(); // Remove loading
-                                                if (resp['success'] == true) {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        resp['message'] ??
-                                                            'Payment updated.',
-                                                      ),
-                                                      backgroundColor:
-                                                          Colors.green,
-                                                    ),
-                                                  );
-                                                  await _fetchOrders();
-                                                } else {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        resp['message'] ??
-                                                            'Failed to update payment',
-                                                      ),
-                                                      backgroundColor:
-                                                          Colors.red,
-                                                    ),
-                                                  );
-                                                }
-                                              } catch (e) {
-                                                Navigator.of(context).pop();
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text('Error: $e'),
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                );
-                                              }
-                                            }
+                                      if (canDelete)
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.delete,
+                                            color: Colors.red,
+                                            size: 18,
+                                          ),
+                                          tooltip: 'Delete Order',
+                                          onPressed: () {
+                                            _deleteOrder(
+                                              order,
+                                            ); // existing delete function
                                           },
                                         ),
                                     ],
@@ -1811,60 +1925,43 @@ class _AllOrdersPageState extends State<AllOrdersPage> with RouteAware {
       ),
 
       // ➕ Floating Action Button
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: Colors.indigo.shade500,
-        foregroundColor: Colors.white,
-        elevation: 3,
-        icon: const Icon(Icons.add_rounded, size: 20),
-        label: const Text(
-          'Create Order',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-        ),
-        onPressed: () async {
-          final result = await showModalBottomSheet<bool>(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.white,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            builder: (context) => Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 16,
-                right: 16,
-                top: 24,
+      floatingActionButton: canWrite
+          ? FloatingActionButton.extended(
+              backgroundColor: Colors.indigo.shade500,
+              foregroundColor: Colors.white,
+              elevation: 3,
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text(
+                'Create Order',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
               ),
-              child: _CreateOrderSheet(),
-            ),
-          );
-          // if the sheet returned true (order created), refresh the orders list
-          if (result == true) {
-            await _fetchOrders();
-          }
-        },
-        // onPressed: () async {
-        //   await showModalBottomSheet(
-        //     context: context,
-        //     isScrollControlled: true,
-        //     backgroundColor: Colors.white,
-        //     shape: const RoundedRectangleBorder(
-        //       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        //     ),
-        //     builder: (context) => Padding(
-        //       padding: EdgeInsets.only(
-        //         bottom: MediaQuery.of(context).viewInsets.bottom,
-        //         left: 16,
-        //         right: 16,
-        //         top: 24,
-        //       ),
-        //       child: _CreateOrderSheet(),
-        //     ),
-        //   );
-        // },
-      ),
-
-      bottomNavigationBar: UniversalNavBar(selectedIndex: 1, onTap: _onNavTap),
+              onPressed: () async {
+                final result = await showModalBottomSheet<bool>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  builder: (context) => Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                      left: 16,
+                      right: 16,
+                      top: 24,
+                    ),
+                    child: _CreateOrderSheet(),
+                  ),
+                );
+                // if the sheet returned true (order created), refresh the orders list
+                if (result == true) {
+                  await _fetchOrders();
+                }
+              },
+            )
+          : null,
     );
   }
 }
@@ -5212,6 +5309,244 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                 ),
               ),
             ),
+    );
+  }
+}
+
+class RecycleBinPage extends StatefulWidget {
+  @override
+  _RecycleBinPageState createState() => _RecycleBinPageState();
+}
+
+class _RecycleBinPageState extends State<RecycleBinPage> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _deletedOrders = [];
+  List<Map<String, dynamic>> _filteredOrders = [];
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDeletedOrders();
+    _searchController.addListener(_filterOrders);
+  }
+
+  Future<void> _fetchDeletedOrders() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await Future.delayed(const Duration(seconds: 1)); // Simulate API
+      _deletedOrders = [
+        {
+          "orderNumber": "ORD-00123",
+          "customer": {"name": "John Doe", "phone": "9876543210"},
+          "total": 1520.50,
+        },
+        {
+          "orderNumber": "ORD-00124",
+          "customer": {"name": "Jane Smith", "phone": "9822334455"},
+          "total": 820.75,
+        },
+      ];
+      _filteredOrders = _deletedOrders;
+    } catch (e) {
+      _error = 'Error loading deleted orders';
+      _deletedOrders = [];
+    }
+    setState(() {
+      _loading = false;
+    });
+  }
+
+  void _filterOrders() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredOrders = _deletedOrders.where((order) {
+        final customer = order['customer'] ?? {};
+        final orderNumber =
+            order['orderNumber']?.toString().toLowerCase() ?? '';
+        final customerName = customer['name']?.toString().toLowerCase() ?? '';
+        final customerPhone = customer['phone']?.toString().toLowerCase() ?? '';
+
+        return orderNumber.contains(query) ||
+            customerName.contains(query) ||
+            customerPhone.contains(query);
+      }).toList();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // Restore Button (for future actions)
+  Widget _buildRestoreButton() {
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.indigo,
+        side: BorderSide(color: Colors.indigo.shade300),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: () {},
+      icon: const Icon(Icons.restore_rounded, size: 16),
+      label: const Text(
+        "Restore",
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return UniversalScaffold(
+      selectedIndex: 0,
+      appIcon: Icons.delete_forever_rounded,
+      title: 'Recycle Bin',
+      body: RefreshIndicator(
+        // Add RefreshIndicator here
+        onRefresh: _fetchDeletedOrders, // Call the fetch method on refresh
+        color: Colors.indigo,
+        child: Column(
+          children: [
+            // Search Bar
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search, color: Colors.indigo),
+                  labelText: 'Search orders',
+                  labelStyle: const TextStyle(fontSize: 13),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.indigo.shade100),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.indigo.shade100),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: Colors.indigo.shade400,
+                      width: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Body
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Colors.indigo),
+                    )
+                  : _error != null
+                  ? Center(
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    )
+                  : _filteredOrders.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No deleted orders found.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : ListView.separated(
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: _filteredOrders.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final order = _filteredOrders[index];
+                        final customer = order['customer'] ?? {};
+                        final total = order['total'] ?? 0.0;
+
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12.withOpacity(0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ListTile(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            title: Text(
+                              'Order #${order['orderNumber']}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Colors.indigo,
+                              ),
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 6.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Customer: ${customer['name'] ?? 'N/A'}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Phone: ${customer['phone'] ?? 'N/A'}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Total: ₹${total.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.indigo,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            trailing: _buildRestoreButton(),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

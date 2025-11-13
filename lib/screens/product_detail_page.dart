@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:anibhaviadmin/permissions/permission_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import '../services/app_data_repo.dart';
@@ -25,7 +26,8 @@ class ProductDetailPage extends StatefulWidget {
   State<ProductDetailPage> createState() => _ProductDetailPageState();
 }
 
-class _ProductDetailPageState extends State<ProductDetailPage> {
+class _ProductDetailPageState extends State<ProductDetailPage>
+    with PermissionHelper {
   late Future<Map<String, dynamic>> _productFuture;
   List<String> selectedSizes = [];
   List<String> imageUrls = [];
@@ -69,6 +71,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   void initState() {
     super.initState();
+    // Load permissions for /products (update product)
+    initPermissions('/products').then((_) {
+      if (!mounted) return;
+      debugPrint('ProductDetailPage permissions: canUpdate=$canUpdate');
+    });
+
     _productFuture = AppDataRepo().fetchProductDetailById(widget.productId);
     _productFuture = AppDataRepo().fetchAnyProductById(widget.productId);
   }
@@ -436,7 +444,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           // Determine whether the loaded item is a sub-product (catalogue) or a parent product.
           final bool isSubProduct =
               data.containsKey('productId') || resp['data'] is List;
-          if (!isSubProduct) {
+          // if (!isSubProduct) {
+          if (!isSubProduct || !canUpdate) {
             // don't show FAB for parent-product detail view
             return const SizedBox.shrink();
           }

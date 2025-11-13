@@ -31,39 +31,68 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-  setState(() {
-    _error = null;
-    _loading = true;
-  });
-  if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
     setState(() {
-      _error = 'Please enter email/mobile and password';
-      _loading = false;
+      _error = null;
+      _loading = true;
     });
-    return;
-  }
-  try {
-    final response = await _appDataRepo.adminLogin(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
-    if (response['status'] == true && response['data'] != null) {
-      await _appDataRepo.saveUserData(response['data']['user'], response['data']['token']);
-      setState(() { _loading = false; });
-      Navigator.pushReplacementNamed(context, '/dashboard');
-    } else {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       setState(() {
-        _error = response['message'] ?? 'Login failed';
+        _error = 'Please enter email/mobile and password';
+        _loading = false;
+      });
+      return;
+    }
+    try {
+      final response = await _appDataRepo.adminLogin(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+      if (response['status'] == true && response['data'] != null) {
+        final user = Map<String, dynamic>.from(response['data']['user'] ?? {});
+        final token = response['data']['token']?.toString() ?? '';
+
+        await _appDataRepo.saveUserData(user, token);
+
+        // extract role id robustly and persist it
+        String? roleId;
+        try {
+          if (user.containsKey('role')) {
+            final r = user['role'];
+            if (r is String)
+              roleId = r;
+            else if (r is Map && r['_id'] != null)
+              roleId = r['_id'].toString();
+          }
+          if (roleId == null && user.containsKey('roleId')) {
+            roleId = user['roleId']?.toString();
+          }
+        } catch (_) {}
+
+        if (roleId != null && roleId.isNotEmpty) {
+          await _appDataRepo.saveCurrentRoleId(roleId);
+        }
+
+        // load roles cache so permission checks are fast
+        await _appDataRepo.loadRolesFromApi();
+
+        setState(() {
+          _loading = false;
+        });
+        Navigator.pushReplacementNamed(context, '/dashboard');
+        return;
+      } else {
+        setState(() {
+          _error = response['message'] ?? 'Login failed';
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
         _loading = false;
       });
     }
-  } catch (e) {
-    setState(() {
-      _error = e.toString().replaceAll('Exception: ', '');
-      _loading = false;
-    });
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +120,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 labelText: 'Password',
                 border: OutlineInputBorder(),
                 suffixIcon: IconButton(
-                  icon: Icon(_showPassword ? Icons.visibility : Icons.visibility_off),
+                  icon: Icon(
+                    _showPassword ? Icons.visibility : Icons.visibility_off,
+                  ),
                   onPressed: () {
                     setState(() {
                       _showPassword = !_showPassword;
@@ -115,7 +146,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _login,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Text('Login',style: TextStyle(color: Colors.white),),
+                      child: Text(
+                        'Login',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
                   ),
             TextButton(

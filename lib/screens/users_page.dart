@@ -1,4 +1,7 @@
-import 'universal_navbar.dart';
+import 'package:anibhaviadmin/widgets/universal_scaffold.dart';
+import 'package:anibhaviadmin/widgets/universal_drawer.dart';
+
+import '../widgets/universal_navbar.dart';
 import 'dart:convert';
 
 import 'package:anibhaviadmin/screens/userDetailsPage.dart';
@@ -11,6 +14,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:anibhaviadmin/permissions/permission_helper.dart';
 
 class UsersPage extends StatefulWidget {
   final bool showActive;
@@ -28,7 +32,7 @@ Future<bool?> showUserCreationDialog(BuildContext context) async {
 }
 
 class _UsersPageState extends State<UsersPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, PermissionHelper {
   bool _disposed = false;
   List<Map<String, dynamic>> _activeUsers = [];
   List<Map<String, dynamic>> _inactiveUsers = [];
@@ -50,7 +54,20 @@ class _UsersPageState extends State<UsersPage>
       vsync: this,
       initialIndex: widget.showActive ? 0 : 1,
     );
-    _fetchUsers();
+
+    // initialize permissions first, then fetch users only if read allowed
+    initPermissions('/users').then((_) async {
+      if (canRead) {
+        await _fetchUsers();
+      } else {
+        // ensure loading flag is false so UI can show access denied
+        if (!_disposed) {
+          setState(() {
+            _loading = false;
+          });
+        }
+      }
+    });
   }
 
   @override
@@ -482,40 +499,30 @@ class _UsersPageState extends State<UsersPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // Replace your appBar property in Scaffold with this:
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.indigo.shade500, Colors.teal.shade400],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.people, color: Colors.white, size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Users',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    // while permission check runs show the same skeleton that appears when loading data
+    if (!permissionsReady()) {
+      return UniversalScaffold(
+        selectedIndex: 2,
+        appIcon: Icons.people,
+        title: 'Users',
+        body: _UsersSkeleton(),
+      );
+    }
 
+    // If no read permission, show access denied after initial skeleton
+    if (!canRead) {
+      return UniversalScaffold(
+        selectedIndex: 2,
+        appIcon: Icons.people,
+        title: 'Users',
+        body: Center(child: Text('You do not have permission to view Users')),
+      );
+    }
+
+    return UniversalScaffold(
+      selectedIndex: 2,
+      appIcon: Icons.people,
+      title: 'Users',
       body: _loading
           ? _UsersSkeleton()
           : Column(
@@ -620,18 +627,19 @@ class _UsersPageState extends State<UsersPage>
                 // ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
-        child: Icon(Icons.add),
-        onPressed: () async {
-          final created = await showUserCreationDialog(context);
-          if (created == true) {
-            _fetchUsers();
-          }
-        },
-      ),
-      bottomNavigationBar: UniversalNavBar(selectedIndex: 2, onTap: _onNavTap),
+      floatingActionButton: canWrite
+          ? FloatingActionButton(
+              backgroundColor: Colors.indigo,
+              foregroundColor: Colors.white,
+              child: Icon(Icons.add),
+              onPressed: () async {
+                final created = await showUserCreationDialog(context);
+                if (created == true) {
+                  _fetchUsers();
+                }
+              },
+            )
+          : null,
     );
   }
 }

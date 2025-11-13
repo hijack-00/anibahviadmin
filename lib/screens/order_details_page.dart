@@ -1,4 +1,6 @@
+import 'package:anibhaviadmin/permissions/permission_helper.dart';
 import 'package:anibhaviadmin/services/api_service.dart';
+import 'package:anibhaviadmin/widgets/universal_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/app_data_repo.dart';
@@ -16,9 +18,31 @@ import 'package:share_plus/share_plus.dart';
 import '../services/app_data_repo.dart';
 import 'package:anibhaviadmin/services/api_service.dart';
 
-class OrderDetailsPage extends StatelessWidget {
+// class OrderDetailsPage extends StatelessWidget {
+//   final String orderId;
+//   const OrderDetailsPage({required this.orderId, Key? key}) : super(key: key);
+
+class OrderDetailsPage extends StatefulWidget {
   final String orderId;
   const OrderDetailsPage({required this.orderId, Key? key}) : super(key: key);
+
+  @override
+  State<OrderDetailsPage> createState() => _OrderDetailsPageState();
+}
+
+class _OrderDetailsPageState extends State<OrderDetailsPage>
+    with PermissionHelper {
+  @override
+  void initState() {
+    super.initState();
+    // Load permissions for /orders (update/delete order)
+    initPermissions('/orders').then((_) {
+      if (!mounted) return;
+      debugPrint(
+        'OrderDetailsPage permissions: canUpdate=$canUpdate canDelete=$canDelete canWrite=$canWrite',
+      );
+    });
+  }
 
   // Generate Order PDF bytes (similar to challan pdf generation)
   Future<Uint8List> _buildOrderPdfData(Map<String, dynamic> order) async {
@@ -956,10 +980,73 @@ class OrderDetailsPage extends StatelessWidget {
                           const SizedBox(height: 12),
 
                           if (selectedOrder != null) ...[
-                            const Text(
-                              'Dispatch Quantities per Item',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Dispatch Quantities per Item',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Fill max quantities',
+                                  icon: const Icon(
+                                    Icons.playlist_add_check,
+                                    size: 20,
+                                    color: Colors.indigo,
+                                  ),
+                                  onPressed: () {
+                                    // Fill every item's qty to remaining (ordered - alreadyDispatched)
+                                    for (
+                                      var i = 0;
+                                      i < orderItems.length;
+                                      i++
+                                    ) {
+                                      final orderedSets =
+                                          int.tryParse(
+                                            orderItems[i]['quantity']
+                                                    ?.toString() ??
+                                                '0',
+                                          ) ??
+                                          0;
+                                      final already = _alreadyDispatchedForItem(
+                                        orderItems[i],
+                                      );
+                                      final remaining =
+                                          (orderedSets - already) > 0
+                                          ? (orderedSets - already)
+                                          : 0;
+
+                                      newDispatchMap[i] = remaining;
+
+                                      // ensure controller exists and update text/cursor
+                                      final ctrl = dispatchControllers
+                                          .putIfAbsent(
+                                            i,
+                                            () => TextEditingController(
+                                              text: remaining.toString(),
+                                            ),
+                                          );
+                                      if (ctrl.text != remaining.toString()) {
+                                        ctrl.value = TextEditingValue(
+                                          text: remaining.toString(),
+                                          selection: TextSelection.collapsed(
+                                            offset: remaining.toString().length,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                    setStateModal(() {});
+                                  },
+                                ),
+                              ],
                             ),
+                            // const Text(
+                            //   'Dispatch Quantities per Item',
+                            //   style: TextStyle(fontWeight: FontWeight.bold),
+                            // ),
                             const SizedBox(height: 8),
                             for (int i = 0; i < orderItems.length; i++)
                               Padding(
@@ -1701,7 +1788,9 @@ class OrderDetailsPage extends StatelessWidget {
         ModalRoute.of(context)?.settings.arguments
             as List<Map<String, dynamic>>?;
     final order = allOrders?.firstWhere(
-      (o) => o['_id'] == orderId || o['id'] == orderId,
+      // (o) => o['_id'] == orderId || o['id'] == orderId,
+      (o) => o['_id'] == widget.orderId || o['id'] == widget.orderId,
+
       orElse: () => {},
     );
 
@@ -1713,11 +1802,11 @@ class OrderDetailsPage extends StatelessWidget {
     } else {
       try {
         debugPrint(
-          'OrderDetailsPage: displaying order for id=$orderId -> ${jsonEncode(order)}',
+          'OrderDetailsPage: displaying order for id=${widget.orderId} -> ${jsonEncode(order)}',
         );
       } catch (_) {
         debugPrint(
-          'OrderDetailsPage: displaying order for id=$orderId -> $order',
+          'OrderDetailsPage: displaying order for id=${widget.orderId} -> $order',
         );
       }
     }
@@ -1758,6 +1847,56 @@ class OrderDetailsPage extends StatelessWidget {
       }
     }
 
+    if (!permissionsReady()) {
+      // show the same visible skeleton used while _loading to avoid a black/empty screen
+      return UniversalScaffold(
+        selectedIndex: 1,
+        title: 'Orders',
+        appIcon: Icons.list_alt,
+        body: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: 3,
+          itemBuilder: (context, idx) {
+            return Card(
+              color: Colors.white,
+              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: List.generate(
+                    4,
+                    (i) => Container(
+                      height: 14,
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(vertical: 6.0),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    // If no read permission, show access denied inside scaffold
+    if (!canRead) {
+      return UniversalScaffold(
+        selectedIndex: 1,
+        title: 'Orders',
+        appIcon: Icons.list_alt,
+        body: Center(child: Text('You do not have permission to view Orders')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -1766,168 +1905,173 @@ class OrderDetailsPage extends StatelessWidget {
         ),
         // ADD: Edit and PDF actions
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: 'Edit Order',
-            onPressed: () {
-              // simple placeholder — replace with navigation to your edit screen if available
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.white,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                builder: (ctx) {
-                  // controllers created here for the sheet lifecycle
-                  final TextEditingController transportCtl =
-                      TextEditingController(
-                        text: order['transportName']?.toString() ?? '',
-                      );
-                  final TextEditingController noteCtl = TextEditingController(
-                    text: order['orderNote']?.toString() ?? '',
-                  );
-                  final TextEditingController paidCtl = TextEditingController(
-                    text: order['paidAmount']?.toString() ?? '',
-                  );
-                  String statusVal = order['status']?.toString() ?? '';
-
-                  return Padding(
-                    padding: EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      top: 12,
-                      bottom: MediaQuery.of(ctx).viewInsets.bottom + 18,
+          if (canUpdate)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: 'Edit Order',
+              onPressed: () {
+                // simple placeholder — replace with navigation to your edit screen if available
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(16),
                     ),
-                    child: StatefulBuilder(
-                      builder: (ctx2, setModalState) {
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Edit Order',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () => Navigator.of(ctx).pop(),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<String>(
-                              value: statusVal.isNotEmpty ? statusVal : null,
-                              decoration: const InputDecoration(
-                                labelText: 'Status',
-                                isDense: true,
-                              ),
-                              items:
-                                  [
-                                        'Pending',
-                                        'Packed',
-                                        'Shipped',
-                                        'Delivered',
-                                        'Cancelled',
-                                      ]
-                                      .map(
-                                        (s) => DropdownMenuItem(
-                                          value: s,
-                                          child: Text(s),
-                                        ),
-                                      )
-                                      .toList(),
-                              onChanged: (v) => setModalState(
-                                () => statusVal = v ?? statusVal,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: transportCtl,
-                              decoration: const InputDecoration(
-                                labelText: 'Transport Name',
-                                isDense: true,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: paidCtl,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Paid Amount',
-                                isDense: true,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: noteCtl,
-                              maxLines: 3,
-                              decoration: const InputDecoration(
-                                labelText: 'Order Note',
-                                isDense: true,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () => Navigator.of(ctx).pop(),
-                                    child: const Text('Cancel'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () async {
-                                      // prepare updated map (caller can perform actual API update)
-                                      final updated = Map<String, dynamic>.from(
-                                        order,
-                                      );
-                                      updated['transportName'] = transportCtl
-                                          .text
-                                          .trim();
-                                      updated['orderNote'] = noteCtl.text
-                                          .trim();
-                                      updated['status'] = statusVal;
-                                      updated['paidAmount'] =
-                                          double.tryParse(
-                                            paidCtl.text.trim(),
-                                          ) ??
-                                          order['paidAmount'] ??
-                                          0;
-
-                                      // show simple feedback and return updated object to caller
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Order saved (local).'),
-                                        ),
-                                      );
-                                      Navigator.of(ctx).pop(updated);
-                                    },
-                                    child: const Text('Save'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                          ],
+                  ),
+                  builder: (ctx) {
+                    // controllers created here for the sheet lifecycle
+                    final TextEditingController transportCtl =
+                        TextEditingController(
+                          text: order['transportName']?.toString() ?? '',
                         );
-                      },
-                    ),
-                  );
-                },
-              );
-            },
-          ),
+                    final TextEditingController noteCtl = TextEditingController(
+                      text: order['orderNote']?.toString() ?? '',
+                    );
+                    final TextEditingController paidCtl = TextEditingController(
+                      text: order['paidAmount']?.toString() ?? '',
+                    );
+                    String statusVal = order['status']?.toString() ?? '';
+
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        top: 12,
+                        bottom: MediaQuery.of(ctx).viewInsets.bottom + 18,
+                      ),
+                      child: StatefulBuilder(
+                        builder: (ctx2, setModalState) {
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Edit Order',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () => Navigator.of(ctx).pop(),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: statusVal.isNotEmpty ? statusVal : null,
+                                decoration: const InputDecoration(
+                                  labelText: 'Status',
+                                  isDense: true,
+                                ),
+                                items:
+                                    [
+                                          'Pending',
+                                          'Packed',
+                                          'Shipped',
+                                          'Delivered',
+                                          'Cancelled',
+                                        ]
+                                        .map(
+                                          (s) => DropdownMenuItem(
+                                            value: s,
+                                            child: Text(s),
+                                          ),
+                                        )
+                                        .toList(),
+                                onChanged: (v) => setModalState(
+                                  () => statusVal = v ?? statusVal,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: transportCtl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Transport Name',
+                                  isDense: true,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: paidCtl,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Paid Amount',
+                                  isDense: true,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: noteCtl,
+                                maxLines: 3,
+                                decoration: const InputDecoration(
+                                  labelText: 'Order Note',
+                                  isDense: true,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () => Navigator.of(ctx).pop(),
+                                      child: const Text('Cancel'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        // prepare updated map (caller can perform actual API update)
+                                        final updated =
+                                            Map<String, dynamic>.from(order);
+                                        updated['transportName'] = transportCtl
+                                            .text
+                                            .trim();
+                                        updated['orderNote'] = noteCtl.text
+                                            .trim();
+                                        updated['status'] = statusVal;
+                                        updated['paidAmount'] =
+                                            double.tryParse(
+                                              paidCtl.text.trim(),
+                                            ) ??
+                                            order['paidAmount'] ??
+                                            0;
+
+                                        // show simple feedback and return updated object to caller
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Order saved (local).',
+                                            ),
+                                          ),
+                                        );
+                                        Navigator.of(ctx).pop(updated);
+                                      },
+                                      child: const Text('Save'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          );
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           PopupMenuButton<String>(
             tooltip: 'Order PDF',
             onSelected: (val) async {
@@ -2495,227 +2639,246 @@ class OrderDetailsPage extends StatelessWidget {
               // Bottom action row: Update & Create Challan
               Row(
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.save, size: 18),
-                      label: const Text('Update'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                  if (canUpdate)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.save, size: 18),
+                        label: const Text('Update'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      ),
-                      onPressed: () async {
-                        // reuse the edit sheet shown by the AppBar edit icon
-                        final updated =
-                            await showModalBottomSheet<Map<String, dynamic>?>(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.white,
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(16),
-                                ),
-                              ),
-                              builder: (ctx) {
-                                final TextEditingController transportCtl =
-                                    TextEditingController(
-                                      text:
-                                          order['transportName']?.toString() ??
-                                          '',
-                                    );
-                                final TextEditingController noteCtl =
-                                    TextEditingController(
-                                      text:
-                                          order['orderNote']?.toString() ?? '',
-                                    );
-                                final TextEditingController paidCtl =
-                                    TextEditingController(
-                                      text:
-                                          order['paidAmount']?.toString() ?? '',
-                                    );
-                                String statusVal =
-                                    order['status']?.toString() ?? '';
-
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    left: 16,
-                                    right: 16,
-                                    top: 12,
-                                    bottom:
-                                        MediaQuery.of(ctx).viewInsets.bottom +
-                                        18,
+                        onPressed: () async {
+                          // reuse the edit sheet shown by the AppBar edit icon
+                          final updated =
+                              await showModalBottomSheet<Map<String, dynamic>?>(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.white,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(16),
                                   ),
-                                  child: StatefulBuilder(
-                                    builder: (ctx2, setModalState) {
-                                      return Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              const Text(
-                                                'Edit Order',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 16,
+                                ),
+                                builder: (ctx) {
+                                  final TextEditingController transportCtl =
+                                      TextEditingController(
+                                        text:
+                                            order['transportName']
+                                                ?.toString() ??
+                                            '',
+                                      );
+                                  final TextEditingController
+                                  noteCtl = TextEditingController(
+                                    text: order['orderNote']?.toString() ?? '',
+                                  );
+                                  final TextEditingController
+                                  paidCtl = TextEditingController(
+                                    text: order['paidAmount']?.toString() ?? '',
+                                  );
+                                  String statusVal =
+                                      order['status']?.toString() ?? '';
+
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                      left: 16,
+                                      right: 16,
+                                      top: 12,
+                                      bottom:
+                                          MediaQuery.of(ctx).viewInsets.bottom +
+                                          18,
+                                    ),
+                                    child: StatefulBuilder(
+                                      builder: (ctx2, setModalState) {
+                                        return Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                const Text(
+                                                  'Edit Order',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 16,
+                                                  ),
                                                 ),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(Icons.close),
-                                                onPressed: () =>
-                                                    Navigator.of(ctx).pop(),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          DropdownButtonFormField<String>(
-                                            value: statusVal.isNotEmpty
-                                                ? statusVal
-                                                : null,
-                                            decoration: const InputDecoration(
-                                              labelText: 'Status',
-                                              isDense: true,
-                                            ),
-                                            items:
-                                                [
-                                                      'Pending',
-                                                      'Packed',
-                                                      'Shipped',
-                                                      'Delivered',
-                                                      'Cancelled',
-                                                    ]
-                                                    .map(
-                                                      (s) => DropdownMenuItem(
-                                                        value: s,
-                                                        child: Text(s),
-                                                      ),
-                                                    )
-                                                    .toList(),
-                                            onChanged: (v) => setModalState(
-                                              () => statusVal = v ?? statusVal,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          TextFormField(
-                                            controller: transportCtl,
-                                            decoration: const InputDecoration(
-                                              labelText: 'Transport Name',
-                                              isDense: true,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          TextFormField(
-                                            controller: paidCtl,
-                                            keyboardType: TextInputType.number,
-                                            decoration: const InputDecoration(
-                                              labelText: 'Paid Amount',
-                                              isDense: true,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          TextFormField(
-                                            controller: noteCtl,
-                                            maxLines: 3,
-                                            decoration: const InputDecoration(
-                                              labelText: 'Order Note',
-                                              isDense: true,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 14),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: OutlinedButton(
+                                                IconButton(
+                                                  icon: const Icon(Icons.close),
                                                   onPressed: () =>
                                                       Navigator.of(ctx).pop(),
-                                                  child: const Text('Cancel'),
                                                 ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 8),
+                                            DropdownButtonFormField<String>(
+                                              value: statusVal.isNotEmpty
+                                                  ? statusVal
+                                                  : null,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Status',
+                                                isDense: true,
                                               ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: ElevatedButton(
-                                                  onPressed: () {
-                                                    final updated =
-                                                        Map<
-                                                          String,
-                                                          dynamic
-                                                        >.from(order);
-                                                    updated['transportName'] =
-                                                        transportCtl.text
-                                                            .trim();
-                                                    updated['orderNote'] =
-                                                        noteCtl.text.trim();
-                                                    updated['status'] =
-                                                        statusVal;
-                                                    updated['paidAmount'] =
-                                                        double.tryParse(
-                                                          paidCtl.text.trim(),
-                                                        ) ??
-                                                        order['paidAmount'] ??
-                                                        0;
-                                                    // return updated to caller
-                                                    Navigator.of(
-                                                      ctx,
-                                                    ).pop(updated);
-                                                  },
-                                                  child: const Text('Save'),
+                                              items:
+                                                  [
+                                                        'Pending',
+                                                        'Packed',
+                                                        'Shipped',
+                                                        'Delivered',
+                                                        'Cancelled',
+                                                      ]
+                                                      .map(
+                                                        (s) => DropdownMenuItem(
+                                                          value: s,
+                                                          child: Text(s),
+                                                        ),
+                                                      )
+                                                      .toList(),
+                                              onChanged: (v) => setModalState(
+                                                () =>
+                                                    statusVal = v ?? statusVal,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            TextFormField(
+                                              controller: transportCtl,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Transport Name',
+                                                isDense: true,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            TextFormField(
+                                              controller: paidCtl,
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Paid Amount',
+                                                isDense: true,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            TextFormField(
+                                              controller: noteCtl,
+                                              maxLines: 3,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Order Note',
+                                                isDense: true,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: OutlinedButton(
+                                                    onPressed: () =>
+                                                        Navigator.of(ctx).pop(),
+                                                    child: const Text('Cancel'),
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 12),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                );
-                              },
-                            );
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: ElevatedButton(
+                                                    onPressed: () {
+                                                      final updated =
+                                                          Map<
+                                                            String,
+                                                            dynamic
+                                                          >.from(order);
+                                                      updated['transportName'] =
+                                                          transportCtl.text
+                                                              .trim();
+                                                      updated['orderNote'] =
+                                                          noteCtl.text.trim();
+                                                      updated['status'] =
+                                                          statusVal;
+                                                      updated['paidAmount'] =
+                                                          double.tryParse(
+                                                            paidCtl.text.trim(),
+                                                          ) ??
+                                                          order['paidAmount'] ??
+                                                          0;
+                                                      // return updated to caller
+                                                      Navigator.of(
+                                                        ctx,
+                                                      ).pop(updated);
+                                                    },
+                                                    child: const Text('Save'),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 40),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                              );
 
-                        if (updated != null && updated.isNotEmpty) {
-                          // Try to refresh page by replacing route and providing updated object as argument,
-                          // previous screens (orders list) can also receive this when popped.
-                          final updatedListArg = [updated];
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) => OrderDetailsPage(
-                                orderId: updated['_id']?.toString() ?? orderId,
+                          if (updated != null && updated.isNotEmpty) {
+                            // Try to refresh page by replacing route and providing updated object as argument,
+                            // previous screens (orders list) can also receive this when popped.
+                            final updatedListArg = [updated];
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (_) => OrderDetailsPage(
+                                  orderId:
+                                      updated['_id']?.toString() ??
+                                      widget.orderId,
+                                ),
+                                settings: RouteSettings(
+                                  arguments: updatedListArg,
+                                ),
                               ),
-                              settings: RouteSettings(
-                                arguments: updatedListArg,
-                              ),
-                            ),
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Order updated')),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.receipt_long, size: 18),
-                      label: const Text('Create Challan'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Order updated')),
+                            );
+                          }
+                        },
                       ),
-                      onPressed: () =>
-                          _openCreateChallanFromOrder(context, order),
                     ),
-                  ),
+
+                  // else
+                  //   Expanded(
+                  //     child: ElevatedButton.icon(
+                  //       icon: const Icon(Icons.save, size: 18),
+                  //       label: const Text('Update'),
+                  //       style: ElevatedButton.styleFrom(
+                  //         backgroundColor: Colors.grey.shade400,
+                  //         foregroundColor: Colors.white,
+                  //       ),
+                  //       onPressed: null,
+                  //     ),
+                  //   ),
+                  const SizedBox(width: 12),
+                  if (canWrite)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.receipt_long, size: 18),
+                        label: const Text('Create Challan'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () =>
+                            _openCreateChallanFromOrder(context, order),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 35),

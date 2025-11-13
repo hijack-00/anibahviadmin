@@ -1,3 +1,4 @@
+import 'package:anibhaviadmin/admin/AdminUsersPage.dart';
 import 'package:anibhaviadmin/screens/accessUserPage.dart';
 import 'package:anibhaviadmin/screens/users_page.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +17,7 @@ import 'screens/stock_adjustment_page.dart';
 import 'screens/notifications_page.dart';
 import 'screens/stock_management_page.dart';
 import 'screens/customer_ledger_page.dart';
-import 'screens/user_data_page.dart';
+// import 'screens/user_data_page.dart';
 import 'screens/catalogue_upload_page.dart';
 
 void main() {
@@ -83,16 +84,29 @@ class MyApp extends StatelessWidget {
                 ModalRoute.of(context)?.settings.arguments as String? ?? '';
             return OrderDetailsPage(orderId: orderId);
           },
-          // '/report_detail': (context) {
-          //   final reportType =
-          //       ModalRoute.of(context)?.settings.arguments as String? ?? '';
-          //   return ReportDetailScreen(reportType: reportType);
-          // },
+
           '/product-detail': (context) {
             final productId =
                 ModalRoute.of(context)?.settings.arguments as String? ?? '';
             return ProductDetailPage(productId: productId);
           },
+          '/recycleBin': (context) => RecycleBinPage(),
+
+          '/sales-return': (context) => SalesReturnPage(),
+          '/stock-adjustment': (context) => StockAdjustmentPage(),
+
+          '/notifications': (context) => NotificationsPage(),
+          '/access-user': (context) => AccessUserPage(),
+          '/stock-management': (context) => StockManagementPage(),
+          '/customer-ledger': (context) => CustomerLedgerPage(),
+
+          '/catalogue-upload': (context) => CatalogueUploadPage(),
+          '/admin-users': (context) => AdminUsersPage(),
+          // '/report_detail': (context) {
+          //   final reportType =
+          //       ModalRoute.of(context)?.settings.arguments as String? ?? '';
+          //   return ReportDetailScreen(reportType: reportType);
+          // },
           // Add new routes below
           // '/sales-order': (context) => SalesOrderPage(),
           // '/notes': (context) => NotesPage(),
@@ -101,19 +115,12 @@ class MyApp extends StatelessWidget {
           // '/pdf-share': (context) => PDFSharePage(),
           // '/barcode': (context) => BarcodePage(),
           // '/franchisee-select': (context) => FranchiseeSelectPage(),
-          '/sales-return': (context) => SalesReturnPage(),
-          '/stock-adjustment': (context) => StockAdjustmentPage(),
           // '/refund-credit': (context) => RefundCreditPage(),
           // '/return-challan': (context) => ReturnChallanPage(),
           // '/reports-graph': (context) => ReportsGraphPage(),
-          '/notifications': (context) => NotificationsPage(),
-          '/access-user': (context) => AccessUserPage(),
-          '/stock-management': (context) => StockManagementPage(),
-          '/customer-ledger': (context) => CustomerLedgerPage(),
           // '/whatsapp-notifications': (context) => WhatsAppNotificationsPage(),
-          '/user-data': (context) => UserDataPage(),
+          // '/user-data': (context) => UserDataPage(),
           // '/push-notifications': (context) => PushNotificationsPage(),
-          '/catalogue-upload': (context) => CatalogueUploadPage(),
         },
       ),
     );

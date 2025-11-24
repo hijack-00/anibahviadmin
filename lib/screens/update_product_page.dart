@@ -345,6 +345,13 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
                               width: 100,
                               height: 100,
                               fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Image.network(
+                                    kImagePlaceholderUrl,
+                                    width: 100,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                  ),
                             ),
                           ),
                           Positioned(
@@ -401,6 +408,12 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
                             width: 100,
                             height: 100,
                             fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Image(
+                              image: ImagePlaceholderPhoto,
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       );
@@ -511,6 +524,11 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
                         'https://barcode.tec-it.com/barcode.ashx?data=${barcodeController.text}&code=EAN13',
                         height: 48,
                         fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Image(
+                          image: ImagePlaceholderPhoto,
+                          height: 48,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                     SizedBox(height: 8),
@@ -687,7 +705,7 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
                   ),
                 ],
               ),
-              SizedBox(height: 24),
+              SizedBox(height: 40),
             ],
           ),
         ),

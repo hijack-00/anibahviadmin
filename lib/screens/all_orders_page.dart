@@ -32,6 +32,7 @@ class _AllOrdersPageState extends State<AllOrdersPage>
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _orders = [];
+  bool _createOrderShownOnce = false;
 
   // Filter state: delivery status filter (default All)
   String _selectedFilterStatus = 'All';
@@ -268,8 +269,123 @@ class _AllOrdersPageState extends State<AllOrdersPage>
     }).toList();
   }
 
+  // void _deleteOrder(Map<String, dynamic> order) {
+  //   // Move order to recycle bin via API, then refresh list
+  //   () async {
+  //     final orderId = order['_id'] ?? order['id'] ?? order['orderId'] ?? '';
+  //     if (orderId == null || orderId.toString().isEmpty) {
+  //       ScaffoldMessenger.of(
+  //         context,
+  //       ).showSnackBar(const SnackBar(content: Text('Order id not found')));
+  //       return;
+  //     }
+
+  //     // show simple loading indicator
+  //     showDialog(
+  //       context: context,
+  //       barrierDismissible: false,
+  //       builder: (_) => const Center(child: CircularProgressIndicator()),
+  //     );
+
+  //     try {
+  //       final resp = await AppDataRepo().moveOrderToRecycleBin(
+  //         orderId.toString(),
+  //       );
+  //       Navigator.of(context).pop(); // remove loading
+
+  //       final success =
+  //           (resp['success'] == true) ||
+  //           (resp['status'] == true) ||
+  //           (resp['statusCode'] == 200) ||
+  //           (resp['status'] == 200);
+  //       final message = resp['message'] ?? resp['msg'] ?? 'Operation completed';
+
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text(message.toString()),
+  //           backgroundColor: success ? Colors.green : Colors.red,
+  //         ),
+  //       );
+
+  //       if (success) await _fetchOrders();
+  //     } catch (e) {
+  //       Navigator.of(context).pop();
+  //       ScaffoldMessenger.of(
+  //         context,
+  //       ).showSnackBar(SnackBar(content: Text('Error moving order: $e')));
+  //     }
+  //   }();
+  // }
+
   void _deleteOrder(Map<String, dynamic> order) {
-    Navigator.pushNamed(context, '/recycleBin');
+    // Move order to recycle bin via API, then refresh list
+    () async {
+      final orderId = order['_id'] ?? order['id'] ?? order['orderId'] ?? '';
+      if (orderId == null || orderId.toString().isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Order id not found')));
+        return;
+      }
+
+      // Confirm action with user
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Delete Order'),
+          content: const Text(
+            'Are you sure you want to Delete this order and move it to the recycle bin?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
+      // show simple loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
+      try {
+        final resp = await AppDataRepo().moveOrderToRecycleBin(
+          orderId.toString(),
+        );
+        Navigator.of(context).pop(); // remove loading
+
+        final success =
+            (resp['success'] == true) ||
+            (resp['status'] == true) ||
+            (resp['statusCode'] == 200) ||
+            (resp['status'] == 200);
+        final message = resp['message'] ?? resp['msg'] ?? 'Operation completed';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message.toString()),
+            backgroundColor: success ? Colors.green : Colors.red,
+          ),
+        );
+
+        if (success) await _fetchOrders();
+      } catch (e) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error moving order: $e')));
+      }
+    }();
   }
 
   @override
@@ -539,6 +655,26 @@ class _AllOrdersPageState extends State<AllOrdersPage>
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                    )
+                  : _filteredOrders.isEmpty
+                  // keep it scrollable so RefreshIndicator works
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.5,
+                          child: const Center(
+                            child: Text(
+                              'No orders to show',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     )
                   : ListView.separated(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -5309,244 +5445,6 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                 ),
               ),
             ),
-    );
-  }
-}
-
-class RecycleBinPage extends StatefulWidget {
-  @override
-  _RecycleBinPageState createState() => _RecycleBinPageState();
-}
-
-class _RecycleBinPageState extends State<RecycleBinPage> {
-  bool _loading = true;
-  String? _error;
-  List<Map<String, dynamic>> _deletedOrders = [];
-  List<Map<String, dynamic>> _filteredOrders = [];
-  final TextEditingController _searchController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchDeletedOrders();
-    _searchController.addListener(_filterOrders);
-  }
-
-  Future<void> _fetchDeletedOrders() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API
-      _deletedOrders = [
-        {
-          "orderNumber": "ORD-00123",
-          "customer": {"name": "John Doe", "phone": "9876543210"},
-          "total": 1520.50,
-        },
-        {
-          "orderNumber": "ORD-00124",
-          "customer": {"name": "Jane Smith", "phone": "9822334455"},
-          "total": 820.75,
-        },
-      ];
-      _filteredOrders = _deletedOrders;
-    } catch (e) {
-      _error = 'Error loading deleted orders';
-      _deletedOrders = [];
-    }
-    setState(() {
-      _loading = false;
-    });
-  }
-
-  void _filterOrders() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredOrders = _deletedOrders.where((order) {
-        final customer = order['customer'] ?? {};
-        final orderNumber =
-            order['orderNumber']?.toString().toLowerCase() ?? '';
-        final customerName = customer['name']?.toString().toLowerCase() ?? '';
-        final customerPhone = customer['phone']?.toString().toLowerCase() ?? '';
-
-        return orderNumber.contains(query) ||
-            customerName.contains(query) ||
-            customerPhone.contains(query);
-      }).toList();
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  // Restore Button (for future actions)
-  Widget _buildRestoreButton() {
-    return OutlinedButton.icon(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.indigo,
-        side: BorderSide(color: Colors.indigo.shade300),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      onPressed: () {},
-      icon: const Icon(Icons.restore_rounded, size: 16),
-      label: const Text(
-        "Restore",
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return UniversalScaffold(
-      selectedIndex: 0,
-      appIcon: Icons.delete_forever_rounded,
-      title: 'Recycle Bin',
-      body: RefreshIndicator(
-        // Add RefreshIndicator here
-        onRefresh: _fetchDeletedOrders, // Call the fetch method on refresh
-        color: Colors.indigo,
-        child: Column(
-          children: [
-            // Search Bar
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search, color: Colors.indigo),
-                  labelText: 'Search orders',
-                  labelStyle: const TextStyle(fontSize: 13),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.indigo.shade100),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.indigo.shade100),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: Colors.indigo.shade400,
-                      width: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Body
-            Expanded(
-              child: _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Colors.indigo),
-                    )
-                  : _error != null
-                  ? Center(
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.redAccent),
-                      ),
-                    )
-                  : _filteredOrders.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No deleted orders found.',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : ListView.separated(
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: _filteredOrders.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final order = _filteredOrders[index];
-                        final customer = order['customer'] ?? {};
-                        final total = order['total'] ?? 0.0;
-
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black12.withOpacity(0.05),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: ListTile(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            title: Text(
-                              'Order #${order['orderNumber']}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: Colors.indigo,
-                              ),
-                            ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 6.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Customer: ${customer['name'] ?? 'N/A'}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Phone: ${customer['phone'] ?? 'N/A'}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Total: ₹${total.toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.indigo,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            trailing: _buildRestoreButton(),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

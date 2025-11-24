@@ -520,37 +520,125 @@ class _UserDetailsPageState extends State<UserDetailsPage>
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       final item = items[index];
-                      final product = item['product'] ?? {};
+                      // final product = item['product'] ?? {};
+                      // return Card(
+                      //   elevation: 1,
+                      //   shape: RoundedRectangleBorder(
+                      //     borderRadius: BorderRadius.circular(8),
+                      //   ),
+                      //   child: ListTile(
+                      //     leading:
+                      //         (product['photo'] != null &&
+                      //             product['photo'].toString().isNotEmpty)
+                      //         ? ClipRRect(
+                      //             borderRadius: BorderRadius.circular(6),
+                      //             child: Image.network(
+                      //               product['photo'],
+                      //               width: 40,
+                      //               height: 40,
+                      //               fit: BoxFit.cover,
+                      //             ),
+                      //           )
+                      //         : Icon(Icons.image),
+                      //     title: Text(
+                      //       product['productName'] ?? '',
+                      //       style: TextStyle(
+                      //         fontWeight: FontWeight.bold,
+                      //         fontSize: 11,
+                      //       ),
+                      //     ),
+                      //     subtitle: Text(
+                      //       'Qty: ${item['quantity'] ?? 0}',
+                      //       style: TextStyle(fontSize: 10),
+                      //     ),
+                      //   ),
+                      // );
+                      // Support both item['product'] and item['subProduct'] shapes
+                      final Map<String, dynamic> subProduct =
+                          (item['subProduct'] is Map)
+                          ? Map<String, dynamic>.from(item['subProduct'])
+                          : {};
+                      final Map<String, dynamic> product =
+                          (item['product'] is Map)
+                          ? Map<String, dynamic>.from(item['product'])
+                          : {};
+
+                      final String title = subProduct.isNotEmpty
+                          ? (subProduct['name'] ??
+                                (subProduct['productId'] is Map
+                                    ? subProduct['productId']['productName']
+                                    : '') ??
+                                '')
+                          : (product['productName'] ?? product['name'] ?? '');
+
+                      String imageUrl = '';
+                      if (subProduct.isNotEmpty) {
+                        if (subProduct['subProductImages'] is List &&
+                            (subProduct['subProductImages'] as List)
+                                .isNotEmpty) {
+                          imageUrl = (subProduct['subProductImages'] as List)
+                              .first
+                              .toString();
+                        } else if (subProduct['productId'] is Map &&
+                            (subProduct['productId']['images'] is List &&
+                                subProduct['productId']['images'].isNotEmpty)) {
+                          imageUrl = subProduct['productId']['images'][0]
+                              .toString();
+                        }
+                      } else {
+                        if (product['photo'] != null &&
+                            product['photo'].toString().isNotEmpty) {
+                          imageUrl = product['photo'].toString();
+                        } else if (product['images'] is List &&
+                            product['images'].isNotEmpty) {
+                          imageUrl = product['images'][0].toString();
+                        }
+                      }
+
+                      final qty = (item['quantity'] ?? item['qty'] ?? 1)
+                          .toString();
+                      final price =
+                          (subProduct['singlePicPrice'] ??
+                                  subProduct['filnalLotPrice'] ??
+                                  product['price'] ??
+                                  '')
+                              .toString();
+
                       return Card(
                         elevation: 1,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: ListTile(
-                          leading:
-                              (product['photo'] != null &&
-                                  product['photo'].toString().isNotEmpty)
+                          leading: imageUrl.isNotEmpty
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(6),
                                   child: Image.network(
-                                    product['photo'],
-                                    width: 40,
-                                    height: 40,
+                                    imageUrl,
+                                    width: 52,
+                                    height: 52,
                                     fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        const Icon(Icons.image),
                                   ),
                                 )
-                              : Icon(Icons.image),
+                              : const Icon(Icons.image),
                           title: Text(
-                            product['productName'] ?? '',
-                            style: TextStyle(
+                            title,
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 11,
+                              fontSize: 12,
                             ),
                           ),
                           subtitle: Text(
-                            'Qty: ${item['quantity'] ?? 0}',
-                            style: TextStyle(fontSize: 10),
+                            'Qty: $qty' +
+                                (price.isNotEmpty ? ' • ₹$price' : ''),
+                            style: const TextStyle(fontSize: 11),
                           ),
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            // optionally navigate to product/subproduct detail
+                          },
                         ),
                       );
                     },

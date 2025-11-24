@@ -188,27 +188,28 @@ class UniversalDrawer extends StatelessWidget {
             ),
 
             const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.help_outline, color: Colors.indigo),
-              title: const Text('Help & Support'),
-              onTap: () {
-                Navigator.of(context).pop();
-                showAboutDialog(
-                  context: context,
-                  applicationName: 'Anibhavi ERP',
-                  applicationVersion: '1.0.0',
-                  children: [
-                    const Text('Contact support at support@anibhavi.com'),
-                  ],
-                );
-              },
-            ),
 
+            // ListTile(
+            //   leading: const Icon(Icons.help_outline, color: Colors.indigo),
+            //   title: const Text('Help & Support'),
+            //   onTap: () {
+            //     Navigator.of(context).pop();
+            //     showAboutDialog(
+            //       context: context,
+            //       applicationName: 'Anibhavi ERP',
+            //       applicationVersion: '1.0.0',
+            //       children: [
+            //         const Text('Contact support at support@anibhavi.com'),
+            //       ],
+            //     );
+            //   },
+            // ),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Logout', style: TextStyle(color: Colors.red)),
               onTap: () => _confirmLogout(context),
             ),
+            SizedBox(height: 10),
           ],
         ),
       ),

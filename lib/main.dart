@@ -1,5 +1,6 @@
 import 'package:anibhaviadmin/admin/AdminUsersPage.dart';
 import 'package:anibhaviadmin/screens/accessUserPage.dart';
+import 'package:anibhaviadmin/screens/recycle_bin.dart';
 import 'package:anibhaviadmin/screens/users_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

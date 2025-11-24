@@ -310,50 +310,204 @@ class ApiService {
     }
   }
 
+  // Future<Map<String, dynamic>> createProductMultipart({
+  //   required String name,
+  //   required String type,
+  //   required String categoryId,
+  //   required String subcategoryId,
+  //   required String price,
+  //   required String sku,
+  //   required List<File> files,
+  // }) async {
+  //   final uri = Uri.parse('$baseUrl/product/create-product');
+  //   final request = http.MultipartRequest('POST', uri);
+
+  //   // add fields
+  //   request.fields['name'] = name;
+  //   request.fields['type'] = type;
+  //   request.fields['categoryId'] = categoryId;
+  //   request.fields['subcategoryId'] = subcategoryId;
+  //   request.fields['price'] = price;
+  //   request.fields['sku'] = sku;
+
+  //   // attach files
+  //   for (var f in files) {
+  //     if (await f.exists()) {
+  //       final multipart = await http.MultipartFile.fromPath('files', f.path);
+  //       request.files.add(multipart);
+  //     }
+  //   }
+
+  //   try {
+  //     final streamed = await request.send();
+  //     final resp = await http.Response.fromStream(streamed);
+  //     try {
+  //       return jsonDecode(resp.body) as Map<String, dynamic>;
+  //     } catch (_) {
+  //       return {
+  //         'success': resp.statusCode >= 200 && resp.statusCode < 300,
+  //         'message': resp.body,
+  //         'statusCode': resp.statusCode,
+  //       };
+  //     }
+  //   } catch (e) {
+  //     return {'success': false, 'message': e.toString()};
+  //   }
+  // }
+
   Future<Map<String, dynamic>> createProductMultipart({
     required String name,
     required String type,
     required String categoryId,
-    required String subcategoryId,
+    required List<String> categoryIds,
     required String price,
     required String sku,
-    required List<File> files,
+    required List<File> productImages,
+    required bool status,
   }) async {
     final uri = Uri.parse('$baseUrl/product/create-product');
+    print('CREATE PRODUCT URL: $uri');
+
     final request = http.MultipartRequest('POST', uri);
 
-    // add fields
+    // fields expected by API
     request.fields['name'] = name;
-    request.fields['type'] = type;
-    request.fields['categoryId'] = categoryId;
-    request.fields['subcategoryId'] = subcategoryId;
-    request.fields['price'] = price;
     request.fields['sku'] = sku;
+    request.fields['categoryId'] = categoryId;
+    request.fields['type'] = type;
+    request.fields['price'] = price;
+    request.fields['status'] = status.toString();
 
-    // attach files
-    for (var f in files) {
-      if (await f.exists()) {
-        final multipart = await http.MultipartFile.fromPath('files', f.path);
-        request.files.add(multipart);
+    // // send each subcategory as separate form field so server receives an array
+    // // e.g. subcategoryId[0]=id1, subcategoryId[1]=id2 ...
+    // for (var i = 0; i < categoryIds.length; i++) {
+    //   final id = categoryIds[i].toString();
+    //   request.fields['subcategoryId'] = id;
+    // }
+
+    // add each subcategory as a separate multipart text part named 'subcategoryId'
+    // (this produces repeated keys: subcategoryId=value for each selected id)
+    for (var id in categoryIds) {
+      try {
+        request.files.add(
+          http.MultipartFile.fromString('subcategoryId', id.toString()),
+        );
+      } catch (e) {
+        print('CREATE PRODUCT - error adding subcategory field: $e');
       }
     }
+
+    // add default headers if any (MultipartRequest sets Content-Type boundary)
+    try {
+      request.headers.addAll(defaultHeaders);
+      request.headers.remove('Content-Type');
+    } catch (_) {}
+
+    // attach productImages as repeated multipart fields named 'productImages'
+    final List<String> attachedFiles = [];
+    for (var f in productImages) {
+      try {
+        if (await f.exists()) {
+          final multipart = await http.MultipartFile.fromPath(
+            'productImages', // backend expects repeated field 'productImages'
+            f.path,
+            filename: p.basename(f.path),
+          );
+          request.files.add(multipart);
+          attachedFiles.add(f.path);
+        } else {
+          attachedFiles.add('missing:${f.path}');
+        }
+      } catch (e) {
+        attachedFiles.add('error:${f.path}:${e.toString()}');
+      }
+    }
+
+    // debug prints
+    print(
+      'CREATE PRODUCT - Multipart file fields: ${request.files.map((f) => f.field).toList()}',
+    );
+    print(
+      'CREATE PRODUCT - Content-Type header that will be sent: ${request.headers['Content-Type'] ?? "not set (MultipartRequest sets it)"}',
+    );
+    print('CREATE PRODUCT - Request fields: ${request.fields}');
+    print(
+      'CREATE PRODUCT - Attached files paths (${attachedFiles.length}): $attachedFiles',
+    );
 
     try {
       final streamed = await request.send();
       final resp = await http.Response.fromStream(streamed);
+
+      print('CREATE PRODUCT - Response status: ${resp.statusCode}');
+      print('CREATE PRODUCT - Response body: ${resp.body}');
       try {
         return jsonDecode(resp.body) as Map<String, dynamic>;
-      } catch (_) {
+      } catch (e) {
         return {
           'success': resp.statusCode >= 200 && resp.statusCode < 300,
           'message': resp.body,
           'statusCode': resp.statusCode,
         };
       }
-    } catch (e) {
+    } catch (e, st) {
+      print('CREATE PRODUCT - ERROR: $e\n$st');
       return {'success': false, 'message': e.toString()};
     }
   }
+
+  // Future<Map<String, dynamic>> createProductMultipart({
+  //   required String name,
+  //   required String type,
+  //   required String mainCategoryId,
+  //   required List<String> categoryIds,
+  //   required String price,
+  //   required String sku,
+  //   required List<File> productImages,
+  //   required bool status,
+  // }) async {
+  //   final uri = Uri.parse('$baseUrl/product/create-product');
+  //   print('Creating product with name: $uri');
+
+  //   final request = http.MultipartRequest('POST', uri);
+
+  //   // fields expected by API (send categoryIds as JSON array string)
+  //   request.fields['name'] = name;
+  //   request.fields['sku'] = sku;
+  //   request.fields['mainCategoryId'] = mainCategoryId;
+  //   request.fields['categoryId'] = jsonEncode(categoryIds);
+  //   request.fields['type'] = type;
+  //   request.fields['price'] = price;
+  //   request.fields['status'] = status.toString();
+
+  //   // attach productImages as repeated multipart fields named 'productImages'
+  //   for (var f in productImages) {
+  //     if (await f.exists()) {
+  //       final multipart = await http.MultipartFile.fromPath(
+  //         'productImages',
+  //         f.path,
+  //         filename: p.basename(f.path),
+  //       );
+  //       request.files.add(multipart);
+  //     }
+  //   }
+
+  //   try {
+  //     final streamed = await request.send();
+  //     final resp = await http.Response.fromStream(streamed);
+  //     try {
+  //       return jsonDecode(resp.body) as Map<String, dynamic>;
+  //     } catch (_) {
+  //       return {
+  //         'success': resp.statusCode >= 200 && resp.statusCode < 300,
+  //         'message': resp.body,
+  //         'statusCode': resp.statusCode,
+  //       };
+  //     }
+  //   } catch (e) {
+  //     return {'success': false, 'message': e.toString()};
+  //   }
+  // }
 
   // Added: fetch all main categories
   Future<Map<String, dynamic>> getAllMainCategories() async {
@@ -795,12 +949,71 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> deleteOrderById(String orderId) async {
-    final response = await post('/order/order-delete/$orderId');
-    print('Delete order by id response: ' + response.body);
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to delete order: ${response.statusCode}');
+    // Use GET for delete endpoint as requested
+    final response = await get('/order/order-delete/$orderId');
+    print(
+      'Delete order by id (GET) response: ${response.statusCode} ${response.body}',
+    );
+    try {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      // Fallback to a safe map if response is not valid JSON
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return {
+          'success': true,
+          'message': response.body,
+          'statusCode': response.statusCode,
+        };
+      }
+      return {
+        'success': false,
+        'message': response.body,
+        'statusCode': response.statusCode,
+      };
+    }
+  }
+
+  /// Move order to recycle bin (GET)
+  /// Example endpoint: /order/move-to-recycle-bin/<orderId>
+  Future<Map<String, dynamic>> moveOrderToRecycleBin(String orderId) async {
+    final String url = '$baseUrl/order/move-to-recycle-bin/$orderId';
+    print("Move order to recycle bin URL: $url");
+    try {
+      final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+      print('Move order to recycle bin response: ${resp.body}');
+
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> moveOrderToOrder(String orderId) async {
+    final String url = '$baseUrl/order/move-to-order/$orderId';
+    print("Restore (move-to-order) URL: $url");
+    try {
+      final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+      print('Restore order response: ${resp.statusCode} ${resp.body}');
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      print('moveOrderToOrder ERROR: $e');
+      return {'success': false, 'message': e.toString()};
     }
   }
 
@@ -844,11 +1057,36 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchAllRecycledOrdersByAdminWithPagination({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    final String url =
+        "$baseUrl/order/get-all-recycled-orders-by-admin-with-pagination";
+    print('Fetch recycled orders URL: $url');
+    try {
+      final resp = await http.get(Uri.parse(url), headers: defaultHeaders);
+      print('Fetch recycled orders response: ${resp.statusCode} ${resp.body}');
+      try {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {
+          'success': resp.statusCode >= 200 && resp.statusCode < 300,
+          'message': resp.body,
+          'statusCode': resp.statusCode,
+        };
+      }
+    } catch (e) {
+      print('fetchAllRecycledOrdersByAdminWithPagination ERROR: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> fetchAllOrdersByAdminWithPagination({
     int page = 1,
     int limit = 10,
   }) async {
-    final url = "$baseUrl/order/get-all-Admin-orders";
+    final url = "$baseUrl/order/get-all-orders-by-admin-with-pagination";
     final response = await http.get(Uri.parse(url), headers: defaultHeaders);
     return jsonDecode(response.body);
   }

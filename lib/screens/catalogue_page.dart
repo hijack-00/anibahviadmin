@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:anibhaviadmin/widgets/add_product_page.dart';
 import 'package:anibhaviadmin/widgets/universal_scaffold.dart';
 import 'package:anibhaviadmin/widgets/universal_drawer.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shimmer/shimmer.dart';
 import '../services/app_data_repo.dart';
 import '../widgets/universal_navbar.dart';
-import '../widgets/add_product_form.dart';
+import '../widgets/add_catalogue_form.dart';
 import 'package:anibhaviadmin/permissions/permission_helper.dart';
 import 'package:anibhaviadmin/permissions/navigateIfAllowed.dart';
 import 'package:anibhaviadmin/services/app_data_repo.dart';
@@ -56,392 +57,392 @@ class _CataloguePageState extends State<CataloguePage> with PermissionHelper {
     }
   }
 
-  Future<void> _showAddProductForm() async {
-    String name = '';
-    String type = 'Featured Product';
-    String? selectedMainCategoryId;
-    String? selectedSubCategoryId;
-    String price = '';
-    String sku = '';
-    List<File> pickedImages = [];
-    bool submitting = false;
+  // Future<void> _showAddProductForm() async {
+  //   String name = '';
+  //   String type = 'Featured Product';
+  //   String? selectedMainCategoryId;
+  //   String? selectedSubCategoryId;
+  //   String price = '';
+  //   String sku = '';
+  //   List<File> pickedImages = [];
+  //   bool submitting = false;
 
-    // fetch categories & main categories
-    final mainCatsRaw = await AppDataRepo().fetchAllMainCategories();
-    final mainCategories = mainCatsRaw;
-    final categoriesRaw = await AppDataRepo().fetchAllCategories();
-    List<Map<String, dynamic>> categories = categoriesRaw;
+  //   // fetch categories & main categories
+  //   final mainCatsRaw = await AppDataRepo().fetchAllMainCategories();
+  //   final mainCategories = mainCatsRaw;
+  //   final categoriesRaw = await AppDataRepo().fetchAllCategories();
+  //   List<Map<String, dynamic>> categories = categoriesRaw;
 
-    await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      // builder: (ctx) {
-      //   return StatefulBuilder(
-      //     builder: (ctx2, setModalState) {
-      // filter subcategories based on selectedMainCategoryId if available
-      // open sheet nearly full height
-      builder: (ctx) {
-        return FractionallySizedBox(
-          heightFactor: 0.95,
-          child: StatefulBuilder(
-            builder: (ctx2, setModalState) {
-              final subcats = selectedMainCategoryId == null
-                  ? categories
-                  : categories.where((c) {
-                      final main = c['mainCategoryId'];
-                      final mid = main is Map
-                          ? main['_id']?.toString()
-                          : main?.toString();
-                      return mid == selectedMainCategoryId;
-                    }).toList();
+  //   await showModalBottomSheet<bool>(
+  //     context: context,
+  //     isScrollControlled: true,
+  //     shape: const RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  //     ),
+  //     // builder: (ctx) {
+  //     //   return StatefulBuilder(
+  //     //     builder: (ctx2, setModalState) {
+  //     // filter subcategories based on selectedMainCategoryId if available
+  //     // open sheet nearly full height
+  //     builder: (ctx) {
+  //       return FractionallySizedBox(
+  //         heightFactor: 0.95,
+  //         child: StatefulBuilder(
+  //           builder: (ctx2, setModalState) {
+  //             final subcats = selectedMainCategoryId == null
+  //                 ? categories
+  //                 : categories.where((c) {
+  //                     final main = c['mainCategoryId'];
+  //                     final mid = main is Map
+  //                         ? main['_id']?.toString()
+  //                         : main?.toString();
+  //                     return mid == selectedMainCategoryId;
+  //                   }).toList();
 
-              // return Padding(
-              //   padding: EdgeInsets.only(
-              //     bottom: MediaQuery.of(ctx).viewInsets.bottom,
-              //   ),
-              //   child: SingleChildScrollView(
-              //     child: Padding(
-              //       padding: const EdgeInsets.symmetric(
-              //         horizontal: 18,
-              //         vertical: 16,
-              //       ),
-              //       child: Column(
-              //         mainAxisSize: MainAxisSize.min,
-              //         crossAxisAlignment: CrossAxisAlignment.start,
-              //         children: [
-              return Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                ),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 16,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Add New Product',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                decoration: const InputDecoration(
-                                  labelText: 'Product Name',
-                                  isDense: true,
-                                ),
-                                onChanged: (v) => setModalState(() => name = v),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                decoration: const InputDecoration(
-                                  labelText: 'SKU',
-                                  isDense: true,
-                                ),
-                                onChanged: (v) => setModalState(() => sku = v),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                isDense: true,
-                                value: type,
-                                items:
-                                    [
-                                          'Featured Product',
-                                          'Best Seller',
-                                          'New Arrival',
-                                        ]
-                                        .map(
-                                          (t) => DropdownMenuItem(
-                                            value: t,
-                                            child: Text(t),
-                                          ),
-                                        )
-                                        .toList(),
-                                onChanged: (v) =>
-                                    setModalState(() => type = v ?? type),
-                                decoration: const InputDecoration(
-                                  labelText: 'Type',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                decoration: const InputDecoration(
-                                  labelText: 'Price',
-                                  isDense: true,
-                                ),
-                                keyboardType: TextInputType.number,
-                                onChanged: (v) =>
-                                    setModalState(() => price = v),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                isDense: true,
-                                value: selectedMainCategoryId,
-                                items: mainCategories
-                                    .map((m) {
-                                      final id = m['_id']?.toString() ?? '';
-                                      final label =
-                                          m['mainCategoryName'] ??
-                                          m['name'] ??
-                                          id;
-                                      return DropdownMenuItem(
-                                        value: id,
-                                        child: Text(label),
-                                      );
-                                    })
-                                    .toList()
-                                    .cast<DropdownMenuItem<String>>(),
-                                onChanged: (v) => setModalState(() {
-                                  selectedMainCategoryId = v;
-                                  selectedSubCategoryId = null;
-                                }),
-                                decoration: const InputDecoration(
-                                  labelText: 'Category',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                isDense: true,
-                                value: selectedSubCategoryId,
-                                items: subcats
-                                    .map((s) {
-                                      final id = s['_id']?.toString() ?? '';
-                                      final label =
-                                          s['name'] ?? s['categoryName'] ?? id;
-                                      return DropdownMenuItem(
-                                        value: id,
-                                        child: Text(label),
-                                      );
-                                    })
-                                    .toList()
-                                    .cast<DropdownMenuItem<String>>(),
-                                onChanged: (v) => setModalState(
-                                  () => selectedSubCategoryId = v,
-                                ),
-                                decoration: const InputDecoration(
-                                  labelText: 'Sub-Category',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text('Product Images (3-8)'),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.upload_file, size: 18),
-                              label: const Text('Upload Images'),
-                              onPressed: () async {
-                                final picked = await _picker.pickMultiImage(
-                                  imageQuality: 80,
-                                );
-                                if (picked != null && picked.isNotEmpty) {
-                                  setModalState(() {
-                                    pickedImages.addAll(
-                                      picked.map((x) => File(x.path)),
-                                    );
-                                  });
-                                }
-                              },
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                '${pickedImages.length} images selected',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        if (pickedImages.isNotEmpty)
-                          SizedBox(
-                            height: 80,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: pickedImages.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (_, i) {
-                                return Stack(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.file(
-                                        pickedImages[i],
-                                        width: 110,
-                                        height: 80,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                    Positioned(
-                                      right: 0,
-                                      top: 0,
-                                      child: GestureDetector(
-                                        onTap: () => setModalState(
-                                          () => pickedImages.removeAt(i),
-                                        ),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.black54,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.close,
-                                            size: 16,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                child: const Text('Cancel'),
-                                onPressed: () => Navigator.of(ctx).pop(false),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                child: submitting
-                                    ? const CircularProgressIndicator(
-                                        color: Colors.white,
-                                      )
-                                    : const Text('Create Product'),
-                                onPressed: submitting
-                                    ? null
-                                    : () async {
-                                        if (name.trim().isEmpty ||
-                                            selectedMainCategoryId == null ||
-                                            selectedSubCategoryId == null ||
-                                            price.trim().isEmpty ||
-                                            sku.trim().isEmpty ||
-                                            pickedImages.length < 1) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Please fill required fields and upload images',
-                                              ),
-                                            ),
-                                          );
-                                          return;
-                                        }
-                                        setModalState(() => submitting = true);
-                                        final resp = await AppDataRepo()
-                                            .createProduct(
-                                              name: name.trim(),
-                                              type: type,
-                                              categoryId:
-                                                  selectedMainCategoryId!,
-                                              subcategoryId:
-                                                  selectedSubCategoryId!,
-                                              price: price.trim(),
-                                              sku: sku.trim(),
-                                              images: pickedImages,
-                                            );
-                                        setModalState(() => submitting = false);
-                                        if (resp['success'] == true) {
-                                          Navigator.of(ctx).pop(true);
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Product created'),
-                                            ),
-                                          );
-                                          // refresh products page data
-                                          setState(() {
-                                            _productsPageFuture = AppDataRepo()
-                                                .fetchAllProductsCatalog();
-                                            _allProductsPage = [];
-                                            _filteredProductsPage = [];
-                                          });
-                                        } else {
-                                          final msg =
-                                              resp['message']?.toString() ??
-                                              'Create failed';
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(content: Text(msg)),
-                                          );
-                                        }
-                                      },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        //               ],
-                        //             ),
-                        //           ),
-                        //         ),
-                        //       );
-                        //     },
-                        //   );
-                        // },
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
+  //             // return Padding(
+  //             //   padding: EdgeInsets.only(
+  //             //     bottom: MediaQuery.of(ctx).viewInsets.bottom,
+  //             //   ),
+  //             //   child: SingleChildScrollView(
+  //             //     child: Padding(
+  //             //       padding: const EdgeInsets.symmetric(
+  //             //         horizontal: 18,
+  //             //         vertical: 16,
+  //             //       ),
+  //             //       child: Column(
+  //             //         mainAxisSize: MainAxisSize.min,
+  //             //         crossAxisAlignment: CrossAxisAlignment.start,
+  //             //         children: [
+  //             return Padding(
+  //               padding: EdgeInsets.only(
+  //                 bottom: MediaQuery.of(ctx).viewInsets.bottom,
+  //               ),
+  //               child: SingleChildScrollView(
+  //                 child: Padding(
+  //                   padding: const EdgeInsets.symmetric(
+  //                     horizontal: 18,
+  //                     vertical: 16,
+  //                   ),
+  //                   child: Column(
+  //                     mainAxisSize: MainAxisSize.min,
+  //                     crossAxisAlignment: CrossAxisAlignment.start,
+  //                     children: [
+  //                       Row(
+  //                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                         children: [
+  //                           const Text(
+  //                             'Add New Product',
+  //                             style: TextStyle(
+  //                               fontSize: 16,
+  //                               fontWeight: FontWeight.w600,
+  //                             ),
+  //                           ),
+  //                           IconButton(
+  //                             icon: const Icon(Icons.close),
+  //                             onPressed: () => Navigator.of(ctx).pop(false),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                       const SizedBox(height: 8),
+  //                       Row(
+  //                         children: [
+  //                           Expanded(
+  //                             child: TextFormField(
+  //                               decoration: const InputDecoration(
+  //                                 labelText: 'Product Name',
+  //                                 isDense: true,
+  //                               ),
+  //                               onChanged: (v) => setModalState(() => name = v),
+  //                             ),
+  //                           ),
+  //                           const SizedBox(width: 12),
+  //                           Expanded(
+  //                             child: TextFormField(
+  //                               decoration: const InputDecoration(
+  //                                 labelText: 'SKU',
+  //                                 isDense: true,
+  //                               ),
+  //                               onChanged: (v) => setModalState(() => sku = v),
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                       const SizedBox(height: 10),
+  //                       Row(
+  //                         children: [
+  //                           Expanded(
+  //                             child: DropdownButtonFormField<String>(
+  //                               isDense: true,
+  //                               value: type,
+  //                               items:
+  //                                   [
+  //                                         'Featured Product',
+  //                                         'Best Seller',
+  //                                         'New Arrival',
+  //                                       ]
+  //                                       .map(
+  //                                         (t) => DropdownMenuItem(
+  //                                           value: t,
+  //                                           child: Text(t),
+  //                                         ),
+  //                                       )
+  //                                       .toList(),
+  //                               onChanged: (v) =>
+  //                                   setModalState(() => type = v ?? type),
+  //                               decoration: const InputDecoration(
+  //                                 labelText: 'Type',
+  //                               ),
+  //                             ),
+  //                           ),
+  //                           const SizedBox(width: 12),
+  //                           Expanded(
+  //                             child: TextFormField(
+  //                               decoration: const InputDecoration(
+  //                                 labelText: 'Price',
+  //                                 isDense: true,
+  //                               ),
+  //                               keyboardType: TextInputType.number,
+  //                               onChanged: (v) =>
+  //                                   setModalState(() => price = v),
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                       const SizedBox(height: 10),
+  //                       Row(
+  //                         children: [
+  //                           Expanded(
+  //                             child: DropdownButtonFormField<String>(
+  //                               isDense: true,
+  //                               value: selectedMainCategoryId,
+  //                               items: mainCategories
+  //                                   .map((m) {
+  //                                     final id = m['_id']?.toString() ?? '';
+  //                                     final label =
+  //                                         m['mainCategoryName'] ??
+  //                                         m['name'] ??
+  //                                         id;
+  //                                     return DropdownMenuItem(
+  //                                       value: id,
+  //                                       child: Text(label),
+  //                                     );
+  //                                   })
+  //                                   .toList()
+  //                                   .cast<DropdownMenuItem<String>>(),
+  //                               onChanged: (v) => setModalState(() {
+  //                                 selectedMainCategoryId = v;
+  //                                 selectedSubCategoryId = null;
+  //                               }),
+  //                               decoration: const InputDecoration(
+  //                                 labelText: 'Category',
+  //                               ),
+  //                             ),
+  //                           ),
+  //                           const SizedBox(width: 12),
+  //                           Expanded(
+  //                             child: DropdownButtonFormField<String>(
+  //                               isDense: true,
+  //                               value: selectedSubCategoryId,
+  //                               items: subcats
+  //                                   .map((s) {
+  //                                     final id = s['_id']?.toString() ?? '';
+  //                                     final label =
+  //                                         s['name'] ?? s['categoryName'] ?? id;
+  //                                     return DropdownMenuItem(
+  //                                       value: id,
+  //                                       child: Text(label),
+  //                                     );
+  //                                   })
+  //                                   .toList()
+  //                                   .cast<DropdownMenuItem<String>>(),
+  //                               onChanged: (v) => setModalState(
+  //                                 () => selectedSubCategoryId = v,
+  //                               ),
+  //                               decoration: const InputDecoration(
+  //                                 labelText: 'Sub-Category',
+  //                               ),
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                       const SizedBox(height: 12),
+  //                       Text('Product Images (3-8)'),
+  //                       const SizedBox(height: 8),
+  //                       Row(
+  //                         children: [
+  //                           ElevatedButton.icon(
+  //                             icon: const Icon(Icons.upload_file, size: 18),
+  //                             label: const Text('Upload Images'),
+  //                             onPressed: () async {
+  //                               final picked = await _picker.pickMultiImage(
+  //                                 imageQuality: 80,
+  //                               );
+  //                               if (picked != null && picked.isNotEmpty) {
+  //                                 setModalState(() {
+  //                                   pickedImages.addAll(
+  //                                     picked.map((x) => File(x.path)),
+  //                                   );
+  //                                 });
+  //                               }
+  //                             },
+  //                           ),
+  //                           const SizedBox(width: 12),
+  //                           Expanded(
+  //                             child: Text(
+  //                               '${pickedImages.length} images selected',
+  //                               style: const TextStyle(fontSize: 12),
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                       const SizedBox(height: 8),
+  //                       if (pickedImages.isNotEmpty)
+  //                         SizedBox(
+  //                           height: 80,
+  //                           child: ListView.separated(
+  //                             scrollDirection: Axis.horizontal,
+  //                             itemCount: pickedImages.length,
+  //                             separatorBuilder: (_, __) =>
+  //                                 const SizedBox(width: 8),
+  //                             itemBuilder: (_, i) {
+  //                               return Stack(
+  //                                 children: [
+  //                                   ClipRRect(
+  //                                     borderRadius: BorderRadius.circular(8),
+  //                                     child: Image.file(
+  //                                       pickedImages[i],
+  //                                       width: 110,
+  //                                       height: 80,
+  //                                       fit: BoxFit.cover,
+  //                                     ),
+  //                                   ),
+  //                                   Positioned(
+  //                                     right: 0,
+  //                                     top: 0,
+  //                                     child: GestureDetector(
+  //                                       onTap: () => setModalState(
+  //                                         () => pickedImages.removeAt(i),
+  //                                       ),
+  //                                       child: Container(
+  //                                         decoration: BoxDecoration(
+  //                                           color: Colors.black54,
+  //                                           shape: BoxShape.circle,
+  //                                         ),
+  //                                         child: const Icon(
+  //                                           Icons.close,
+  //                                           size: 16,
+  //                                           color: Colors.white,
+  //                                         ),
+  //                                       ),
+  //                                     ),
+  //                                   ),
+  //                                 ],
+  //                               );
+  //                             },
+  //                           ),
+  //                         ),
+  //                       const SizedBox(height: 14),
+  //                       Row(
+  //                         children: [
+  //                           Expanded(
+  //                             child: OutlinedButton(
+  //                               child: const Text('Cancel'),
+  //                               onPressed: () => Navigator.of(ctx).pop(false),
+  //                             ),
+  //                           ),
+  //                           const SizedBox(width: 12),
+  //                           Expanded(
+  //                             child: ElevatedButton(
+  //                               child: submitting
+  //                                   ? const CircularProgressIndicator(
+  //                                       color: Colors.white,
+  //                                     )
+  //                                   : const Text('Create Product'),
+  //                               onPressed: submitting
+  //                                   ? null
+  //                                   : () async {
+  //                                       if (name.trim().isEmpty ||
+  //                                           selectedMainCategoryId == null ||
+  //                                           selectedSubCategoryId == null ||
+  //                                           price.trim().isEmpty ||
+  //                                           sku.trim().isEmpty ||
+  //                                           pickedImages.length < 1) {
+  //                                         ScaffoldMessenger.of(
+  //                                           context,
+  //                                         ).showSnackBar(
+  //                                           const SnackBar(
+  //                                             content: Text(
+  //                                               'Please fill required fields and upload images',
+  //                                             ),
+  //                                           ),
+  //                                         );
+  //                                         return;
+  //                                       }
+  //                                       setModalState(() => submitting = true);
+  //                                       final resp = await AppDataRepo()
+  //                                           .createProduct(
+  //                                             name: name.trim(),
+  //                                             type: type,
+  //                                             categoryId:
+  //                                                 selectedMainCategoryId!,
+  //                                             subcategoryId:
+  //                                                 selectedSubCategoryId!,
+  //                                             price: price.trim(),
+  //                                             sku: sku.trim(),
+  //                                             images: pickedImages,
+  //                                           );
+  //                                       setModalState(() => submitting = false);
+  //                                       if (resp['success'] == true) {
+  //                                         Navigator.of(ctx).pop(true);
+  //                                         ScaffoldMessenger.of(
+  //                                           context,
+  //                                         ).showSnackBar(
+  //                                           const SnackBar(
+  //                                             content: Text('Product created'),
+  //                                           ),
+  //                                         );
+  //                                         // refresh products page data
+  //                                         setState(() {
+  //                                           _productsPageFuture = AppDataRepo()
+  //                                               .fetchAllProductsCatalog();
+  //                                           _allProductsPage = [];
+  //                                           _filteredProductsPage = [];
+  //                                         });
+  //                                       } else {
+  //                                         final msg =
+  //                                             resp['message']?.toString() ??
+  //                                             'Create failed';
+  //                                         ScaffoldMessenger.of(
+  //                                           context,
+  //                                         ).showSnackBar(
+  //                                           SnackBar(content: Text(msg)),
+  //                                         );
+  //                                       }
+  //                                     },
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                       const SizedBox(height: 18),
+  //                       //               ],
+  //                       //             ),
+  //                       //           ),
+  //                       //         ),
+  //                       //       );
+  //                       //     },
+  //                       //   );
+  //                       // },
+  //                     ],
+  //                   ),
+  //                 ),
+  //               ),
+  //             );
+  //           },
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 
   @override
   void initState() {
@@ -1367,20 +1368,44 @@ class _CataloguePageState extends State<CataloguePage> with PermissionHelper {
                         );
                         return;
                       }
-                      final result = await showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.white,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(24),
+                      // final result = await showModalBottomSheet(
+                      //   context: context,
+                      //   isScrollControlled: true,
+                      //   backgroundColor: Colors.white,
+                      //   shape: const RoundedRectangleBorder(
+                      //     borderRadius: BorderRadius.vertical(
+                      //       top: Radius.circular(24),
+                      //     ),
+                      //   ),
+                      //   builder: (context) => Padding(
+                      //     padding: EdgeInsets.only(
+                      //       bottom: MediaQuery.of(context).viewInsets.bottom,
+                      //     ),
+                      //     child: const AddProductForm(),
+                      //   ),
+                      // );
+                      // if (result == true) {
+                      //   setState(() {
+                      //     _productsFuture = AppDataRepo()
+                      //         .fetchCatalogueProducts();
+                      //     _allProducts = [];
+                      //     _filteredProducts = [];
+                      //   });
+                      // }
+                      final result = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (ctx) => Scaffold(
+                            appBar: AppBar(title: const Text('Add Catalogue')),
+                            body: Padding(
+                              padding: EdgeInsets.only(
+                                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                              ),
+                              child: AddProductForm(
+                                onSubmit: () => Navigator.of(ctx).pop(true),
+                              ),
+                            ),
                           ),
-                        ),
-                        builder: (context) => Padding(
-                          padding: EdgeInsets.only(
-                            bottom: MediaQuery.of(context).viewInsets.bottom,
-                          ),
-                          child: const AddProductForm(),
                         ),
                       );
                       if (result == true) {
@@ -1406,12 +1431,134 @@ class _CataloguePageState extends State<CataloguePage> with PermissionHelper {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    // onPressed: () async {
+                    //   // final created = await _showAddProductForm();
+                    //   // // _showAddProductForm already refreshes on success; nothing else needed
+                    //   final created = await Navigator.push<bool>(
+                    //     context,
+                    //     MaterialPageRoute(
+                    //       builder: (ctx) => Scaffold(
+                    //         // appBar: AppBar(title: const Text('Add Product')),
+                    //         body: Padding(
+                    //           padding: EdgeInsets.only(
+                    //             bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                    //           ),
+                    //           child: AddProductForm(
+                    //             onSubmit: () => Navigator.of(ctx).pop(true),
+                    //           ),
+                    //         ),
+                    //       ),
+                    //     ),
+                    //   );
+                    //   if (created == true) {
+                    //     // refresh catalogue/products as appropriate
+                    //     setState(() {
+                    //       _productsFuture = AppDataRepo()
+                    //           .fetchCatalogueProducts();
+                    //       _allProducts = [];
+                    //       _filteredProducts = [];
+                    //     });
+                    //   }
+                    // },
                     onPressed: () async {
-                      final created = await _showAddProductForm();
-                      // _showAddProductForm already refreshes on success; nothing else needed
+                      final ok = await AppDataRepo().currentUserHasPermission(
+                        '/products',
+                        'write',
+                      );
+                      if (!ok) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Access denied')),
+                        );
+                        return;
+                      }
+
+                      // final created = await Navigator.push<bool>(
+                      //   context,
+                      //   MaterialPageRoute(
+                      //     builder: (ctx) => Scaffold(
+                      //       appBar: AppBar(title: const Text('Add Product')),
+                      //       body: SafeArea(
+                      //         child: Padding(
+                      //           padding: EdgeInsets.only(
+                      //             bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                      //           ),
+                      //           child: AddProductForm(
+                      //             // ensure AddProductForm calls this when submission succeeds
+                      //             onSubmit: () => Navigator.of(ctx).pop(true),
+                      //           ),
+                      //         ),
+                      //       ),
+                      //     ),
+                      //   ),
+                      // );
+                      final created = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AddProductPage(),
+                        ),
+                      );
+
+                      if (created == true) {
+                        setState(() {
+                          _productsFuture = AppDataRepo()
+                              .fetchCatalogueProducts();
+                          _allProducts = [];
+                          _filteredProducts = [];
+                          // if on products page also refresh product list page
+                          _productsPageFuture = AppDataRepo()
+                              .fetchAllProductsCatalog();
+                          _allProductsPage = [];
+                          _filteredProductsPage = [];
+                        });
+                      }
                     },
                   )
                 : null),
+      // floatingActionButton: (_currentPage == 0 && canWrite)
+      //     ? FloatingActionButton.extended(
+      //         backgroundColor: Colors.indigo.shade500,
+      //         foregroundColor: Colors.white,
+      //         icon: const Icon(Icons.add_rounded, size: 20),
+      //         label: const Text('Add Catalogue'),
+      //         onPressed: () async {
+      //           final ok = await AppDataRepo().currentUserHasPermission(
+      //             '/catalogue',
+      //             'write',
+      //           );
+      //           if (!ok) {
+      //             ScaffoldMessenger.of(context).showSnackBar(
+      //               const SnackBar(content: Text('Access denied')),
+      //             );
+      //             return;
+      //           }
+      //           final result = await Navigator.push<bool>(
+      //             context,
+      //             MaterialPageRoute(
+      //               builder: (ctx) => Scaffold(
+      //                 // appBar: AppBar(title: const Text('Add Catalogue')),
+      //                 body: SafeArea(
+      //                   child: Padding(
+      //                     padding: EdgeInsets.only(
+      //                       bottom: MediaQuery.of(ctx).viewInsets.bottom,
+      //                     ),
+      //                     child: AddProductForm(
+      //                       onSubmit: () => Navigator.of(ctx).pop(true),
+      //                     ),
+      //                   ),
+      //                 ),
+      //               ),
+      //             ),
+      //           );
+      //           if (result == true) {
+      //             setState(() {
+      //               _productsFuture = AppDataRepo().fetchCatalogueProducts();
+      //               _allProducts = [];
+      //               _filteredProducts = [];
+      //             });
+      //           }
+      //         },
+      //       )
+      //     : null,
     );
   }
 }

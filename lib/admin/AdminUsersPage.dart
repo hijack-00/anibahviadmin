@@ -1635,13 +1635,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> with PermissionHelper {
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'ID: ${_shortId(id)}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
+                        // Text(
+                        //   'ID: ${_shortId(id)}',
+                        //   style: TextStyle(
+                        //     fontSize: 11,
+                        //     color: Colors.grey.shade600,
+                        //   ),
+                        // ),
                       ],
                     ),
                   ),

@@ -685,6 +685,10 @@ class _AddProductFormState extends State<AddProductForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              "Add Catalogue",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             _imageUploadSection(),
             SizedBox(height: 16),
             loadingProducts

@@ -4,7 +4,7 @@ import 'package:anibhaviadmin/screens/sales_reports_page.dart';
 import 'package:anibhaviadmin/widgets/universal_scaffold.dart';
 import 'package:anibhaviadmin/services/app_data_repo.dart';
 import 'package:anibhaviadmin/screens/login_screen.dart';
-import 'package:anibhaviadmin/widgets/add_product_form.dart';
+import 'package:anibhaviadmin/widgets/add_catalogue_form.dart';
 import 'package:anibhaviadmin/widgets/universal_drawer.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -99,7 +99,8 @@ class DashboardScreen extends StatefulWidget {
 String _selectedReportType = 'Overview';
 final List<String> _reportTypes = ['Overview', 'Jeans', 'Shirts'];
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with PermissionHelper {
   // Helper to get dummy or API data for the graph (replace with your actual data source)
   List<dynamic> getJeansDaily(Map<String, dynamic>? salesData) {
     return salesData?['jeans']?['dailyData'] ?? [];
@@ -109,8 +110,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return salesData?['shirts']?['dailyData'] ?? [];
   }
 
+  bool canWriteOrders = false;
+  bool canWriteProducts = false;
+  bool canWriteReturns = false;
+  bool canWriteUserManagement = false;
+
   void _showDashboardActionsSheet() {
     showModalBottomSheet(
+      constraints: BoxConstraints(minWidth: 400),
       context: context,
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(
@@ -133,158 +140,172 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    ElevatedButton.icon(
-                      icon: Icon(Icons.person_add),
-                      label: Text('Add Customer'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Future.microtask(() => showUserCreationDialog(context));
-                      },
-                    ),
-                    ElevatedButton.icon(
-                      icon: Icon(Icons.add),
-                      label: Text('Create Order'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      // onPressed: () {
-                      //   Navigator.pop(context);
-                      //   Future.microtask(
-                      //     () => showCreateOrderBottomSheet(context),
-                      //   );
-                      // },
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // Open AllOrdersPage and auto-open the same Create Order sheet
-                        Future.microtask(() {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  AllOrdersPage(openCreateOrderOnStart: true),
-                            ),
-                          );
-                        });
-                      },
-                    ),
-                    ElevatedButton.icon(
-                      icon: Icon(Icons.add_box),
-                      label: Text('Add Product'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.white,
+                    // Add Customer - requires userManagement write permission
+                    if (canWriteUserManagement)
+                      ElevatedButton.icon(
+                        icon: Icon(Icons.person_add),
+                        label: Text('Add Customer'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(24),
-                            ),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          builder: (context) => Padding(
-                            padding: EdgeInsets.only(
-                              bottom: MediaQuery.of(context).viewInsets.bottom,
-                            ),
-                            child: AddProductForm(),
-                          ),
-                        );
-                      },
-                    ),
-                    ElevatedButton.icon(
-                      icon: Icon(Icons.local_shipping),
-                      label: Text('Create Challan'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Future.microtask(
+                            () => showUserCreationDialog(context),
+                          );
+                        },
                       ),
-                      // onPressed: () {
-                      //   Navigator.pop(context);
-                      //   Future.microtask(
-                      //     () => showCreateChallanDialog(context),
-                      //   );
-                      // },
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Future.microtask(() {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ChallanScreen(
-                                openCreateChallanOnStart: true,
+
+                    if (canWriteOrders)
+                      ElevatedButton.icon(
+                        icon: Icon(Icons.add),
+                        label: Text('Create Order'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        // onPressed: () {
+                        //   Navigator.pop(context);
+                        //   Future.microtask(
+                        //     () => showCreateOrderBottomSheet(context),
+                        //   );
+                        // },
+                        onPressed: () {
+                          Navigator.pop(context);
+                          // Open AllOrdersPage and auto-open the same Create Order sheet
+                          Future.microtask(() {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    AllOrdersPage(openCreateOrderOnStart: true),
+                              ),
+                            );
+                          });
+                        },
+                      ),
+
+                    if (canWriteProducts)
+                      ElevatedButton.icon(
+                        icon: Icon(Icons.add_box),
+                        label: Text('Add Product'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(24),
                               ),
                             ),
-                          );
-                        });
-                      },
-                    ),
-                    ElevatedButton.icon(
-                      icon: Icon(Icons.assignment_return),
-                      label: Text('Return Challan'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      // onPressed: () {
-                      //   Navigator.pop(context);
-                      //   Future.microtask(() => showCreateReturnDialog(context));
-                      // },
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Future.microtask(() {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ChallanScreen(
-                                openCreateReturnOnStart: true,
+                            builder: (context) => Padding(
+                              padding: EdgeInsets.only(
+                                bottom: MediaQuery.of(
+                                  context,
+                                ).viewInsets.bottom,
                               ),
+                              child: AddProductForm(),
                             ),
                           );
-                        });
-                      },
-                    ),
+                        },
+                      ),
+
+                    if (canWriteReturns)
+                      ElevatedButton.icon(
+                        icon: Icon(Icons.local_shipping),
+                        label: Text('Create Challan'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        // onPressed: () {
+                        //   Navigator.pop(context);
+                        //   Future.microtask(
+                        //     () => showCreateChallanDialog(context),
+                        //   );
+                        // },
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Future.microtask(() {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ChallanScreen(
+                                  openCreateChallanOnStart: true,
+                                ),
+                              ),
+                            );
+                          });
+                        },
+                      ),
+
+                    if (canWriteReturns)
+                      ElevatedButton.icon(
+                        icon: Icon(Icons.assignment_return),
+                        label: Text('Create Return'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        // onPressed: () {
+                        //   Navigator.pop(context);
+                        //   Future.microtask(() => showCreateReturnDialog(context));
+                        // },
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Future.microtask(() {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ChallanScreen(
+                                  openCreateReturnOnStart: true,
+                                ),
+                              ),
+                            );
+                          });
+                        },
+                      ),
                   ],
                 ),
                 SizedBox(height: 16),
@@ -353,6 +374,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // Load permissions for dashboard (write for quick actions)
+
+    _loadAllPermissions();
+
     _refreshData();
     jeansShirtFuture = AppDataRepo().getJeansShirtRevenueAndOrder();
     // salesDataFuture = AppDataRepo().getSalesData();
@@ -366,6 +391,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
           print('ERROR fetching salesData: $e\n$st');
           throw e;
         });
+  }
+
+  Future<void> _loadAllPermissions() async {
+    // Load permissions for each module independently
+    await Future.wait([
+      initPermissions('/orders').then((_) {
+        setState(() => canWriteOrders = canWrite);
+      }),
+      initPermissions('/products').then((_) {
+        setState(() => canWriteProducts = canWrite);
+      }),
+      initPermissions('/returns').then((_) {
+        setState(() => canWriteReturns = canWrite);
+      }),
+      initPermissions('/users').then((_) {
+        setState(() => canWriteUserManagement = canWrite);
+      }),
+    ]);
+
+    if (!mounted) return;
+    debugPrint(
+      'DashboardScreen permissions loaded: orders=$canWriteOrders products=$canWriteProducts returns=$canWriteReturns users=$canWriteUserManagement',
+    );
   }
 
   void _refreshData() {
@@ -1926,18 +1974,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
 
           // --- Floating Action Button ---
-          Positioned(
-            right: 24,
-            bottom: MediaQuery.of(context).padding.bottom + 72,
-            child: FloatingActionButton(
-              backgroundColor: Colors.indigo.shade500,
-              foregroundColor: Colors.white,
-              elevation: 4,
-              tooltip: 'Quick Actions',
-              onPressed: _showDashboardActionsSheet,
-              child: const Icon(Icons.add_rounded, size: 28),
+          if (canWriteOrders ||
+              canWriteProducts ||
+              canWriteReturns ||
+              canWriteUserManagement)
+            Positioned(
+              right: 24,
+              bottom: MediaQuery.of(context).padding.bottom + 72,
+              child: FloatingActionButton(
+                backgroundColor: Colors.indigo.shade500,
+                foregroundColor: Colors.white,
+                elevation: 4,
+                tooltip: 'Quick Actions',
+                onPressed: _showDashboardActionsSheet,
+                child: const Icon(Icons.add_rounded, size: 28),
+              ),
             ),
-          ),
         ],
       ),
     );

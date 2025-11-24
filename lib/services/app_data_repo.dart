@@ -293,24 +293,58 @@ class AppDataRepo {
   }
 
   /// Create product wrapper
+  // Future<Map<String, dynamic>> createProduct({
+  //   required String name,
+  //   required String type,
+  //   required String categoryId,
+  //   required String subcategoryId,
+  //   required String price,
+  //   required String sku,
+  //   required List<File> images,
+  // }) async {
+  //   try {
+  //     final resp = await _api.createProductMultipart(
+  //       name: name,
+  //       type: type,
+  //       categoryId: categoryId,
+  //       subcategoryId: subcategoryId,
+  //       price: price,
+  //       sku: sku,
+  //       files: images,
+  //     );
+  //     return resp;
+  //   } catch (e) {
+  //     debugPrint('createProduct error: $e');
+  //     return {'success': false, 'message': e.toString()};
+  //   }
+  // }
+
+  // ...existing code...
   Future<Map<String, dynamic>> createProduct({
     required String name,
     required String type,
     required String categoryId,
-    required String subcategoryId,
+    required List<String> categoryIds,
     required String price,
     required String sku,
     required List<File> images,
+    required bool status,
   }) async {
     try {
+      // ensure ids are strings (trim) before sending
+      final catIds = categoryIds
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
       final resp = await _api.createProductMultipart(
         name: name,
         type: type,
-        categoryId: categoryId,
-        subcategoryId: subcategoryId,
+        categoryId: categoryId.toString(),
+        categoryIds: catIds,
         price: price,
         sku: sku,
-        files: images,
+        productImages: images,
+        status: status,
       );
       return resp;
     } catch (e) {
@@ -318,6 +352,35 @@ class AppDataRepo {
       return {'success': false, 'message': e.toString()};
     }
   }
+  // ...existing code...
+
+  // Future<Map<String, dynamic>> createProduct({
+  //   required String name,
+  //   required String type,
+  //   required String mainCategoryId,
+  //   required List<String> categoryIds,
+  //   required String price,
+  //   required String sku,
+  //   required List<File> images,
+  //   required bool status,
+  // }) async {
+  //   try {
+  //     final resp = await _api.createProductMultipart(
+  //       name: name,
+  //       type: type,
+  //       mainCategoryId: mainCategoryId,
+  //       categoryIds: categoryIds,
+  //       price: price,
+  //       sku: sku,
+  //       productImages: images,
+  //       status: status,
+  //     );
+  //     return resp;
+  //   } catch (e) {
+  //     debugPrint('createProduct error: $e');
+  //     return {'success': false, 'message': e.toString()};
+  //   }
+  // }
 
   Future<Map<String, dynamic>> updateOrderPaymentByAdmin({
     required String orderId,
@@ -506,7 +569,35 @@ class AppDataRepo {
   }
 
   Future<Map<String, dynamic>> deleteOrderById(String orderId) async {
-    return await _api.deleteOrderById(orderId);
+    try {
+      final resp = await _api.deleteOrderById(orderId);
+      return resp;
+    } catch (e) {
+      debugPrint('deleteOrderById error: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Move order to recycle bin (wrapper)
+  Future<Map<String, dynamic>> moveOrderToRecycleBin(String orderId) async {
+    try {
+      final resp = await _api.moveOrderToRecycleBin(orderId);
+      return resp;
+    } catch (e) {
+      debugPrint('moveOrderToRecycleBin error: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Restore order from recycle bin (wrapper)
+  Future<Map<String, dynamic>> moveOrderToOrder(String orderId) async {
+    try {
+      final resp = await _api.moveOrderToOrder(orderId);
+      return resp;
+    } catch (e) {
+      debugPrint('moveOrderToOrder error: $e');
+      return {'success': false, 'message': e.toString()};
+    }
   }
 
   Future<Map<String, dynamic>> deleteUserById(String userId) async {
@@ -528,6 +619,22 @@ class AppDataRepo {
     } catch (e) {
       print('AppDataRepo.getJeansShirtRevenueAndOrder ERROR: $e');
       rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchAllRecycledOrdersByAdminWithPagination({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      final resp = await _api.fetchAllRecycledOrdersByAdminWithPagination(
+        page: page,
+        limit: limit,
+      );
+      return resp;
+    } catch (e) {
+      debugPrint('fetchAllRecycledOrdersByAdminWithPagination error: $e');
+      return {'success': false, 'message': e.toString()};
     }
   }
 
